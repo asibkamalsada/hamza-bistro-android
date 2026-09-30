@@ -1,5 +1,6 @@
 package de.hamzabistro.printstation.security
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
@@ -70,6 +71,8 @@ class KeystoreSessionStore(context: Context) : SessionStore {
     private fun GeneralSecurityException.isPermanent() =
         this is AEADBadTagException || this is KeyPermanentlyInvalidatedException || this is UnrecoverableKeyException
 
+    // commit, not apply: see below.
+    @SuppressLint("ApplySharedPref")
     @Synchronized
     override fun save(session: StoredSession) {
         val json =
@@ -83,6 +86,8 @@ class KeystoreSessionStore(context: Context) : SessionStore {
         prefs.edit().putString(SESSION, seal(json.toString().toByteArray(Charsets.UTF_8))).commit()
     }
 
+    // commit, not apply: a sign-out is not undone by the process dying a moment later.
+    @SuppressLint("ApplySharedPref")
     @Synchronized
     override fun clear() {
         prefs.edit().remove(SESSION).commit()
