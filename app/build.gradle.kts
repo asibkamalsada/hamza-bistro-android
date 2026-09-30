@@ -18,13 +18,17 @@ val releaseKeystore: String? = System.getenv("HB_KEYSTORE_FILE")?.takeIf { it.is
 
 android {
     namespace = "de.hamzabistro.printstation"
-    compileSdk = 36
+    // What the current AndroidX and OkHttp releases are built against.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "de.hamzabistro.printstation"
         // Android 12: the Bluetooth permissions that need no location, and
         // the foreground service rules this is written for.
         minSdk = 31
+        // Android 16's behaviour, which the service and the Bluetooth code
+        // are written and checked against. Raise it on purpose, not along
+        // with compileSdk.
         targetSdk = 36
         versionCode = providers.gradleProperty("versionCode").getOrElse("1").toInt()
         versionName = providers.gradleProperty("versionName").getOrElse("0.1.0")
