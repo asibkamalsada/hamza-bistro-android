@@ -2,17 +2,24 @@ package de.hamzabistro.printstation.security
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import android.util.Base64
 import de.hamzabistro.printstation.core.Account
 import de.hamzabistro.printstation.core.SessionStore
 import de.hamzabistro.printstation.core.StoredSession
+import java.io.IOException
+import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.security.ProviderException
+import java.security.UnrecoverableKeyException
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import org.json.JSONException
 import org.json.JSONObject
 
 /**
@@ -31,19 +38,37 @@ class KeystoreSessionStore(context: Context) : SessionStore {
     @Synchronized
     override fun load(): StoredSession? {
         val sealed = prefs.getString(SESSION, null) ?: return null
+        val plain =
+            try {
+                open(sealed)
+            } catch (e: GeneralSecurityException) {
+                if (!e.isPermanent()) throw IOException("the Keystore did not answer", e)
+                // The key is gone (the Keystore was reset) or the file does
+                // not belong to it: signing in again is the only way forward.
+                clear()
+                return null
+            } catch (e: ProviderException) {
+                // The Keystore itself failing, for a moment: try again later
+                // rather than throwing the session away.
+                throw IOException("the Keystore did not answer", e)
+            } catch (e: IllegalArgumentException) {
+                clear()
+                return null
+            }
         return try {
-            val json = JSONObject(String(open(sealed), Charsets.UTF_8))
+            val json = JSONObject(String(plain, Charsets.UTF_8))
             StoredSession(
                 refreshToken = json.getString("refresh_token"),
                 account = Account(json.getString("user_id"), json.optString("email").ifEmpty { null }),
             )
-        } catch (e: Exception) {
-            // A key that was wiped (a factory reset of the Keystore, say)
-            // or a damaged file: signing in again is the only way forward.
+        } catch (e: JSONException) {
             clear()
             null
         }
     }
+
+    private fun GeneralSecurityException.isPermanent() =
+        this is AEADBadTagException || this is KeyPermanentlyInvalidatedException || this is UnrecoverableKeyException
 
     @Synchronized
     override fun save(session: StoredSession) {
@@ -74,7 +99,9 @@ class KeystoreSessionStore(context: Context) : SessionStore {
 
     private fun open(stored: String): ByteArray {
         val bytes = Base64.decode(stored, Base64.NO_WRAP)
+        require(bytes.isNotEmpty()) { "empty session" }
         val ivLength = bytes[0].toInt()
+        require(ivLength > 0 && bytes.size > 1 + ivLength) { "damaged session" }
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, bytes, 1, ivLength))
         cipher.updateAAD(AAD)

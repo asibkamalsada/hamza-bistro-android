@@ -16,6 +16,7 @@ class StoredSession(val refreshToken: String, val account: Account) {
  * it with a key in the Android Keystore that never leaves the device.
  */
 interface SessionStore {
+    /** The kept session, or null. Throws an IOException when the store cannot be read just now. */
     fun load(): StoredSession?
 
     fun save(session: StoredSession)
@@ -35,7 +36,9 @@ class SessionManager(
 ) {
     private val lock = Mutex()
     private var session: Session? = null
-    private val _account = MutableStateFlow(store.load()?.account)
+    // A store that cannot be read at this moment reads as signed out here;
+    // accessToken() asks it again.
+    private val _account = MutableStateFlow(runCatching { store.load()?.account }.getOrNull())
 
     /** Who is signed in, or null. */
     val account: StateFlow<Account?> = _account.asStateFlow()

@@ -1,6 +1,7 @@
-# Tests the core, lints the app and builds the APK on every push and pull
-# request. With the release key in the repository's secrets, a push to main
-# also builds the signed release APK to install on the tablet.
+# Tests the core, lints the app and builds the debug and release APKs on
+# every push and pull request. With the release key in the repository's
+# secrets, a push to main signs the release APK and keeps it to install on
+# the tablet.
 #
 # Hardened on purpose: every action is pinned to a commit, the token can
 # only read, and the signing key exists on the runner for the one step that
@@ -52,22 +53,25 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
 
-      - name: Signed release APK
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      # Always built, so a problem only the shrinker (R8) finds shows up on
+      # the branch that caused it. Signed only on a push to main with the
+      # key in the secrets; everywhere else the step never sees the key.
+      - name: Release APK
         env:
-          HB_KEYSTORE_BASE64: ${{ secrets.HB_KEYSTORE_BASE64 }}
-          HB_KEYSTORE_PASSWORD: ${{ secrets.HB_KEYSTORE_PASSWORD }}
-          HB_KEY_ALIAS: ${{ secrets.HB_KEY_ALIAS }}
-          HB_KEY_PASSWORD: ${{ secrets.HB_KEY_PASSWORD }}
+          SIGN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          HB_KEYSTORE_BASE64: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.HB_KEYSTORE_BASE64 || '' }}
+          HB_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.HB_KEYSTORE_PASSWORD || '' }}
+          HB_KEY_ALIAS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.HB_KEY_ALIAS || '' }}
+          HB_KEY_PASSWORD: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.HB_KEY_PASSWORD || '' }}
           VERSION_CODE: ${{ github.run_number }}
         run: |
-          if [ -z "$HB_KEYSTORE_BASE64" ]; then
-            echo "No release key in the repository's secrets: nothing to sign."
-            exit 0
+          if [ "$SIGN" = "true" ] && [ -n "$HB_KEYSTORE_BASE64" ]; then
+            export HB_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+            trap 'rm -f "$HB_KEYSTORE_FILE"' EXIT
+            echo "$HB_KEYSTORE_BASE64" | base64 --decode > "$HB_KEYSTORE_FILE"
+          else
+            echo "Building the release unsigned: not a push to main, or no key in the secrets."
           fi
-          export HB_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
-          trap 'rm -f "$HB_KEYSTORE_FILE"' EXIT
-          echo "$HB_KEYSTORE_BASE64" | base64 --decode > "$HB_KEYSTORE_FILE"
           ./gradlew :app:assembleRelease -PversionCode="$VERSION_CODE"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
