@@ -1,12 +1,13 @@
 # Tests the core, lints the app and builds the debug and release APKs on
 # every push and pull request. With the release key in the repository's
-# secrets, a push to main signs the release APK and keeps it to install on
-# the tablet.
+# secrets, a push to main (a merged pull request included) signs the release
+# APK and publishes it as a GitHub release, to install on the tablet.
 #
 # Hardened on purpose: every action is pinned to a commit, the token can
 # only read, and the signing key exists on the runner for the one step that
 # signs, only where secrets are handed out (never to pull requests from
-# forks).
+# forks). The one token that may write, to make the release, is given to a
+# job of its own that runs none of the repository's code.
 
 name: Android
 
@@ -17,14 +18,19 @@ on:
 permissions:
   contents: read
 
+# A newer push stops the build of an older one, except on main: there every
+# push is built and released, one after the other.
 concurrency:
   group: android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      signed: ${{ steps.release-apk.outputs.signed }}
+      version: ${{ steps.release-apk.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,6 +63,7 @@ jobs:
       # the branch that caused it. Signed only on a push to main with the
       # key in the secrets; everywhere else the step never sees the key.
       - name: Release APK
+        id: release-apk
         env:
           SIGN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           HB_KEYSTORE_BASE64: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.HB_KEYSTORE_BASE64 || '' }}
@@ -69,10 +76,18 @@ jobs:
             export HB_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
             trap 'rm -f "$HB_KEYSTORE_FILE"' EXIT
             echo "$HB_KEYSTORE_BASE64" | base64 --decode > "$HB_KEYSTORE_FILE"
+          elif [ "$SIGN" = "true" ]; then
+            echo "::warning::No release key in the secrets: the release APK is unsigned, and no release is published."
           else
-            echo "Building the release unsigned: not a push to main, or no key in the secrets."
+            echo "Building the release unsigned: not a push to main."
           fi
           ./gradlew :app:assembleRelease -PversionCode="$VERSION_CODE"
+          if [ -n "${HB_KEYSTORE_FILE:-}" ]; then
+            # The version as the APK carries it, for the release's name.
+            version=$(jq -er '.elements[0].versionName' app/build/outputs/apk/release/output-metadata.json)
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -81,3 +96,40 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: ignore
           retention-days: 30
+
+  # The signed APK of every push to main as a release, tagged v<version>.
+  # Needs no checkout: it only takes the build's APK and hands it to GitHub.
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.signed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: print-station-release
+          path: apk
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          tag="v$VERSION"
+          apk="druckstation-$VERSION.apk"
+          mv apk/app-release.apk "$apk"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            # A re-run of this run: the same version, the APK built again.
+            gh release upload "$tag" "$apk" --clobber
+            gh release edit "$tag" --draft=false
+          else
+            gh release create "$tag" "$apk" \
+              --target "$GITHUB_SHA" \
+              --title "Druckstation $VERSION" \
+              --generate-notes \
+              --notes "Built from $GITHUB_SHA in [this run]($RUN_URL). Open the APK on the tablet to install it over the version before."
+          fi
