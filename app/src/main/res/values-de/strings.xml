@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Druckstation</string>
+
+    <string name="channel_running">Druckstation</string>
+    <string name="channel_alerts">Drucken gestoppt</string>
+
+    <string name="running_title">Druckstation läuft</string>
+    <string name="running_starting">Startet …</string>
+    <string name="running_looked">Zuletzt nachgesehen um %1$s</string>
+    <string name="running_last_printed">Zuletzt gedruckt: #%1$d · nachgesehen um %2$s</string>
+
+    <string name="problem_not_printed">Bon #%1$d nicht gedruckt: %2$s. Drucker an, Papier drin?</string>
+    <string name="problem_offline">Keine Verbindung zum Shop: %1$s</string>
+    <string name="problem_not_allowed">Dieses Konto darf nicht drucken. Mit dem Druckkonto anmelden.</string>
+
+    <string name="stopped_title">Drucken gestoppt</string>
+    <string name="stopped_signed_out">Abgemeldet. App öffnen und neu anmelden.</string>
+    <string name="stopped_no_printer">Kein Drucker gewählt. App öffnen und Drucker wählen.</string>
+    <string name="stopped_could_not_start">Konnte nicht starten: %1$s. App öffnen.</string>
+
+    <string name="section_account">Konto</string>
+    <string name="sign_in_hint">Mit dem Druckkonto für dieses Tablet anmelden. Das Passwort wird nicht auf dem Gerät gespeichert.</string>
+    <string name="email">E-Mail</string>
+    <string name="password">Passwort</string>
+    <string name="sign_in">Anmelden</string>
+    <string name="sign_out">Abmelden</string>
+    <string name="signed_in">Angemeldet.</string>
+    <string name="signed_out">Abgemeldet. Auf diesem Tablet wird nicht mehr gedruckt.</string>
+    <string name="signed_in_as">Angemeldet als %1$s</string>
+    <string name="sign_in_wrong">E-Mail oder Passwort falsch.</string>
+    <string name="sign_in_unconfirmed">Die Adresse ist noch nicht bestätigt: zuerst den Link in der E-Mail von der Website öffnen.</string>
+    <string name="sign_in_captcha">Die Prüfung ist abgelaufen. Auf den Haken warten, dann erneut anmelden.</string>
+    <string name="sign_in_refused">Anmeldung abgelehnt: %1$s</string>
+
+    <string name="section_printer">Drucker</string>
+    <string name="printer_none">Noch kein Drucker gewählt. Drucker einschalten und suchen.</string>
+    <string name="printer_chosen">Drucker: %1$s</string>
+    <string name="printer_scan">Drucker suchen</string>
+    <string name="printer_pick">Den Drucker antippen (sein Modellname, z. B. CY-BX58D-…):</string>
+    <string name="printer_unnamed">Ohne Namen</string>
+    <string name="printer_test">Testdruck</string>
+    <string name="printer_sent">Testbon gesendet.</string>
+    <string name="printer_failed">Drucker: %1$s</string>
+
+    <string name="section_station">Drucken</string>
+    <string name="station_switch">Jede angenommene Bestellung drucken</string>
+    <string name="station_one_printer">Der Drucker nimmt nur eine Verbindung an: auf diesem Tablet auf der Website „Jede angenommene Bestellung drucken“ ausschalten.</string>
+    <string name="station_stopped">Aus.</string>
+    <string name="station_off_failed">Hier wird nicht mehr gedruckt, aber die Station konnte nicht aus der Liste genommen werden (%1$s). Auf der Website unter „Druckstationen“ entfernen.</string>
+
+    <string name="section_background">Im Hintergrund weiterdrucken</string>
+    <string name="battery_hint">Android beendet die App sonst womöglich, um Akku zu sparen – dann druckt nichts. Den Hintergrundbetrieb erlauben. Bei Samsung und Xiaomi zusätzlich die Schritte für das eigene Modell auf dontkillmyapp.com befolgen.</string>
+    <string name="battery_button">Hintergrundbetrieb erlauben</string>
+</resources>
