@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A receipt with a torn edge, inside the adaptive icon's safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M38,30h32v44l-4,-3l-4,3l-4,-3l-4,3l-4,-3l-4,3l-4,-3l-4,3z" />
+    <path
+        android:fillColor="#FFB3261E"
+        android:pathData="M43,38h22v3h-22zM43,45h22v3h-22zM43,52h14v3h-14zM43,60h22v3h-22z" />
+</vector>

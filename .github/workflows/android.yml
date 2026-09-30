@@ -1,0 +1,79 @@
+# Tests the core, lints the app and builds the APK on every push and pull
+# request. With the release key in the repository's secrets, a push to main
+# also builds the signed release APK to install on the tablet.
+#
+# Hardened on purpose: every action is pinned to a commit, the token can
+# only read, and the signing key exists on the runner for the one step that
+# signs, only where secrets are handed out (never to pull requests from
+# forks).
+
+name: Android
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Also checks that gradle-wrapper.jar is a genuine Gradle release.
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Core tests
+        run: ./gradlew :core:test
+
+      - name: Lint
+        run: ./gradlew :app:lintDebug
+
+      - name: Debug APK
+        run: ./gradlew :app:assembleDebug -PversionCode=${{ github.run_number }}
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: print-station-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - name: Signed release APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          HB_KEYSTORE_BASE64: ${{ secrets.HB_KEYSTORE_BASE64 }}
+          HB_KEYSTORE_PASSWORD: ${{ secrets.HB_KEYSTORE_PASSWORD }}
+          HB_KEY_ALIAS: ${{ secrets.HB_KEY_ALIAS }}
+          HB_KEY_PASSWORD: ${{ secrets.HB_KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          if [ -z "$HB_KEYSTORE_BASE64" ]; then
+            echo "No release key in the repository's secrets: nothing to sign."
+            exit 0
+          fi
+          export HB_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$HB_KEYSTORE_FILE"' EXIT
+          echo "$HB_KEYSTORE_BASE64" | base64 --decode > "$HB_KEYSTORE_FILE"
+          ./gradlew :app:assembleRelease -PversionCode="$VERSION_CODE"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: print-station-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+          retention-days: 30
