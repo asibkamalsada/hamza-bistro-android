@@ -133,8 +133,12 @@ In hamza-bistro-web, on the branch that brings the Android station:
 
 ### 2. The tablet
 
-1. Install the APK (see "Building" below): open it on the tablet and allow
-   installing from that source when Android asks.
+1. Install the APK: on the tablet, download `druckstation-….apk` from the
+   latest of the repository's
+   [releases](https://github.com/asibkamalsada/hamza-bistro-android/releases/latest)
+   (see "Building" below), open it and allow installing from that source
+   when Android asks. A newer release installs the same way, over the old
+   one, and keeps the sign-in and the printer.
 2. Open **Druckstation**, sign in with the print account (wait for the
    captcha's tick first).
 3. Switch the printer on, **Drucker suchen**, and tap the printer — its
@@ -170,9 +174,18 @@ For the release APK, add the release key to the repository's secrets once:
 | `HB_KEY_ALIAS` | the key's alias |
 | `HB_KEY_PASSWORD` | the key's password |
 
-Every push to `main` then builds a signed `print-station-release` APK. Make
-the key once and keep it safe outside the repository — Android installs an
-update only when it is signed with the same key:
+Every push to `main` — a merged pull request too — then builds a signed
+release APK and publishes it as a GitHub release: tag `v0.1.<run>`, the APK
+as `druckstation-0.1.<run>.apk`, and the pull requests merged since the
+release before as its notes. `<run>` is the workflow's run number, which is
+also the APK's `versionCode`, so each release installs over the one before;
+the tablet shows the same `0.1.<run>` under App info. The `0.1` is set in
+[`app/build.gradle.kts`](app/build.gradle.kts). Without the key, `main`
+builds an unsigned APK that no tablet installs, publishes nothing, and says
+so in a warning on the run.
+
+Make the key once and keep it safe outside the repository — Android installs
+an update only when it is signed with the same key:
 
 ```
 keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 4096 \
