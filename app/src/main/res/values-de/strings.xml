@@ -6,7 +6,7 @@
     <string name="channel_alerts">Drucken gestoppt</string>
     <string name="channel_alarm">Alarm: neue Bestellung</string>
     <string name="channel_alarm_description">Klingelt in Schleife über dem Sperrbildschirm, bis jemand die Bestellung annimmt oder ablehnt. Den Ton macht die App selbst, auf dem Wecker-Kanal.</string>
-    <string name="channel_kitchen">Küche: Vorbestellung, Drucker, Verbindung</string>
+    <string name="channel_kitchen">Hinweise: Vorbestellung, Drucker, Verbindung</string>
     <string name="channel_kitchen_description">Einmal-Hinweise: eine Vorbestellung muss jetzt auf den Herd, ein Bon kam nicht raus, keine Verbindung zum Shop.</string>
     <string name="channel_orders">Neue Bestellung (Nachricht)</string>
     <string name="channel_orders_description">Für Geräte, die bei neuen Bestellungen nur einmal Bescheid geben sollen.</string>
@@ -178,9 +178,9 @@
     <!-- Settings -->
     <string name="section_shift">Schicht</string>
     <string name="shift_switch">Im Dienst – dieses Gerät klingelt</string>
-    <string name="shift_hint">Während der Schicht läuft die App im Hintergrund, hält die Verbindung zum Shop und steht auf der Website unter „Wer von Bestellungen erfährt“. Nach Feierabend ausschalten; das Küchen-Tablet bleibt einfach an.</string>
+    <string name="shift_hint">Während der Schicht läuft die App im Hintergrund, hält die Verbindung zum Shop und steht auf der Website unter „Wer von Bestellungen erfährt“. Auf dem Tablet im Laden einfach immer an lassen; auf dem Handy eines Fahrers nach Feierabend ausschalten.</string>
     <string name="device_name">Name dieses Geräts</string>
-    <string name="device_name_hint">z. B. Küche, Kasse, Fahrer 1</string>
+    <string name="device_name_hint">z. B. Tablet, Fahrer 1</string>
 
     <string name="section_alarm">Alarm</string>
     <string name="alarm_mode">Bei einer neuen Bestellung</string>
@@ -229,7 +229,7 @@
     <string name="section_screen">Bildschirm</string>
     <string name="keep_awake">Bildschirm anlassen, solange die Liste offen ist</string>
 
-    <string name="section_printer_staff">Bondrucker (nur am Gerät neben dem Drucker)</string>
+    <string name="section_printer_staff">Bondrucker (am Tablet im Laden)</string>
 
     <string name="section_website">Auf der Website</string>
     <string name="website_hint">Ausverkauft-Schalter, Speisekarte und „Letzte Bestellungen“ bleiben auf der Website.</string>

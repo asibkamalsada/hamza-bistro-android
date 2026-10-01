@@ -6,7 +6,7 @@
     <string name="channel_alerts">Printing stopped</string>
     <string name="channel_alarm">Alarm: new order</string>
     <string name="channel_alarm_description">Rings in a loop over the lock screen until somebody accepts or declines the order. The app makes the sound itself, on the alarm stream.</string>
-    <string name="channel_kitchen">Kitchen: pre-order, printer, connection</string>
+    <string name="channel_kitchen">Alerts: pre-order, printer, connection</string>
     <string name="channel_kitchen_description">One-off alerts: a pre-order has to go on now, a ticket did not print, no connection to the shop.</string>
     <string name="channel_orders">New order (message)</string>
     <string name="channel_orders_description">For devices that should only say once that an order came in.</string>
@@ -178,9 +178,9 @@
     <!-- Settings -->
     <string name="section_shift">Shift</string>
     <string name="shift_switch">On shift — this device rings</string>
-    <string name="shift_hint">On shift, the app runs in the background, keeps its connection to the shop and is listed on the website under \"Wer von Bestellungen erfährt\". Switch it off after work; the kitchen tablet simply stays on.</string>
+    <string name="shift_hint">On shift, the app runs in the background, keeps its connection to the shop and is listed on the website under \"Wer von Bestellungen erfährt\". On the shop\'s tablet, simply leave it on; on a driver\'s phone, switch it off after work.</string>
     <string name="device_name">Name of this device</string>
-    <string name="device_name_hint">e.g. Kitchen, Till, Driver 1</string>
+    <string name="device_name_hint">e.g. Tablet, Driver 1</string>
 
     <string name="section_alarm">Alarm</string>
     <string name="alarm_mode">When a new order comes in</string>
@@ -229,7 +229,7 @@
     <string name="section_screen">Screen</string>
     <string name="keep_awake">Keep the screen on while the queue is open</string>
 
-    <string name="section_printer_staff">Receipt printer (only on the device next to it)</string>
+    <string name="section_printer_staff">Receipt printer (on the shop\'s tablet)</string>
 
     <string name="section_website">On the website</string>
     <string name="website_hint">Sold-out switches, the menu and \"Letzte Bestellungen\" stay on the website.</string>

@@ -1,8 +1,9 @@
-# Hamza Team (Android) – the kitchen, the till, the drivers, the printer
+# Hamza Team (Android) – the shop's tablet, and the drivers' phones
 
-The shop's own app for everybody who works the orders: the kitchen tablet,
-the person at the till, the drivers' phones. No menu, no cart — the queue
-of [hamza-bistro-web](https://github.com/asibkamalsada/hamza-bistro-web)'s
+The shop's own app for working the orders: on **the one tablet in the
+shop**, where orders are accepted and from which they print, and if wanted
+on the drivers' phones. No menu, no cart — the queue of
+[hamza-bistro-web](https://github.com/asibkamalsada/hamza-bistro-web)'s
 `/orders`, and the one thing a web page cannot do:
 
 **an alarm that rings until somebody answers the order.** In a loop, on
@@ -37,17 +38,36 @@ foreground service keeps the queue in view itself — Supabase Realtime,
 with a 25-second poll underneath, as `/orders` does — and rings from the
 device. No Firebase, no Google services, no new secrets on the server.
 
-## What each device does
+## One tablet in the shop
 
-| Device                      | Signs in as                               | Does                                                                                   |
-| --------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
-| Kitchen tablet              | a staff account for the kitchen           | Queue, loud alarm until answered, prints every accepted order, screen stays on        |
-| Till / seller               | their own staff account                   | Queue, alarm (loud or once), "Bon drucken" if the printer is beside it                 |
-| Driver's phone              | their own staff account                   | Queue (the "Unterwegs" list, route, call, "Geliefert"), alarm "once" or off, own night window |
-| A tablet that only prints   | a print account (`public.print_accounts`) | Printing, nothing else — as before                                                     |
+There is **one tablet in the shop, for the kitchen and the counter alike**,
+and that is enough — no separate device for the kitchen, the till or
+anybody else. It is where it happens:
 
-Which one a device is follows from the account: staff get the queue, a
-print account gets the printer setup and nothing else.
+- **orders are accepted (or declined) on it** — it rings until somebody
+  does;
+- **it prints** every accepted order, on the Bluetooth printer beside it;
+- it moves them on, "Unterwegs" / "Abholbereit", "Geliefert" / "Abgeholt".
+
+It signs in with a staff account of its own (see Security), stays on
+shift, stays plugged in and keeps its screen on.
+
+**A driver's phone** can have the app as well, with the driver's own staff
+account: for the "Unterwegs" list with the route and the phone number, and
+for "Geliefert" at the door. It is optional — the tablet does not need it —
+and a driver will usually want the alarm set to "once" or off, so that the
+tablet stays the place orders are taken.
+
+| Device                          | Signs in as                               | Does                                                                                  |
+| ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every accepted order, screen on    |
+| A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Geliefert"; alarm "once" or off; own night window           |
+
+Which one a device is follows from the account: staff get the queue. A
+print account (`public.print_accounts`) gets the printer setup and nothing
+else — what the tablet ran on as the Druckstation, and still possible for a
+tablet that should only print; the shop's tablet now needs the staff
+account, because it accepts the orders.
 
 ### The queue
 
@@ -92,7 +112,7 @@ decides, every few seconds and on every change of the queue:
   device's own alarm tone); full volume while ringing; vibration; a night
   window (22:00–09:00 to start with) in which an order is a silent
   notification instead.
-- **The kitchen's chimes**, once each: an accepted pre-order that has to go
+- **The tablet's chimes**, once each: an accepted pre-order that has to go
   on now; this device's printer not printing a ticket (after half a
   minute, again every three while it lasts — the server's push about it
   comes after two); the queue unreadable for two minutes, which is a
@@ -187,12 +207,11 @@ pockets, so it gives away as little as it can:
   print account reads only the accepted orders nobody has printed and
   prints them. A driver taken off the `staff` table can no longer read the
   queue and drops off the website's list at once.
-- **The kitchen tablet** needs a staff account to ring, so it can read
-  what `/orders` on that tablet could already read. Give it an account of
-  its own, added to `staff` — not somebody's personal one, so it can be
-  taken away without locking a person out — with an address that is not
-  written down anywhere public and a long, random password. A tablet that
-  only prints stays on a print account.
+- **The shop's tablet** needs a staff account to accept orders and ring,
+  so it can read what `/orders` on that tablet could already read. Give it
+  an account of its own, added to `staff` — not somebody's personal one,
+  so it can be taken away without locking a person out — with an address
+  that is not written down anywhere public and a long, random password.
 - **No password on the device.** It is typed once and sent once; what is
   kept is the refresh token, sealed with AES-256-GCM under a key in the
   Android Keystore (StrongBox where there is one). Signing out ends the
@@ -239,10 +258,10 @@ In hamza-bistro-web:
    — it rings, prints and moves orders — but the website does not know
    about it, and `/orders` keeps saying in red that nobody hears about
    orders once the phones' pushes are off.
-2. For printing: `print-ticket` deployed and, for a print-only tablet, a
-   print account — see "The Android print station" in the site's README.
-3. Each person who uses the app is in `staff`, as for `/orders`. For the
-   kitchen tablet, add an account of its own (see Security).
+2. For printing: `print-ticket` deployed — see "The Android print
+   station" in the site's README.
+3. The tablet's own account in `staff` (see Security), and each driver who
+   uses the app with their own, as for `/orders`.
 
 ### 2. Each device
 
@@ -261,21 +280,22 @@ In hamza-bistro-web:
    (Samsung: _Settings → Battery → Background usage limits → Never
    sleeping apps_, add Hamza Team; Xiaomi: _Autostart_ on and _Battery
    saver → No restrictions_), or those makers stop the app anyway.
-5. Give the device a name ("Küche", "Kasse", "Fahrer 1"), choose how it rings,
-   and press **Probehören**.
+5. Give the device a name ("Tablet", "Fahrer 1"), choose how it rings, and
+   press **Probehören**.
 6. Check on the website, `/orders/settings` → "Wer von Bestellungen
    erfährt": the device is there, "im Dienst seit …".
 7. On a phone that had the installed `/orders` with pushes on, switch the
    pushes off there ("Dieses Gerät" on `/orders/settings`), or it hears
    about every order twice.
 
-**The kitchen tablet** additionally, under **Einstellungen → Bondrucker**:
-switch the printer on, **Drucker suchen**, tap the printer (`CY-BX58D-…`,
-allow "Geräte in der Nähe"), **Testdruck**, and switch on **Jede
-angenommene Bestellung drucken**. In Chrome on the same tablet, switch the
-website's own "Jede angenommene Bestellung drucken" off: the printer takes
-one connection at a time. Keep it plugged in; **Bildschirm anlassen** keeps
-the queue on screen.
+**The tablet** additionally, under **Einstellungen → Bondrucker**: switch
+the printer on, **Drucker suchen**, tap the printer (`CY-BX58D-…`, allow
+"Geräte in der Nähe"), **Testdruck**, and switch on **Jede angenommene
+Bestellung drucken**. In Chrome on the same tablet, switch the website's
+own "Jede angenommene Bestellung drucken" off: the printer takes one
+connection at a time. Leave the alarm on "Laut klingeln" and the shift on
+for good; keep it plugged in; **Bildschirm anlassen** keeps the queue on
+screen.
 
 **A driver** will usually want **Einmal Bescheid geben** rather than the
 loop, and to end the shift (**Im Dienst** off) at the end of the evening,
@@ -292,6 +312,13 @@ installs over it. A tablet signed in with a print account carries on
 printing as before, after the update as after a reboot. The first time the
 app is opened afterwards it finds out once whether the account is staff;
 for a print account nothing changes on screen.
+
+To make the shop's tablet the place orders are accepted: **Abmelden** (which
+switches printing off and takes the station off the website's list),
+sign in with the tablet's staff account, **Schicht beginnen**, and under
+**Einstellungen → Bondrucker** switch **Jede angenommene Bestellung
+drucken** on again — the printer stays chosen. The print account is then
+no longer needed; delete its row in `print_accounts` (or the account).
 
 ## Building
 
