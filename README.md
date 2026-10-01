@@ -1,101 +1,215 @@
-# Hamza Bistro – Druckstation (Android)
+# Hamza Team (Android) – the kitchen, the till, the drivers, the printer
 
-Prints every accepted order on the shop's Bluetooth receipt printer from the
-tablet beside it — with Chrome closed, the app in the background and the
-screen off. It does what the site's print station does on a page
-(`src/app/services/print-station.service.ts` in
-[hamza-bistro-web](https://github.com/asibkamalsada/hamza-bistro-web)), from
-an Android foreground service, which is what a web page cannot be
-([hamza-bistro-web#62](https://github.com/asibkamalsada/hamza-bistro-web/issues/62)).
+The shop's own app for everybody who works the orders: the kitchen tablet,
+the person at the till, the drivers' phones. No menu, no cart — the queue
+of [hamza-bistro-web](https://github.com/asibkamalsada/hamza-bistro-web)'s
+`/orders`, and the one thing a web page cannot do:
 
-It is installed from an APK on the shop's own tablets, never through Google
-Play. Accepting or refusing orders stays with the website and Telegram.
+**an alarm that rings until somebody answers the order.** In a loop, on
+the alarm stream, over the lock screen with the screen switched on, like an
+incoming call — through "silent", and through Do Not Disturb as long as
+alarms are allowed there (Android's default), with the volume turned up
+while it rings if somebody turned it down. It stops on
+every device the moment the order is accepted or declined anywhere: in the
+app, on the website, in Telegram.
+
+It is also the print station it grew out of: the device beside the
+Bluetooth receipt printer prints every accepted order with the screen off,
+and says out loud when a ticket did not come out.
+
+Installed from an APK, never through Google Play.
+
+## Why an app, after the PWA
+
+The installed `/orders` (the PWA) gets a Web Push per order and one every
+30 seconds while it waits. In practice that was not enough:
+
+- **A push is a notification, not an alarm.** It plays once, on the
+  ringer, and a phone on silent or in an apron pocket over a fryer does not
+  make it heard. The reminders help, but each is still one ping.
+- **Whether it arrives at all depends on the phone.** Web Push travels
+  through Chrome and Google's push service, and each maker's battery saver
+  has its own idea about both. Some devices were reliable, some were not.
+- **Sound needs a tap** ("Schicht starten") and stops when the page sleeps.
+
+The app does not depend on a push: while a device is on shift, a
+foreground service keeps the queue in view itself — Supabase Realtime,
+with a 25-second poll underneath, as `/orders` does — and rings from the
+device. No Firebase, no Google services, no new secrets on the server.
+
+## What each device does
+
+| Device                      | Signs in as                               | Does                                                                                   |
+| --------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| Kitchen tablet              | a staff account for the kitchen           | Queue, loud alarm until answered, prints every accepted order, screen stays on        |
+| Till / seller               | their own staff account                   | Queue, alarm (loud or once), "Bon drucken" if the printer is beside it                 |
+| Driver's phone              | their own staff account                   | Queue (the "Unterwegs" list, route, call, "Geliefert"), alarm "once" or off, own night window |
+| A tablet that only prints   | a print account (`public.print_accounts`) | Printing, nothing else — as before                                                     |
+
+Which one a device is follows from the account: staff get the queue, a
+print account gets the printer setup and nothing else.
+
+### The queue
+
+What `/orders` shows, under the same three headings — **Neu** (accept or
+decline), **In der Küche**, **Unterwegs & abholbereit** — read by the same
+rules, ported to Kotlin with the site's own test cases
+([`StaffQueue`](core/src/main/kotlin/de/hamzabistro/printstation/core/StaffQueue.kt),
+[`Eta`](core/src/main/kotlin/de/hamzabistro/printstation/core/Eta.kt)):
+
+- one tap accepts, with the minutes on the button; the filled one is the
+  estimate from the dishes and the delivery ring, as on the site;
+- a pre-order is accepted for its time; declining asks why, and the
+  customer's email says it;
+- "fällig 18:32 · noch 12 Min.", red once late; "kochen ab 18:05" on a
+  pre-order;
+- every step waits out the undo window (5 s by default) and only lands if
+  the order is still where this device saw it;
+- the phone number opens the dialler, the address opens the route in the
+  chosen map app, the note for the door has a box of its own;
+- "Bon gedruckt 18:05" on an accepted order, "Bon drucken" on a device with
+  the printer;
+- held sideways on a tablet, the three headings stand side by side, like
+  a kitchen pass.
+
+Sold-out switches, the menu and "Letzte Bestellungen" stay on the website;
+the settings link there.
+
+### The alarm
+
+[`AlarmPolicy`](core/src/main/kotlin/de/hamzabistro/printstation/core/AlarmPolicy.kt)
+decides, every few seconds and on every change of the queue:
+
+- **A new order rings in a loop** — the first hour after it came in, and a
+  pre-order still waiting in the hour before its time, the same windows as
+  the server's reminders. Accepted or declined anywhere, it stops
+  everywhere, because it leaves the queue every device reads.
+- **"Stumm"** silences what is ringing for a minute (settable); an order
+  still waiting after that rings again, and one that arrives meanwhile rings
+  at once.
+- **Per device**: ring in a loop, say so once like a message, or nothing;
+  the sound (beeps, bell, siren — the site's three, synthesised — or the
+  device's own alarm tone); full volume while ringing; vibration; a night
+  window (22:00–09:00 to start with) in which an order is a silent
+  notification instead.
+- **The kitchen's chimes**, once each: an accepted pre-order that has to go
+  on now; this device's printer not printing a ticket (after half a
+  minute, again every three while it lasts — the server's push about it
+  comes after two); the queue unreadable for two minutes, which is a
+  device that would not hear about the next order.
+
+The full-screen alarm shows the order number, what to cook and the total
+— never the customer's name, phone or address, which stay behind the lock
+screen — and the accept buttons, so an order can be taken without
+unlocking.
+
+### On the website
+
+A device on shift says so once a minute
+([`staff_app_seen`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261001120000_staff_app_devices.sql)),
+so `/orders/settings` lists it under **"Wer von Bestellungen erfährt"**,
+with how it rings and when it was last heard from, and the red line on
+`/orders` ("nobody will hear about the next order") counts it. A device
+not heard from for three minutes is shown as not listening. Ending the
+shift takes it off the list; any staff phone can remove a lost one.
 
 ## How it works
 
 ```
- order accepted (phone, tablet, Telegram)
-        │
-        ▼
- Supabase ── Realtime: "an accepted order changed" ──►  PrintStationService
-    ▲    ◄── every 25 s: accepted orders not printed ──   (foreground service,
-    │    ◄── print_station_seen, at least once a minute     connectedDevice,
-    │    ◄── claim_print(order) ─────────── "claimed" ──►   started on boot)
-    │    ◄── print-ticket edge function ── ESC/POS bytes ─►       │
-    │    ◄── finish_print(order, true | false)                   │ BLE, 20-byte writes
-    │                                                            ▼
-    │                                                   CY-BX58D receipt printer
+                 Supabase (the site's project)
+   ┌──────────────────────────────────────────────────────────┐
+   │ orders ── Realtime ──┐        staff_app_seen  (1/min)  ◄─┼── on shift
+   │   ▲                  │        print_station_seen (1/min)◄─┼── printing
+   │   │ PATCH status     │        claim_print / finish_print◄─┼──┐
+   │   │ (from status)    ▼        print-ticket function ─────┼──┤ ESC/POS
+   └───┼──────────────────┼───────────────────────────────────┘  │
+       │                  │                                       │
+   ┌───┴──────────────────┴────── ShiftService (foreground) ─────┴──┐
+   │ OrderQueue ── QueueState ──► AlarmController ──► AlarmPlayer     │
+   │   (Realtime + 25 s poll)       (AlarmPolicy)     (alarm stream,  │
+   │                                     │             loop/chime)    │
+   │                                     └─► full-screen notification │
+   │ PrintStation ─────────────────────────────► BlePrinter ──► CY-BX58D
+   └──────────────────────────────────────────────────────────────────┘
+        ▲                        ▲
+   QueueScreen / AlarmActivity: the same queue, the same steps (PendingSteps)
 ```
 
-- **The same protocol as every printing device**
-  (`supabase/migrations/20260930150000_order_printing.sql`): the station
-  registers with `print_station_seen` (label `Android-App`, a random id kept
-  on the tablet), takes each order with `claim_print` before printing it —
-  only `claimed` prints, `printed` and `moved` are never retried, `busy` is
-  looked at again next time — and says how it went with `finish_print`.
-  With the site's station switched on somewhere too, each order still prints
-  exactly once. Switching printing off in the app calls `print_station_off`,
-  which takes it off "Druckstationen" on `/orders/settings`.
-- **The same ticket as the site.** The bytes come from the `print-ticket`
-  edge function, which builds them with the site's own `receipt.ts`. The app
-  has no ticket layout of its own, so changing the ticket is a deploy of the
-  function, not a new APK on every tablet.
-- **Printer off:** the ticket is given back (`finish_print(…, false)`), the
-  round stops, and the next look — Realtime or the 25-second poll — tries
-  again, so switching the printer on is all it takes. Meanwhile the site's
-  "Bon nicht gedruckt" push goes out after two minutes, saying the station
-  is running.
-- **Printed but not recorded** (the network went at the wrong moment): kept
-  in a small file on the tablet and reported at the next look, never printed
-  twice.
-- **Switching on** does not print the whole evening again: what is accepted
-  at that moment is left to others, as with the site's switch.
+One foreground service, one permanent notification ("Schicht läuft · 2 neu
+· 3 in der Küche"), with either or both parts:
+
+- **the shift** — type `specialUse` — while a staff account is on shift;
+- **printing** — type `connectedDevice`, which Android 14 requires of a
+  service holding a Bluetooth link — while printing is switched on and a
+  printer chosen.
+
+It starts again by itself after a reboot and after an update, and holds
+the CPU awake while it runs, so an order arriving with the screen off rings
+in seconds.
+
+### Printing
+
+Unchanged from the print station, and the same protocol as every printing
+device (`supabase/migrations/20260930150000_order_printing.sql` in the
+site): the station registers with `print_station_seen` (label
+`Android-App`), takes each order with `claim_print` before printing it and
+reports with `finish_print`, so with the site printing somewhere too each
+order still prints exactly once. The bytes come from the `print-ticket`
+edge function, built with the site's own `receipt.ts`, so changing the
+ticket is a deploy of the function, not a new APK. Printer off: the ticket
+is given back and tried again at the next look; printed but not recorded:
+kept in a small file and reported later, never printed twice.
 
 ### The code
 
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
-  (`SupabaseAuth`, `SessionManager`), the queue and the protocol
-  (`SupabasePrintBackend`), Realtime (`OrdersRealtime`), and the loop that
-  decides what to print (`PrintStation`).
-- [`app/`](app) — what only Android can do: the foreground service and the
-  boot receiver (`station/`), the BLE printer and the scan (`printer/`), the
-  Keystore-sealed session (`security/`), and the setup screen (`ui/`).
+  (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
+  `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the alarm's
+  rules (`AlarmPolicy`), Realtime (`OrdersRealtime`), and printing
+  (`SupabasePrintBackend`, `PrintStation`).
+- [`app/`](app) — what only Android can do: the service and the boot
+  receiver (`station/`), the alarm's sound and screen (`alarm/`), the undo
+  window (`queue/`), the BLE printer (`printer/`), the Keystore-sealed
+  session (`security/`), and the screens (`ui/`).
+
+The package is still `de.hamzabistro.printstation`: it is the application
+id, and changing it would make the new app a second install beside the
+old one instead of an update of it.
 
 ## Security
 
-The app runs unattended on a tablet that lies on a counter all evening, so it
-is built to give away as little as possible if the tablet, or the app, falls
-into the wrong hands:
+The app runs on devices that lie on a counter all evening and on phones in
+pockets, so it gives away as little as it can:
 
-- **A print account, not a staff account.** It signs in as an account in
-  `public.print_accounts` (`20260930180000_print_accounts.sql` in
-  hamza-bistro-web). That account can read the accepted orders nobody has
-  printed yet — and only while they are — and take part in printing. It
-  cannot open `/orders`, accept or cancel anything, change the menu, read
-  older orders, or take other print stations off the list. It never holds
-  the service-role key; every call carries the account's own token and the
-  database's policies decide.
-- **No password on the device.** The password is typed once and sent once;
-  what is kept is the refresh token, sealed with AES-256-GCM under a key in
-  the Android Keystore (StrongBox where the tablet has it). The key never
-  leaves the hardware, so a copy of the app's files is worth nothing on any
-  other device. Signing out ends the session on the server as well.
-- **Nothing leaves in a backup.** Backups and device-to-device transfer are
-  off for all of the app's data.
+- **Each person signs in with their own account**, the one they use on
+  the website. What an account may do is decided by the database, exactly
+  as for `/orders`: staff read and move orders (`is_staff()` and RLS), a
+  print account reads only the accepted orders nobody has printed and
+  prints them. A driver taken off the `staff` table can no longer read the
+  queue and drops off the website's list at once.
+- **The kitchen tablet** needs a staff account to ring, so it can read
+  what `/orders` on that tablet could already read. Give it an account of
+  its own (e.g. `<shop-mailbox>+kueche@gmail.com`, added to `staff`), not
+  somebody's personal one, so it can be taken away without locking a
+  person out. A tablet that only prints stays on a print account.
+- **No password on the device.** It is typed once and sent once; what is
+  kept is the refresh token, sealed with AES-256-GCM under a key in the
+  Android Keystore (StrongBox where there is one). Signing out ends the
+  session on the server as well.
+- **Nothing leaves in a backup**; backups and device transfer are off.
 - **HTTPS only**, trusting Android's own certificate authorities and none a
-  user or a profile added, so a proxy with its own CA on the tablet cannot
-  read the traffic.
-- **Least surface.** Nothing is exported but the launcher screen; the boot
-  receiver only hears the system. Bluetooth scanning is declared as never
-  used for location. The setup screen cannot be screenshotted and ignores
-  taps through other apps' overlays. Releases are minified with debug
-  logging stripped, and logs never carry a token or anything off a ticket.
-- **The captcha.** The site's sign-in is protected by Cloudflare Turnstile,
-  and Supabase refuses a password sign-in without its token. The app shows
-  the same widget in a WebView that shows one fixed page, cannot navigate,
-  cannot call into the app (the app reads the token out) and is wiped when
-  it closes. Refreshing a session needs no captcha, so it is shown only at
-  sign-in.
+  user or a profile added.
+- **What shows where.** A lock screen and a notification show the order
+  number, what to cook and the total — never a name, phone number or
+  address. The app's screens cannot be screenshotted or shown in the
+  recent-apps picture, and ignore taps through other apps' overlays.
+- **Least surface.** Nothing is exported but the launcher; the boot
+  receiver and the "Stumm" receiver hear only the system and the app's own
+  notification. Releases are minified with debug logging stripped, and
+  logs never carry a token or anything about a customer.
+- **The captcha.** The site's sign-in is behind Cloudflare Turnstile; the
+  app shows the same widget in a WebView that cannot navigate or call into
+  the app, wiped when it closes.
 - **Supply chain.** Dependencies come only from the repository that owns
   their group, Dependabot proposes updates, and CI's actions are pinned to
   commits with a read-only token.
@@ -108,57 +222,66 @@ ships in its own code; none of them is a secret.
 
 ### 1. The server side (once)
 
-In hamza-bistro-web, on the branch that brings the Android station:
+In hamza-bistro-web:
 
-1. Merge it, so `20260930180000_print_accounts.sql` reaches the database.
-2. Deploy the ticket function (with JWT verification, the default):
+1. Merge the branch with `20261001120000_staff_app_devices.sql`, so the
+   website lists the app's devices. Without it the app works all the same
+   — it rings, prints and moves orders — but the website does not know
+   about it, and `/orders` keeps saying in red that nobody hears about
+   orders once the phones' pushes are off.
+2. For printing: `print-ticket` deployed and, for a print-only tablet, a
+   print account — see "The Android print station" in the site's README.
+3. Each person who uses the app is in `staff`, as for `/orders`. For the
+   kitchen tablet, add an account of its own (see Security).
 
-   ```
-   npx supabase functions deploy print-ticket --project-ref <your-project-ref>
-   ```
+### 2. Each device
 
-3. Make the print account. Sign up on the website with an address of its
-   own and confirm it — a Gmail "plus" address of the shop's mailbox works
-   (`<shop-mailbox>+<alias>@gmail.com` arrives in the shop's inbox) —
-   then, in the Supabase SQL editor:
-
-   ```sql
-   insert into public.print_accounts (user_id, label)
-   select id, 'Tablet an der Kasse' from auth.users
-   where email = '<shop-mailbox>+<alias>@gmail.com' and email_confirmed_at is not null;
-   ```
-
-   Do not add it to `staff`. To take the right away, delete the row (or the
-   account).
-
-### 2. The tablet
-
-1. Install the APK: on the tablet, download `druckstation-….apk` from the
+1. Install the APK: on the device, download `hamza-team-….apk` from the
    latest of the repository's
-   [releases](https://github.com/asibkamalsada/hamza-bistro-android/releases/latest)
-   (see "Building" below), open it and allow installing from that source
-   when Android asks. A newer release installs the same way, over the old
-   one, and keeps the sign-in and the printer.
-2. Open **Druckstation**, sign in with the print account (wait for the
-   captcha's tick first).
-3. Switch the printer on, **Drucker suchen**, and tap the printer — its
-   model name, `CY-BX58D-…`. Allow "Geräte in der Nähe" when asked.
-4. **Testdruck**: umlauts as umlauts, one full line of digits, and a QR code
-   a phone can scan.
-5. Switch on **Jede angenommene Bestellung drucken** and allow notifications.
-   The permanent notification "Druckstation läuft" appears.
-6. **Hintergrundbetrieb erlauben**, and confirm. On Samsung and Xiaomi also
+   [releases](https://github.com/asibkamalsada/hamza-bistro-android/releases/latest),
+   open it and allow installing from that source when Android asks. A newer
+   release installs the same way, over the old one — and over the old
+   **Druckstation**, keeping its sign-in, printer and printing.
+2. Open **Hamza Team** and sign in (wait for the captcha's tick first).
+3. **Schicht beginnen**, and allow notifications.
+4. Under **Einstellungen → Damit es klingelt**, fix whatever is listed:
+   notifications, "Vollbild über dem Sperrbildschirm" (Android 14 and
+   later), and **Hintergrundbetrieb erlauben**. On Samsung and Xiaomi also
    follow [dontkillmyapp.com](https://dontkillmyapp.com) for the model
-   (Samsung: *Settings → Battery → Background usage limits → Never sleeping
-   apps*, add Druckstation; Xiaomi: *Autostart* on and *Battery saver: No
-   restrictions*), or those makers stop the app anyway.
-7. In Chrome on the same tablet, switch **"Jede angenommene Bestellung
-   drucken"** off on `/orders/settings`: the printer takes one connection at
-   a time, and the two would fight over it.
+   (Samsung: _Settings → Battery → Background usage limits → Never
+   sleeping apps_, add Hamza Team; Xiaomi: _Autostart_ on and _Battery
+   saver → No restrictions_), or those makers stop the app anyway.
+5. Give the device a name ("Küche", "Kasse", "Ali"), choose how it rings,
+   and press **Probehören**.
+6. Check on the website, `/orders/settings` → "Wer von Bestellungen
+   erfährt": the device is there, "im Dienst seit …".
+7. On a phone that had the installed `/orders` with pushes on, switch the
+   pushes off there ("Dieses Gerät" on `/orders/settings`), or it hears
+   about every order twice.
 
-After a reboot the station starts by itself once the tablet has been
+**The kitchen tablet** additionally, under **Einstellungen → Bondrucker**:
+switch the printer on, **Drucker suchen**, tap the printer (`CY-BX58D-…`,
+allow "Geräte in der Nähe"), **Testdruck**, and switch on **Jede
+angenommene Bestellung drucken**. In Chrome on the same tablet, switch the
+website's own "Jede angenommene Bestellung drucken" off: the printer takes
+one connection at a time. Keep it plugged in; **Bildschirm anlassen** keeps
+the queue on screen.
+
+**A driver** will usually want **Einmal Bescheid geben** rather than the
+loop, and to end the shift (**Im Dienst** off) at the end of the evening,
+which takes the phone off the website's list at once.
+
+After a reboot the service starts by itself once the device has been
 unlocked for the first time — before that, Android keeps the app's
-encrypted data locked. A tablet without a screen lock gets there by itself.
+encrypted data locked.
+
+### Updating from the Druckstation
+
+The app is the same application, signed with the same key, so the release
+installs over it. A tablet signed in with a print account carries on
+printing as before, after the update as after a reboot. The first time the
+app is opened afterwards it finds out once whether the account is staff;
+for a print account nothing changes on screen.
 
 ## Building
 
@@ -167,21 +290,21 @@ on every push: the debug APK is attached to each run.
 
 For the release APK, add the release key to the repository's secrets once:
 
-| Secret | What |
-| --- | --- |
-| `HB_KEYSTORE_BASE64` | the keystore, `base64 -w0 release.jks` |
-| `HB_KEYSTORE_PASSWORD` | its password |
-| `HB_KEY_ALIAS` | the key's alias |
-| `HB_KEY_PASSWORD` | the key's password |
+| Secret                 | What                                |
+| ---------------------- | ----------------------------------- |
+| `HB_KEYSTORE_BASE64`   | the keystore, `base64 -w0 release.jks` |
+| `HB_KEYSTORE_PASSWORD` | its password                        |
+| `HB_KEY_ALIAS`         | the key's alias                     |
+| `HB_KEY_PASSWORD`      | the key's password                  |
 
 Every push to `main` — a merged pull request too — then builds a signed
-release APK and publishes it as a GitHub release: tag `v0.1.<run>`, the APK
-as `druckstation-0.1.<run>.apk`, and the pull requests merged since the
+release APK and publishes it as a GitHub release: tag `v0.2.<run>`, the APK
+as `hamza-team-0.2.<run>.apk`, and the pull requests merged since the
 release before as its notes. `<run>` is the workflow's run number, which is
 also the APK's `versionCode`, so each release installs over the one before;
-the tablet shows the same `0.1.<run>` under App info. The `0.1` is set in
+the device shows the same `0.2.<run>` under App info. The `0.2` is set in
 [`app/build.gradle.kts`](app/build.gradle.kts). Without the key, `main`
-builds an unsigned APK that no tablet installs, publishes nothing, and says
+builds an unsigned APK that no device installs, publishes nothing, and says
 so in a warning on the run.
 
 Make the key once and keep it safe outside the repository — Android installs
@@ -192,8 +315,9 @@ keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 4096 \
   -validity 10000 -alias druckstation
 ```
 
-Locally, with the Android SDK: `./gradlew :core:test :app:assembleDebug`,
-or with the environment variables `HB_KEYSTORE_FILE`, `HB_KEYSTORE_PASSWORD`,
-`HB_KEY_ALIAS` and `HB_KEY_PASSWORD` set, `./gradlew :app:assembleRelease`.
+Locally, with the Android SDK: `./gradlew :core:test :app:lintDebug
+:app:assembleDebug`, or with the environment variables `HB_KEYSTORE_FILE`,
+`HB_KEYSTORE_PASSWORD`, `HB_KEY_ALIAS` and `HB_KEY_PASSWORD` set,
+`./gradlew :app:assembleRelease`.
 
-Requirements: Android 12 or later on the tablet; JDK 17+ to build.
+Requirements: Android 12 or later; JDK 17+ to build.

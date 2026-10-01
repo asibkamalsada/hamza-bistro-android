@@ -17,7 +17,8 @@ import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.printer.FoundPrinter
 import de.hamzabistro.printstation.printer.PrinterScanner
 import de.hamzabistro.printstation.station.ChosenPrinter
-import de.hamzabistro.printstation.station.PrintStationService
+import de.hamzabistro.printstation.station.Role
+import de.hamzabistro.printstation.station.ShiftService
 import de.hamzabistro.printstation.station.StationState
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
@@ -29,9 +30,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Everything the setup screen shows. */
+/** Everything the sign-in and the printer setup show. */
 data class UiState(
     val account: Account? = null,
+    /** What the account is to this app; null while it is being found out. */
+    val role: Role? = null,
     val printer: ChosenPrinter? = null,
     val enabled: Boolean = false,
     val station: StationState = StationState.Stopped,
@@ -46,6 +49,11 @@ data class UiState(
 
 data class Message(val text: String, val error: Boolean)
 
+/**
+ * Signing in and out, and the printer: the part of the app every account
+ * has. Which account it is decides the rest — staff get the queue and the
+ * alarm ([StaffViewModel]), a print account only this.
+ */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
     private val graph: AppGraph = (application as PrintStationApp).graph
@@ -56,6 +64,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         MutableStateFlow(
             UiState(
                 account = graph.sessions.account.value,
+                role = graph.settings.device.value.role,
                 printer = graph.settings.printer,
                 enabled = graph.settings.enabled,
                 station = graph.stationState.value,
@@ -67,13 +76,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val captchaOrigin: String = BuildConfig.TURNSTILE_ORIGIN
 
     init {
-        viewModelScope.launch { graph.sessions.account.collect { a -> _state.update { it.copy(account = a) } } }
+        viewModelScope.launch {
+            graph.sessions.account.collect { account ->
+                _state.update { it.copy(account = account) }
+                // Signed out by the server: what was the account's goes.
+                if (account == null && graph.settings.device.value.role != null) graph.settings.forgetAccount()
+            }
+        }
+        viewModelScope.launch { graph.settings.device.collect { d -> _state.update { it.copy(role = d.role) } } }
         viewModelScope.launch {
             graph.stationState.collect { station ->
                 _state.update { it.copy(station = station, enabled = graph.settings.enabled) }
             }
         }
+        // Signed in by an older version, which knew only print accounts:
+        // find out once what this account is.
+        if (graph.sessions.account.value != null && graph.settings.device.value.role == null) {
+            viewModelScope.launch { learnRole() }
+        }
         refresh()
+    }
+
+    private suspend fun learnRole() {
+        try {
+            val role = if (graph.staff.isStaff()) Role.STAFF else Role.PRINTER
+            graph.settings.update { it.copy(role = role) }
+        } catch (e: SignedOutException) {
+            graph.settings.forgetAccount()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Offline: the printer setup is what this device did before,
+            // and the role is asked again next time the app opens.
+            graph.logger.warn("Could not find out whether this account is staff", e)
+            _state.update { it.copy(role = Role.PRINTER) }
+        }
     }
 
     /** Things that change outside the app: the battery setting, a permission. */
@@ -93,12 +129,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun signIn(email: String, password: String, captchaToken: String?) = act {
         try {
             graph.sessions.signIn(email, password, captchaToken)
-            // An account that may not print is not kept on the device.
-            if (!graph.backend.canPrint()) {
-                graph.sessions.signOut()
-                problem(R.string.problem_not_allowed)
-            } else {
-                info(R.string.signed_in)
+            when {
+                graph.staff.isStaff() -> {
+                    graph.settings.update { it.copy(role = Role.STAFF) }
+                    info(R.string.signed_in_staff)
+                }
+                graph.backend.canPrint() -> {
+                    graph.settings.update { it.copy(role = Role.PRINTER, onShift = false) }
+                    info(R.string.signed_in)
+                }
+                else -> {
+                    // An account that may do nothing here is not kept on the device.
+                    graph.sessions.signOut()
+                    problem(R.string.problem_not_allowed_any)
+                }
             }
         } catch (e: AuthRejectedException) {
             problem(
@@ -115,9 +159,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Ends the shift and printing here, takes this device off both lists
+     * on the site, and ends the session on the server.
+     */
     fun signOut() = act {
+        if (graph.settings.device.value.onShift) {
+            graph.settings.update { it.copy(onShift = false) }
+            runCatching { graph.staff.off(graph.settings.stationId) }
+        }
         switchOff()
         graph.sessions.signOut()
+        graph.settings.forgetAccount()
+        ShiftService.update(app)
         info(R.string.signed_out)
     }
 
@@ -140,11 +194,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scan?.cancel()
         graph.settings.choosePrinter(ChosenPrinter(found.address, found.name))
         _state.update { it.copy(printer = graph.settings.printer, found = emptyList()) }
-        // A running station picks the new printer up when it starts again.
-        if (graph.settings.enabled) {
-            PrintStationService.stop(app)
-            PrintStationService.start(app, skipWaiting = false)
-        }
+        // A running station lets go of the old printer and takes this one.
+        if (graph.settings.enabled) ShiftService.update(app, restartPrinting = true)
     }
 
     fun testPrint() = act {
@@ -159,7 +210,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (on) {
             graph.settings.enabled = true
             _state.update { it.copy(enabled = true) }
-            PrintStationService.start(app, skipWaiting = true)
+            ShiftService.update(app, skipWaiting = true)
         } else {
             switchOff()
         }
@@ -171,9 +222,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * stays listed until somebody removes it there.
      */
     private suspend fun switchOff() {
+        if (!graph.settings.enabled) return
         graph.settings.enabled = false
         _state.update { it.copy(enabled = false) }
-        PrintStationService.stop(app)
+        ShiftService.update(app)
         try {
             graph.backend.off(graph.settings.stationId)
         } catch (e: Exception) {

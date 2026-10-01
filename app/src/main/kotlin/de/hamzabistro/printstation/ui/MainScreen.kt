@@ -55,8 +55,10 @@ import de.hamzabistro.printstation.station.StationNotifications
 import de.hamzabistro.printstation.station.StationState
 
 /**
- * The one screen: sign in, choose the printer, switch printing on. Used once
- * when the tablet is set up, and afterwards only to look at how it is going.
+ * Signed out, the sign-in; for a print account, the one screen it has:
+ * choose the printer, switch printing on. Used once when the tablet is set
+ * up, and afterwards only to look at how it is going. Staff get the queue
+ * instead (StaffApp), with the printer under its settings.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +84,7 @@ fun MainScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-private fun Notice(message: Message, onDismiss: () -> Unit) {
+fun Notice(message: Message, onDismiss: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onDismiss)) {
         Text(
             text = message.text,
@@ -93,7 +95,7 @@ private fun Notice(message: Message, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+fun Section(title: String, content: @Composable () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
@@ -103,7 +105,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun AccountSection(state: UiState, viewModel: MainViewModel) {
+fun AccountSection(state: UiState, viewModel: MainViewModel) {
     Section(stringResource(R.string.section_account)) {
         val account = state.account
         if (account != null) {
@@ -158,7 +160,7 @@ private fun AccountSection(state: UiState, viewModel: MainViewModel) {
 }
 
 @Composable
-private fun PrinterSection(state: UiState, viewModel: MainViewModel) {
+fun PrinterSection(state: UiState, viewModel: MainViewModel) {
     val context = LocalContext.current
     val askForBluetooth =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
@@ -199,7 +201,7 @@ private fun PrinterSection(state: UiState, viewModel: MainViewModel) {
 }
 
 @Composable
-private fun StationSection(state: UiState, viewModel: MainViewModel) {
+fun StationSection(state: UiState, viewModel: MainViewModel) {
     val context = LocalContext.current
     val askToRun =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
@@ -236,7 +238,7 @@ private fun StationSection(state: UiState, viewModel: MainViewModel) {
 }
 
 @Composable
-private fun BackgroundSection(state: UiState) {
+fun BackgroundSection(state: UiState) {
     if (!state.batteryOptimised) return
     val context = LocalContext.current
     Section(stringResource(R.string.section_background)) {
@@ -253,7 +255,7 @@ private fun BackgroundSection(state: UiState) {
  * may not ask this way; one installed from an APK for a single job may.
  */
 @SuppressLint("BatteryLife")
-private fun Context.askToIgnoreBatteryOptimisation() {
+fun Context.askToIgnoreBatteryOptimisation() {
     startActivity(
         Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
     )

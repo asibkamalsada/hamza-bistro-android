@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Supabase: the queue, the print protocol and the ticket. -->
+    <!-- Supabase: the queue, the steps, the print protocol and the ticket. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- The printer. Scanning is only for choosing it, and never for location. -->
@@ -9,20 +9,28 @@
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Only the device beside the printer needs it; a driver's phone does not. -->
     <uses-feature
         android:name="android.hardware.bluetooth_le"
-        android:required="true" />
+        android:required="false" />
 
-    <!-- Printing with the screen off: a foreground service that keeps the
-         Bluetooth link, started again after a reboot, holding the CPU awake
-         while it runs (the tablet is on mains power). -->
+    <!-- Ringing and printing with the screen off: a foreground service that
+         keeps the queue in view (specialUse) and the Bluetooth link
+         (connectedDevice), started again after a reboot, holding the CPU
+         awake while it runs. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Asks Android once, from the setup screen, to leave the station out
-         of battery optimisation. Allowed for an app that is not on Google
+    <!-- The alarm: over the lock screen like an incoming call, buzzing. A
+         sideloaded app keeps the full-screen permission Android 14 grants;
+         the settings screen says when it was taken away. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Asks Android once, from the setup screen, to leave the app out of
+         battery optimisation. Allowed for an app that is not on Google
          Play, and the one setting that keeps Samsung and Xiaomi from killing
          it. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -53,10 +61,31 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".station.PrintStationService"
+        <!-- The alarm over the lock screen. Its own task, out of the recent
+             apps: it comes and goes with the order it rings for. -->
+        <activity
+            android:name=".alarm.AlarmActivity"
+            android:excludeFromRecents="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:turnScreenOn="true" />
+
+        <service
+            android:name=".station.ShiftService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Receives a restaurant's incoming orders in real time while staff are on shift, and rings an alarm until one of them accepts or declines the order." />
+        </service>
+
+        <!-- "Stumm" on the alarm's notification; only the app's own
+             PendingIntent reaches it. -->
+        <receiver
+            android:name=".alarm.AlarmActionReceiver"
+            android:exported="false" />
 
         <!-- Not exported: the system's own broadcasts still arrive, nobody
              else's do. -->
