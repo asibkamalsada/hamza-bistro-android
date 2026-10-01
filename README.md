@@ -189,9 +189,10 @@ pockets, so it gives away as little as it can:
   queue and drops off the website's list at once.
 - **The kitchen tablet** needs a staff account to ring, so it can read
   what `/orders` on that tablet could already read. Give it an account of
-  its own (e.g. `<shop-mailbox>+kueche@gmail.com`, added to `staff`), not
-  somebody's personal one, so it can be taken away without locking a
-  person out. A tablet that only prints stays on a print account.
+  its own, added to `staff` — not somebody's personal one, so it can be
+  taken away without locking a person out — with an address that is not
+  written down anywhere public and a long, random password. A tablet that
+  only prints stays on a print account.
 - **No password on the device.** It is typed once and sent once; what is
   kept is the refresh token, sealed with AES-256-GCM under a key in the
   Android Keystore (StrongBox where there is one). Signing out ends the
@@ -217,6 +218,15 @@ pockets, so it gives away as little as it can:
 The Supabase URL, its publishable key and the Turnstile site key in
 [`gradle.properties`](gradle.properties) are the public values the website
 ships in its own code; none of them is a secret.
+
+**This repository and its releases are public**, and nothing above rests
+on them being secret: anybody can read the code and install the APK, and
+what they then get is decided by the database for the account they sign
+in with. An account that is neither staff nor a print account is signed
+straight out again. The release key and its password live only in the
+repository's secrets, which pull requests from forks never see. Keep
+account addresses, names and passwords out of the repository, its issues
+and its releases — add people on the dashboard, as the site's README says.
 
 ## Setting it up
 
@@ -251,7 +261,7 @@ In hamza-bistro-web:
    (Samsung: _Settings → Battery → Background usage limits → Never
    sleeping apps_, add Hamza Team; Xiaomi: _Autostart_ on and _Battery
    saver → No restrictions_), or those makers stop the app anyway.
-5. Give the device a name ("Küche", "Kasse", "Ali"), choose how it rings,
+5. Give the device a name ("Küche", "Kasse", "Fahrer 1"), choose how it rings,
    and press **Probehören**.
 6. Check on the website, `/orders/settings` → "Wer von Bestellungen
    erfährt": the device is there, "im Dienst seit …".

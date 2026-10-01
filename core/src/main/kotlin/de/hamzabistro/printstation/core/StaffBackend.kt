@@ -14,7 +14,7 @@ import okhttp3.OkHttpClient
 data class DeviceReport(
     /** This device's id: random, made once and kept. */
     val id: String,
-    /** "Küche", "Ali", "Kasse" — how /orders/settings lists it. */
+    /** "Küche", "Kasse", "Fahrer 1" — how /orders/settings lists it. */
     val label: String,
     /** How it alarms about a new order: "loop", "once" or "off". */
     val alarm: String,

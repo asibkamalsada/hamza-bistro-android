@@ -180,7 +180,7 @@
     <string name="shift_switch">On shift — this device rings</string>
     <string name="shift_hint">On shift, the app runs in the background, keeps its connection to the shop and is listed on the website under \"Wer von Bestellungen erfährt\". Switch it off after work; the kitchen tablet simply stays on.</string>
     <string name="device_name">Name of this device</string>
-    <string name="device_name_hint">e.g. Kitchen, Till, Ali</string>
+    <string name="device_name_hint">e.g. Kitchen, Till, Driver 1</string>
 
     <string name="section_alarm">Alarm</string>
     <string name="alarm_mode">When a new order comes in</string>

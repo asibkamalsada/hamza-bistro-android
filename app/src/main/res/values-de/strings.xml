@@ -180,7 +180,7 @@
     <string name="shift_switch">Im Dienst – dieses Gerät klingelt</string>
     <string name="shift_hint">Während der Schicht läuft die App im Hintergrund, hält die Verbindung zum Shop und steht auf der Website unter „Wer von Bestellungen erfährt“. Nach Feierabend ausschalten; das Küchen-Tablet bleibt einfach an.</string>
     <string name="device_name">Name dieses Geräts</string>
-    <string name="device_name_hint">z. B. Küche, Kasse, Ali</string>
+    <string name="device_name_hint">z. B. Küche, Kasse, Fahrer 1</string>
 
     <string name="section_alarm">Alarm</string>
     <string name="alarm_mode">Bei einer neuen Bestellung</string>
