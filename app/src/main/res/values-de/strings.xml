@@ -1,32 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Druckstation</string>
+    <string name="app_name">Hamza Team</string>
 
-    <string name="channel_running">Druckstation</string>
+    <string name="channel_running">Schicht und Druckstation</string>
     <string name="channel_alerts">Drucken gestoppt</string>
+    <string name="channel_alarm">Alarm: neue Bestellung</string>
+    <string name="channel_alarm_description">Klingelt in Schleife über dem Sperrbildschirm, bis jemand die Bestellung annimmt oder ablehnt. Den Ton macht die App selbst, auf dem Wecker-Kanal.</string>
+    <string name="channel_kitchen">Hinweise: Vorbestellung, Drucker, Verbindung</string>
+    <string name="channel_kitchen_description">Einmal-Hinweise: eine Vorbestellung muss jetzt auf den Herd, ein Bon kam nicht raus, keine Verbindung zum Shop.</string>
+    <string name="channel_orders">Neue Bestellung (Nachricht)</string>
+    <string name="channel_orders_description">Für Geräte, die bei neuen Bestellungen nur einmal Bescheid geben sollen.</string>
+    <string name="channel_quiet">Nachts, ohne Ton</string>
+    <string name="channel_quiet_description">Was in der Nachtruhe ankommt: sichtbar, aber stumm.</string>
 
     <string name="running_title">Druckstation läuft</string>
+    <string name="running_shift_title">Schicht läuft</string>
     <string name="running_starting">Startet …</string>
     <string name="running_looked">Zuletzt nachgesehen um %1$s</string>
     <string name="running_last_printed">Zuletzt gedruckt: #%1$d · nachgesehen um %2$s</string>
+    <string name="running_printer_line">Drucker: %1$s</string>
+
+    <string name="count_new">%1$d neu</string>
+    <string name="count_cooking">%1$d in der Küche</string>
+    <string name="count_out">%1$d unterwegs</string>
+    <string name="queue_empty_short">Keine offenen Bestellungen</string>
+    <string name="queue_not_staff">Dieses Konto steht nicht (mehr) auf der Personalliste. Beim Inhaber melden.</string>
+    <string name="queue_offline_since">Keine Verbindung zum Shop seit %1$s – dieses Gerät erfährt gerade nichts von neuen Bestellungen.</string>
 
     <string name="problem_not_printed">Bon #%1$d nicht gedruckt: %2$s. Drucker an, Papier drin?</string>
     <string name="problem_offline">Keine Verbindung zum Shop: %1$s</string>
-    <string name="problem_not_allowed">Dieses Konto darf nicht drucken. Mit dem Druckkonto anmelden.</string>
+    <string name="problem_not_allowed">Dieses Konto darf nicht drucken. Mit dem Druckkonto oder einem Personalkonto anmelden.</string>
+    <string name="problem_not_allowed_any">Dieses Konto ist weder Personal noch ein Druckkonto. Der Inhaber trägt es im Shop ein.</string>
 
     <string name="stopped_title">Drucken gestoppt</string>
     <string name="stopped_signed_out">Abgemeldet. App öffnen und neu anmelden.</string>
     <string name="stopped_no_printer">Kein Drucker gewählt. App öffnen und Drucker wählen.</string>
     <string name="stopped_could_not_start">Konnte nicht starten: %1$s. App öffnen.</string>
 
+    <string name="alarm_title">Neue Bestellung #%1$d</string>
+    <string name="alarm_title_preorder">Vorbestellung #%1$d</string>
+    <string name="alarm_total">Gesamt %1$s</string>
+    <plurals name="alarm_more">
+        <item quantity="one">+ %1$d weitere wartet</item>
+        <item quantity="other">+ %1$d weitere warten</item>
+    </plurals>
+    <string name="alarm_silence">Stumm</string>
+    <string name="alarm_open">Öffnen</string>
+    <string name="alarm_heading">Neue Bestellung</string>
+    <string name="alarm_heading_preorder">Neue Vorbestellung</string>
+    <string name="alarm_silence_until">Stumm bis %1$s</string>
+    <string name="alarm_open_queue">Zur Bestellliste</string>
+    <string name="alarm_privacy">Name, Telefon und Adresse stehen in der App, hinter der Bildschirmsperre.</string>
+    <string name="silenced_until">Alarm stumm bis %1$s – was dann noch wartet, klingelt wieder.</string>
+
+    <string name="chime_cook_now">Vorbestellung #%1$d: jetzt kochen</string>
+    <string name="chime_cook_now_text">Fällig %1$s · %2$s</string>
+    <string name="chime_printer">Bon #%1$d nicht gedruckt</string>
+    <string name="chime_printer_text">%1$s. Drucker an, Papier drin?</string>
+    <string name="chime_offline">Keine Verbindung zum Shop</string>
+    <string name="chime_offline_text">Seit %1$s – neue Bestellungen kommen hier gerade nicht an. WLAN oder mobile Daten prüfen.</string>
+
+    <string name="slot_today">heute</string>
+    <string name="slot_tomorrow">morgen</string>
+
     <string name="section_account">Konto</string>
-    <string name="sign_in_hint">Mit dem Druckkonto für dieses Tablet anmelden. Das Passwort wird nicht auf dem Gerät gespeichert.</string>
+    <string name="sign_in_hint">Mit deinem Konto von der Website anmelden – das, mit dem du /orders öffnest. Ein Tablet, das nur druckt, meldet sich mit seinem Druckkonto an. Das Passwort wird nicht auf dem Gerät gespeichert.</string>
     <string name="email">E-Mail</string>
     <string name="password">Passwort</string>
     <string name="sign_in">Anmelden</string>
     <string name="sign_out">Abmelden</string>
     <string name="signed_in">Angemeldet.</string>
-    <string name="signed_out">Abgemeldet. Auf diesem Tablet wird nicht mehr gedruckt.</string>
+    <string name="signed_in_staff">Angemeldet. „Schicht beginnen“, damit dieses Gerät bei neuen Bestellungen klingelt.</string>
+    <string name="signed_out">Abgemeldet. Auf diesem Gerät klingelt und druckt nichts mehr.</string>
     <string name="signed_in_as">Angemeldet als %1$s</string>
     <string name="sign_in_wrong">E-Mail oder Passwort falsch.</string>
     <string name="sign_in_unconfirmed">Die Adresse ist noch nicht bestätigt: zuerst den Link in der E-Mail von der Website öffnen.</string>
@@ -51,5 +96,142 @@
 
     <string name="section_background">Im Hintergrund weiterdrucken</string>
     <string name="battery_hint">Android beendet die App sonst womöglich, um Akku zu sparen – dann druckt nichts. Den Hintergrundbetrieb erlauben. Bei Samsung und Xiaomi zusätzlich die Schritte für das eigene Modell auf dontkillmyapp.com befolgen.</string>
+    <string name="battery_hint_staff">Samsung und Xiaomi beenden Apps trotzdem: dort zusätzlich die Schritte für das eigene Modell auf dontkillmyapp.com befolgen (Samsung: Akku → Hintergrundnutzung → „Nie schlafende Apps“).</string>
     <string name="battery_button">Hintergrundbetrieb erlauben</string>
+
+    <!-- The queue -->
+    <string name="queue_title">Bestellungen</string>
+    <string name="queue_title_waiting">Bestellungen (%1$d neu)</string>
+    <string name="queue_empty">Gerade keine offenen Bestellungen.</string>
+    <string name="queue_decide">Neu – annehmen oder ablehnen</string>
+    <string name="queue_cook">In der Küche</string>
+    <string name="queue_out">Unterwegs &amp; abholbereit</string>
+    <string name="settings">Einstellungen</string>
+    <string name="back">Zurück</string>
+    <string name="retry">Erneut</string>
+    <string name="shift_off_banner">Keine Schicht: dieses Gerät klingelt nicht bei neuen Bestellungen.</string>
+    <string name="shift_start">Schicht beginnen</string>
+    <string name="alarm_limited">Der Alarm ist eingeschränkt – es fehlt: %1$s. In den Einstellungen beheben.</string>
+    <string name="need_notifications">Benachrichtigungen</string>
+    <string name="need_full_screen">Vollbild über dem Sperrbildschirm</string>
+    <string name="need_background">Hintergrundbetrieb</string>
+    <string name="order_moved">Diese Bestellung wurde inzwischen geändert – so steht sie jetzt.</string>
+    <string name="step_failed">Nicht gesendet: %1$s</string>
+    <string name="printed_by_hand">Bon #%1$d gedruckt.</string>
+
+    <string name="waiting_for">wartet seit %1$d Min.</string>
+    <string name="due_at">fällig %1$s</string>
+    <string name="due_in">noch %1$d Min.</string>
+    <string name="due_late">%1$d Min. drüber</string>
+    <string name="cook_from">kochen ab %1$s</string>
+    <string name="cook_now">Jetzt kochen</string>
+
+    <string name="status_new">Neu</string>
+    <string name="status_confirmed">Angenommen</string>
+    <string name="status_ready">Abholbereit</string>
+    <string name="status_on_the_way">Unterwegs</string>
+    <string name="status_delivered">Geliefert</string>
+    <string name="status_collected">Abgeholt</string>
+    <string name="status_cancelled">Storniert</string>
+
+    <string name="preorder_badge">Für %1$s Uhr</string>
+    <string name="pickup_badge">Selbstabholer</string>
+    <string name="ordered_at">Bestellt %1$s</string>
+    <string name="kitchen_note">Anmerkung für die Küche</string>
+    <string name="collect">Kassieren %1$s</string>
+    <string name="fee_label">Lieferung %1$s</string>
+    <string name="deposit_label">Pfand %1$s</string>
+    <string name="pickup_discount_label">Selbstabholerrabatt −%1$s</string>
+    <string name="discount_label">Rabatt %1$s −%2$s</string>
+    <string name="stamp_label">Stempelkarte −%1$s</string>
+    <string name="new_customer">Erste Bestellung – kurz anrufen</string>
+    <string name="door_note">An der Tür</string>
+    <string name="unverified_address">Adresse nicht geprüft – beim Anruf bestätigen</string>
+    <string name="cancel_reason_shown">Grund: %1$s</string>
+    <string name="ticket_printed">Bon gedruckt %1$s</string>
+    <string name="ticket_not_printed">Bon noch nicht gedruckt</string>
+
+    <string name="accept_delivery_in">Annehmen – da in</string>
+    <string name="accept_pickup_in">Annehmen – fertig in</string>
+    <string name="accept_scheduled">Für %1$s Uhr annehmen</string>
+    <string name="eta_button">%1$d Min.</string>
+    <string name="step_on_the_way">Unterwegs</string>
+    <string name="step_ready">Abholbereit</string>
+    <string name="step_delivered">Geliefert</string>
+    <string name="step_collected">Abgeholt</string>
+    <string name="decline">Ablehnen</string>
+    <string name="cancel_later">Stornieren</string>
+    <string name="cancel_why">Warum? Der Kunde erfährt es.</string>
+    <string name="cancel_back">Zurück</string>
+    <string name="reason_busy">Zu viel los</string>
+    <string name="reason_sold_out">Ausverkauft</string>
+    <string name="reason_unreachable">Nicht erreichbar</string>
+    <string name="reason_address">Adresse unklar</string>
+    <string name="reason_none">Ohne Grund</string>
+    <string name="pending_sending">%1$s – wird gleich gesendet</string>
+    <string name="pending_accepted">Angenommen, %1$d Min.</string>
+    <string name="pending_declined">Abgelehnt</string>
+    <string name="pending_cancelled">Storniert</string>
+    <string name="undo">Rückgängig</string>
+    <string name="print_ticket">Bon drucken</string>
+
+    <!-- Settings -->
+    <string name="section_shift">Schicht</string>
+    <string name="shift_switch">Im Dienst – dieses Gerät klingelt</string>
+    <string name="shift_hint">Während der Schicht läuft die App im Hintergrund, hält die Verbindung zum Shop und steht auf der Website unter „Wer von Bestellungen erfährt“. Auf dem Tablet im Laden einfach immer an lassen; auf dem Handy eines Fahrers nach Feierabend ausschalten.</string>
+    <string name="device_name">Name dieses Geräts</string>
+    <string name="device_name_hint">z. B. Tablet, Fahrer 1</string>
+
+    <string name="section_alarm">Alarm</string>
+    <string name="alarm_mode">Bei einer neuen Bestellung</string>
+    <string name="alarm_mode_loop">Laut klingeln, bis jemand annimmt oder ablehnt – auf irgendeinem Gerät</string>
+    <string name="alarm_mode_once">Einmal Bescheid geben, wie eine Nachricht</string>
+    <string name="alarm_mode_off">Nichts – nur in der Liste</string>
+    <string name="alarm_sound">Ton</string>
+    <string name="sound_beeps">Piepen</string>
+    <string name="sound_bell">Glocke</string>
+    <string name="sound_siren">Sirene</string>
+    <string name="sound_device">Wecker des Geräts</string>
+    <string name="alarm_test">Probehören</string>
+    <string name="alarm_full_volume">Beim Klingeln volle Lautstärke (danach zurück)</string>
+    <string name="alarm_vibrate">Vibrieren</string>
+    <string name="alarm_silence_for">„Stumm“ hält</string>
+    <string name="alarm_quiet">Nachtruhe</string>
+    <string name="alarm_quiet_hint">In der Nachtruhe klingelt nichts; eine Bestellung kommt als stille Benachrichtigung an – etwa eine Vorbestellung um ein Uhr nachts. Eine Vorbestellung, die dann noch wartet, klingelt in der Stunde vor ihrer Zeit.</string>
+    <string name="alarm_cook_now">Vorbestellung: Bescheid, wenn sie auf den Herd muss</string>
+    <string name="alarm_printer">Drucker: Bescheid, wenn ein Bon nicht rauskam</string>
+    <string name="alarm_connection">Bescheid, wenn die Verbindung zum Shop weg ist</string>
+    <string name="minutes_n">%1$d Min.</string>
+    <string name="seconds_n">%1$d Sek.</string>
+    <string name="quiet_never">Keine</string>
+    <string name="quiet_window">%1$s–%2$s</string>
+
+    <string name="section_ringing">Damit es klingelt</string>
+    <string name="ringing_ok">Alles erlaubt: dieses Gerät klingelt auch gesperrt, stumm geschaltet und im Hintergrund.</string>
+    <string name="ringing_missing">Es fehlt etwas – ohne das bleibt der Alarm womöglich stumm:</string>
+    <string name="fix_notifications">Benachrichtigungen erlauben</string>
+    <string name="fix_full_screen">Vollbild erlauben</string>
+    <string name="ringing_dnd_hint">Der Alarm läuft über den Wecker-Kanal: er klingelt auch bei lautlos und bei „Bitte nicht stören“, solange dort Wecker erlaubt sind (Standard).</string>
+
+    <string name="section_accept">Annehmen</string>
+    <string name="eta_ladder">Minuten-Knöpfe neben dem Vorschlag</string>
+    <string name="undo_window">Rückgängig-Fenster</string>
+    <string name="undo_none">Sofort senden</string>
+
+    <string name="section_route">Route</string>
+    <string name="nav_google">Google Maps</string>
+    <string name="nav_apple">Apple Karten</string>
+    <string name="nav_waze">Waze</string>
+    <string name="nav_geo">Gerät fragt</string>
+    <string name="travel_bike">Fahrrad</string>
+    <string name="travel_car">Auto</string>
+
+    <string name="section_screen">Bildschirm</string>
+    <string name="keep_awake">Bildschirm anlassen, solange die Liste offen ist</string>
+
+    <string name="section_printer_staff">Bondrucker (am Tablet im Laden)</string>
+
+    <string name="section_website">Auf der Website</string>
+    <string name="website_hint">Ausverkauft-Schalter, Speisekarte und „Letzte Bestellungen“ bleiben auf der Website.</string>
+    <string name="website_open">Website öffnen</string>
 </resources>

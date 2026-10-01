@@ -25,13 +25,14 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
 /**
- * Says within a second that an order was accepted, over Supabase Realtime —
- * the same postgres_changes subscription the site's queue has.
+ * Says within a second that an order changed, over Supabase Realtime — the
+ * same postgres_changes subscription the site's queue has.
  *
  * Only ever a hint to look: what it carries is not read (it would be the
- * order, name and address included), and the station's poll stays
- * underneath for a socket that died without saying so. Signed in as a print
- * account, the database sends only the rows that account may read.
+ * order, name and address included), and the poll of whoever listens stays
+ * underneath for a socket that died without saying so. The database sends
+ * only the rows the signed-in account may read: for a print account, the
+ * accepted orders not printed yet.
  */
 class OrdersRealtime(
     private val config: SupabaseConfig,
@@ -42,17 +43,17 @@ class OrdersRealtime(
     private val heartbeat: Duration = 25.seconds,
 ) {
     /**
-     * Emits whenever an accepted order may have changed, and once every time
-     * the socket has (re)joined, for whatever happened while it was down.
-     * Reconnects for as long as it is collected; ends only with a
+     * Emits whenever an order that [what] covers may have changed, and once
+     * every time the socket has (re)joined, for whatever happened while it
+     * was down. Reconnects for as long as it is collected; ends only with a
      * [SignedOutException].
      */
-    fun changes(): Flow<Unit> = channelFlow {
+    fun changes(what: Watch = Watch.ACCEPTED): Flow<Unit> = channelFlow {
         var backoff = MIN_BACKOFF
         while (true) {
             val started = now()
             try {
-                watch { send(Unit) }
+                watch(what) { send(Unit) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SignedOutException) {
@@ -68,7 +69,7 @@ class OrdersRealtime(
     }
 
     /** One socket, from connecting until it closes or fails. */
-    private suspend fun watch(onChange: suspend () -> Unit) {
+    private suspend fun watch(watch: Watch, onChange: suspend () -> Unit) {
         val frames = Channel<Frame>(Channel.UNLIMITED)
         val url =
             config.endpoint("realtime/v1/websocket")
@@ -106,7 +107,7 @@ class OrdersRealtime(
 
             var token = sessions.accessToken()
             val joinRef = nextRef()
-            socket.send(join(joinRef, token))
+            socket.send(join(watch, joinRef, token))
             var joined = false
             var awaitedBeat: String? = null
             var nextBeat = now() + heartbeat.inWholeMilliseconds
@@ -122,7 +123,7 @@ class OrdersRealtime(
                     val fresh = sessions.accessToken()
                     if (fresh != token) {
                         token = fresh
-                        socket.send(accessToken(nextRef(), joinRef, token))
+                        socket.send(accessToken(watch, nextRef(), joinRef, token))
                     }
                     awaitedBeat = nextRef()
                     socket.send(beat(awaitedBeat))
@@ -145,7 +146,7 @@ class OrdersRealtime(
                         logger.info("Realtime subscribed")
                         onChange()
                     }
-                    topic != TOPIC -> Unit
+                    topic != watch.topic -> Unit
                     event == "postgres_changes" -> onChange()
                     event == "phx_error" || event == "phx_close" -> throw IOException("channel $event")
                     event == "system" && status == "error" ->
@@ -158,9 +159,9 @@ class OrdersRealtime(
         }
     }
 
-    private fun join(ref: String, token: String): String =
+    private fun join(watch: Watch, ref: String, token: String): String =
         buildJsonObject {
-                put("topic", TOPIC)
+                put("topic", watch.topic)
                 put("event", "phx_join")
                 putJsonObject("payload") {
                     putJsonObject("config") {
@@ -177,8 +178,7 @@ class OrdersRealtime(
                                 put("event", "*")
                                 put("schema", "public")
                                 put("table", "orders")
-                                // What a station prints; the rest is not its business.
-                                put("filter", "status=eq.confirmed")
+                                watch.filter?.let { put("filter", it) }
                             }
                         }
                         put("private", false)
@@ -190,9 +190,9 @@ class OrdersRealtime(
             }
             .toString()
 
-    private fun accessToken(ref: String, joinRef: String, token: String): String =
+    private fun accessToken(watch: Watch, ref: String, joinRef: String, token: String): String =
         buildJsonObject {
-                put("topic", TOPIC)
+                put("topic", watch.topic)
                 put("event", "access_token")
                 putJsonObject("payload") { put("access_token", token) }
                 put("ref", ref)
@@ -217,8 +217,16 @@ class OrdersRealtime(
         class Closed(val why: String) : Frame
     }
 
+    /** Which orders a socket is about. */
+    enum class Watch(val topic: String, val filter: String?) {
+        /** What a print station prints; the rest is not its business. */
+        ACCEPTED("realtime:print-station", "status=eq.confirmed"),
+
+        /** Every order, as the staff queue on /orders watches them. */
+        ALL("realtime:staff-queue", null),
+    }
+
     companion object {
-        const val TOPIC = "realtime:print-station"
         private val MIN_BACKOFF = 1.seconds
         private val MAX_BACKOFF = 60.seconds
     }

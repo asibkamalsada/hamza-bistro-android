@@ -1,0 +1,341 @@
+package de.hamzabistro.printstation.ui
+
+import android.Manifest
+import android.app.NotificationManager
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.OrderStatus
+import de.hamzabistro.printstation.core.QueueGroup
+import de.hamzabistro.printstation.core.StaffOrder
+import de.hamzabistro.printstation.core.StaffQueue
+import de.hamzabistro.printstation.queue.StepFailure
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * The queue, for staff: what /orders shows, under the same three headings —
+ * decide, cook, out — with the shift switch on top. On a tablet held
+ * sideways the three headings stand side by side, as on a kitchen pass.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused: () -> Unit, onSettings: () -> Unit) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val event by viewModel.events.collectAsStateWithLifecycle()
+    val asked by focus.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val snackbar = remember { SnackbarHostState() }
+
+    // Coming back to the screen shows the queue as it is now; going away
+    // sends what waits on its undo window, as /orders does.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.flush() }
+
+    val view = LocalView.current
+    DisposableEffect(state.prefs.keepAwake) {
+        view.keepScreenOn = state.prefs.keepAwake
+        onDispose { view.keepScreenOn = false }
+    }
+
+    LaunchedEffect(event) {
+        val shown = event ?: return@LaunchedEffect
+        snackbar.showSnackbar(
+            when (shown) {
+                is StaffEvent.Step ->
+                    when (val failure = shown.failure) {
+                        StepFailure.Moved -> resources.getString(R.string.order_moved)
+                        is StepFailure.Failed -> resources.getString(R.string.step_failed, failure.reason)
+                    }
+                is StaffEvent.Printed -> resources.getString(R.string.printed_by_hand, shown.order)
+                is StaffEvent.PrintFailed -> resources.getString(R.string.printer_failed, shown.reason)
+            }
+        )
+        viewModel.eventShown()
+    }
+
+    val actions = remember(viewModel) { Actions(context, viewModel) }
+    val waiting = state.queue.orders.count { it.status == OrderStatus.NEW }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
+                },
+                actions = { TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) } },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Banners(state, viewModel)
+            when {
+                !state.queue.loaded && state.queue.failingSince == null ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.queue.orders.isEmpty() ->
+                    Text(
+                        stringResource(R.string.queue_empty),
+                        modifier = Modifier.padding(24.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                else -> Groups(state, actions, asked, onFocused)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Groups(state: StaffState, actions: OrderActions, focus: String?, onFocused: () -> Unit) {
+    val groups = StaffQueue.group(state.queue.orders)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth >= 840.dp) {
+            // Side by side, each heading its own column, as on a pass.
+            Row(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (group in QueueGroup.entries) {
+                    val orders = groups.firstOrNull { it.first == group }?.second.orEmpty()
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        heading(group, orders.size)
+                        cards(orders, state, actions, focus)
+                    }
+                }
+            }
+        } else {
+            val list = rememberLazyListState()
+            LazyColumn(
+                state = list,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                for ((group, orders) in groups) {
+                    heading(group, orders.size)
+                    cards(orders, state, actions, focus)
+                }
+            }
+            // A tapped notification: scroll to the order it was about.
+            LaunchedEffect(focus, state.queue.orders) {
+                if (focus == null) return@LaunchedEffect
+                var index = 0
+                for ((_, orders) in groups) {
+                    index++
+                    val at = orders.indexOfFirst { it.id == focus }
+                    if (at >= 0) {
+                        list.animateScrollToItem(index + at)
+                        break
+                    }
+                    index += orders.size
+                }
+                delay(FOCUS_MS)
+                onFocused()
+            }
+        }
+    }
+}
+
+private fun LazyListScope.heading(group: QueueGroup, count: Int) {
+    item(key = "heading-$group") {
+        Text(
+            "${headingText(group)} · $count",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun headingText(group: QueueGroup): String =
+    stringResource(
+        when (group) {
+            QueueGroup.DECIDE -> R.string.queue_decide
+            QueueGroup.COOK -> R.string.queue_cook
+            QueueGroup.OUT -> R.string.queue_out
+        }
+    )
+
+private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, actions: OrderActions, focus: String?) {
+    items(orders, key = { it.id }) { order ->
+        OrderCard(
+            order = order,
+            now = state.now,
+            prep = state.queue.prep,
+            prefs = state.prefs,
+            pending = state.pending[order.id],
+            busy = order.id in state.busy,
+            canPrint = state.canPrint,
+            actions = actions,
+            focused = order.id == focus,
+        )
+    }
+}
+
+/**
+ * What would stop this device hearing about the next order, one line each,
+ * with the fix a tap away — the shift switched off above all.
+ */
+@Composable
+private fun Banners(state: StaffState, viewModel: StaffViewModel) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    var checks by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { checks++ }
+    val askForNotifications =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.setOnShift(true) }
+
+    Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!state.prefs.onShift) {
+            Banner(stringResource(R.string.shift_off_banner), warning = true) {
+                Button(onClick = {
+                    if (needsNotificationPermission(context)) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    else viewModel.setOnShift(true)
+                }) { Text(stringResource(R.string.shift_start)) }
+            }
+        } else {
+            val missing = remember(checks) { missingForAlarm(context) }
+            if (missing.isNotEmpty()) {
+                Banner(stringResource(R.string.alarm_limited, missing.joinToString(", ") { resources.getString(it) }), warning = true) {}
+            }
+        }
+        state.alarm.silencedUntil?.let {
+            Banner(stringResource(R.string.silenced_until, Format.clock(it)), warning = false) {}
+        }
+        if (state.queue.notAllowed) Banner(stringResource(R.string.queue_not_staff), warning = true) {}
+        state.queue.failingSince?.let {
+            Banner(stringResource(R.string.queue_offline_since, Format.clock(it)), warning = true) {
+                OutlinedButton(onClick = viewModel::refresh) { Text(stringResource(R.string.retry)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Banner(text: String, warning: Boolean, action: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = if (warning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(text, modifier = Modifier.weight(1f), color = if (warning) MaterialTheme.colorScheme.onErrorContainer else Color.Unspecified)
+            action()
+        }
+    }
+}
+
+/** The permissions an alarm needs that this device has not given, as names to show. */
+fun missingForAlarm(context: Context): List<Int> {
+    val missing = mutableListOf<Int>()
+    val notifications = context.getSystemService(NotificationManager::class.java)
+    if (!notifications.areNotificationsEnabled()) missing += R.string.need_notifications
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !notifications.canUseFullScreenIntent()) {
+        missing += R.string.need_full_screen
+    }
+    if (!context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)) {
+        missing += R.string.need_background
+    }
+    return missing
+}
+
+fun needsNotificationPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+
+/** The card's buttons, wired to the view model and to the phone's dialler and map. */
+private class Actions(private val context: Context, private val viewModel: StaffViewModel) : OrderActions {
+    override fun accept(order: StaffOrder, minutes: Int) = viewModel.accept(order, minutes)
+
+    override fun acceptScheduled(order: StaffOrder) = viewModel.acceptScheduled(order)
+
+    override fun moveOn(order: StaffOrder) = viewModel.moveOn(order)
+
+    override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
+
+    override fun undo(order: StaffOrder) = viewModel.undo(order)
+
+    override fun print(order: StaffOrder) = viewModel.print(order)
+
+    /** The dialler with the number in it — not a call: the person decides. */
+    override fun call(phone: String) {
+        open(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null)))
+    }
+
+    override fun route(order: StaffOrder) {
+        val prefs = viewModel.state.value.prefs
+        open(Intent(Intent.ACTION_VIEW, Uri.parse(StaffQueue.navigationUrl(order, prefs.navApp, prefs.travelMode))))
+    }
+
+    private fun open(intent: Intent) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: ActivityNotFoundException) {
+            // No dialler or map on a kitchen tablet: nothing to open.
+        }
+    }
+}
+
+private const val FOCUS_MS = 4_000L

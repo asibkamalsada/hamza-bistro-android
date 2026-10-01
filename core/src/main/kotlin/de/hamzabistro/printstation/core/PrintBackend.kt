@@ -1,7 +1,5 @@
 package de.hamzabistro.printstation.core
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -9,9 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.Response
-import okhttp3.coroutines.executeAsync
 
 /** An accepted order no station has printed. The ticket itself comes from [PrintBackend.ticket]. */
 data class QueuedOrder(val id: String, val number: Long)
@@ -65,16 +61,15 @@ interface PrintBackend {
  * the print-ticket edge function for the bytes. Every call carries the
  * signed-in account's own token, so the database's policies decide.
  */
-class SupabasePrintBackend(
-    private val config: SupabaseConfig,
-    private val http: OkHttpClient,
-    private val sessions: SessionManager,
-) : PrintBackend {
+class SupabasePrintBackend internal constructor(private val rest: SupabaseRest) : PrintBackend {
+    constructor(config: SupabaseConfig, http: OkHttpClient, sessions: SessionManager) :
+        this(SupabaseRest(config, http, sessions))
+
     override suspend fun canPrint(): Boolean = rpc("can_print", buildJsonObject {}) == "true"
 
     override suspend fun openOrders(): List<QueuedOrder> {
         val url =
-            config.endpoint("rest/v1/orders")
+            rest.endpoint("rest/v1/orders")
                 .addQueryParameter("select", "id,order_number")
                 .addQueryParameter("status", "eq.confirmed")
                 .addQueryParameter("printed_at", "is.null")
@@ -82,9 +77,9 @@ class SupabasePrintBackend(
                 .addQueryParameter("order", "scheduled_for.asc.nullsfirst,created_at.asc")
                 .addQueryParameter("limit", QUEUE_LIMIT.toString())
                 .build()
-        return call({ it.url(url).get() }) { response ->
+        return rest.call({ it.url(url).get() }) { response ->
             val body = response.body.string()
-            if (!response.isSuccessful) throw rejected(response.code, body, "orders")
+            if (!response.isSuccessful) throw rest.rejected(response.code, body, "orders")
             json.decodeFromString(ListSerializer(OrderRow.serializer()), body).map {
                 QueuedOrder(it.id, it.orderNumber)
             }
@@ -133,13 +128,13 @@ class SupabasePrintBackend(
         }) ?: throw BackendException(404, "print-ticket has no test ticket")
 
     private suspend fun printTicket(body: JsonObject): ByteArray? {
-        val url = config.endpoint("functions/v1/print-ticket").build()
-        return call({ it.url(url).post(body.toRequestBody()) }) { response ->
+        val url = rest.endpoint("functions/v1/print-ticket").build()
+        return rest.call({ it.url(url).post(body.toRequestBody()) }) { response ->
             when {
                 response.code == 404 -> null
                 response.code == 403 -> throw NotAllowedException()
                 !response.isSuccessful ->
-                    throw rejected(response.code, response.body.string(), "print-ticket")
+                    throw rest.rejected(response.code, response.body.string(), "print-ticket")
                 response.header("Content-Type")?.startsWith("application/octet-stream") != true ->
                     throw BackendException(response.code, "print-ticket did not answer with a ticket")
                 else -> readTicket(response)
@@ -163,50 +158,7 @@ class SupabasePrintBackend(
         return bytes
     }
 
-    /** A database function; its answer as JSON text ("" for none). */
-    private suspend fun rpc(name: String, args: JsonObject): String {
-        val url = config.endpoint("rest/v1/rpc/$name").build()
-        return call({ it.url(url).post(args.toRequestBody()) }) { response ->
-            val body = response.body.string()
-            if (!response.isSuccessful) throw rejected(response.code, body, name)
-            body
-        }
-    }
-
-    /**
-     * Sends a request as the signed-in account. A 401 is tried once more
-     * with a fresh token: the one it had may have run out on the way.
-     * [read] reads the body, which blocks, hence the IO dispatcher.
-     */
-    private suspend fun <T> call(
-        build: (Request.Builder) -> Request.Builder,
-        read: (Response) -> T,
-    ): T =
-        withContext(Dispatchers.IO) {
-            val token = sessions.accessToken()
-            val first = send(build, token)
-            if (first.code != 401) return@withContext first.use(read)
-            first.close()
-            sessions.expire(token)
-            send(build, sessions.accessToken()).use(read)
-        }
-
-    private suspend fun send(build: (Request.Builder) -> Request.Builder, token: String): Response {
-        val request =
-            build(Request.Builder())
-                .header("apikey", config.anonKey)
-                .header("Authorization", "Bearer $token")
-                .build()
-        return http.newCall(request).executeAsync()
-    }
-
-    private fun rejected(status: Int, body: String, what: String): Exception {
-        val message = errorField(body, "message", "msg", "error") ?: "HTTP $status"
-        // How the printing functions refuse an account that is neither
-        // staff nor a print account.
-        if (message == "staff only") return NotAllowedException()
-        return BackendException(status, "$what: $message")
-    }
+    private suspend fun rpc(name: String, args: JsonObject): String = rest.rpc(name, args)
 
     @Serializable
     private class OrderRow(val id: String, @SerialName("order_number") val orderNumber: Long)

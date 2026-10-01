@@ -34,7 +34,7 @@ android {
         versionCode = build
         // CI's run number as the last part, so the version the tablet shows
         // under App info is the name of the release it came from.
-        versionName = providers.gradleProperty("versionName").getOrElse("0.1.$build")
+        versionName = providers.gradleProperty("versionName").getOrElse("0.2.$build")
 
         buildConfigField("String", "SUPABASE_URL", quoted(setting("supabaseUrl")))
         buildConfigField("String", "SUPABASE_KEY", quoted(setting("supabaseKey")))

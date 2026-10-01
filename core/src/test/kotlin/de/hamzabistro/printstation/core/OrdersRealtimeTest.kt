@@ -58,11 +58,11 @@ class OrdersRealtimeTest {
         signedIn()
         realtimeServer { socket, ref ->
             socket.send(
-                """{"topic":"${OrdersRealtime.TOPIC}","event":"phx_reply","ref":"$ref",""" +
+                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"phx_reply","ref":"$ref",""" +
                     """"payload":{"status":"ok","response":{"postgres_changes":[{"id":1}]}}}"""
             )
             socket.send(
-                """{"topic":"${OrdersRealtime.TOPIC}","event":"postgres_changes","ref":null,""" +
+                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"postgres_changes","ref":null,""" +
                     """"payload":{"data":{"type":"UPDATE","record":{"customer_name":"not read"}},"ids":[1]}}"""
             )
         }
@@ -84,17 +84,40 @@ class OrdersRealtimeTest {
     }
 
     @Test
+    fun `watches every order for the staff queue, on a topic of its own`() = runBlocking<Unit> {
+        signedIn()
+        val topic = OrdersRealtime.Watch.ALL.topic
+        realtimeServer { socket, ref ->
+            socket.send("""{"topic":"$topic","event":"phx_reply","ref":"$ref","payload":{"status":"ok","response":{}}}""")
+            // A message for another topic is not this socket's business.
+            socket.send("""{"topic":"realtime:other","event":"postgres_changes","ref":null,"payload":{}}""")
+            socket.send("""{"topic":"$topic","event":"postgres_changes","ref":null,"payload":{}}""")
+        }
+        val realtime =
+            OrdersRealtime(test.config, test.client, sessions, PrintLogger, System::currentTimeMillis)
+
+        withTimeout(10.seconds) { assertEquals(2, realtime.changes(OrdersRealtime.Watch.ALL).take(2).toList().size) }
+
+        test.server.takeRequest()
+        val join = assertNotNull(heard.poll(5, TimeUnit.SECONDS))
+        assertEquals(topic, join.string("topic"))
+        val changes = join["payload"]!!.jsonObject["config"]!!.jsonObject["postgres_changes"]!!.jsonArray.single().jsonObject
+        assertEquals("orders", changes.string("table"))
+        assertEquals(null, changes["filter"])
+    }
+
+    @Test
     fun `a refused subscription is dropped and tried again`() = runBlocking<Unit> {
         signedIn()
         realtimeServer { socket, ref ->
             socket.send(
-                """{"topic":"${OrdersRealtime.TOPIC}","event":"phx_reply","ref":"$ref",""" +
+                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"phx_reply","ref":"$ref",""" +
                     """"payload":{"status":"error","response":{"reason":"Unauthorized"}}}"""
             )
         }
         realtimeServer { socket, ref ->
             socket.send(
-                """{"topic":"${OrdersRealtime.TOPIC}","event":"phx_reply","ref":"$ref","payload":{"status":"ok","response":{}}}"""
+                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"phx_reply","ref":"$ref","payload":{"status":"ok","response":{}}}"""
             )
         }
         val realtime =

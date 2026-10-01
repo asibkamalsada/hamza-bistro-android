@@ -1,32 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Print station</string>
+    <string name="app_name">Hamza Team</string>
 
-    <string name="channel_running">Print station</string>
+    <string name="channel_running">Shift and print station</string>
     <string name="channel_alerts">Printing stopped</string>
+    <string name="channel_alarm">Alarm: new order</string>
+    <string name="channel_alarm_description">Rings in a loop over the lock screen until somebody accepts or declines the order. The app makes the sound itself, on the alarm stream.</string>
+    <string name="channel_kitchen">Alerts: pre-order, printer, connection</string>
+    <string name="channel_kitchen_description">One-off alerts: a pre-order has to go on now, a ticket did not print, no connection to the shop.</string>
+    <string name="channel_orders">New order (message)</string>
+    <string name="channel_orders_description">For devices that should only say once that an order came in.</string>
+    <string name="channel_quiet">At night, without sound</string>
+    <string name="channel_quiet_description">What arrives in the night window: shown, but silent.</string>
 
     <string name="running_title">Print station running</string>
+    <string name="running_shift_title">On shift</string>
     <string name="running_starting">Starting…</string>
     <string name="running_looked">Looked at the queue at %1$s</string>
     <string name="running_last_printed">Last ticket #%1$d · looked at the queue at %2$s</string>
+    <string name="running_printer_line">Printer: %1$s</string>
+
+    <string name="count_new">%1$d new</string>
+    <string name="count_cooking">%1$d in the kitchen</string>
+    <string name="count_out">%1$d out</string>
+    <string name="queue_empty_short">No open orders</string>
+    <string name="queue_not_staff">This account is not (or no longer) on the staff list. Ask the owner.</string>
+    <string name="queue_offline_since">No connection to the shop since %1$s — this device hears nothing about new orders just now.</string>
 
     <string name="problem_not_printed">Ticket #%1$d did not print: %2$s. Printer on, paper in?</string>
     <string name="problem_offline">No connection to the shop: %1$s</string>
-    <string name="problem_not_allowed">This account may not print. Sign in with the print account.</string>
+    <string name="problem_not_allowed">This account may not print. Sign in with the print account or a staff account.</string>
+    <string name="problem_not_allowed_any">This account is neither staff nor a print account. The owner adds it in the shop.</string>
 
     <string name="stopped_title">Printing stopped</string>
     <string name="stopped_signed_out">Signed out. Open the app and sign in again.</string>
     <string name="stopped_no_printer">No printer chosen. Open the app and choose one.</string>
     <string name="stopped_could_not_start">Could not start: %1$s. Open the app.</string>
 
+    <string name="alarm_title">New order #%1$d</string>
+    <string name="alarm_title_preorder">Pre-order #%1$d</string>
+    <string name="alarm_total">Total %1$s</string>
+    <plurals name="alarm_more">
+        <item quantity="one">+ %1$d more waiting</item>
+        <item quantity="other">+ %1$d more waiting</item>
+    </plurals>
+    <string name="alarm_silence">Silence</string>
+    <string name="alarm_open">Open</string>
+    <string name="alarm_heading">New order</string>
+    <string name="alarm_heading_preorder">New pre-order</string>
+    <string name="alarm_silence_until">Silence until %1$s</string>
+    <string name="alarm_open_queue">To the queue</string>
+    <string name="alarm_privacy">Name, phone and address are in the app, behind the lock screen.</string>
+    <string name="silenced_until">Alarm silenced until %1$s — whatever still waits then rings again.</string>
+
+    <string name="chime_cook_now">Pre-order #%1$d: start cooking</string>
+    <string name="chime_cook_now_text">Due %1$s · %2$s</string>
+    <string name="chime_printer">Ticket #%1$d did not print</string>
+    <string name="chime_printer_text">%1$s. Printer on, paper in?</string>
+    <string name="chime_offline">No connection to the shop</string>
+    <string name="chime_offline_text">Since %1$s — new orders do not reach this device just now. Check Wi-Fi or mobile data.</string>
+
+    <string name="slot_today">today</string>
+    <string name="slot_tomorrow">tomorrow</string>
+
     <string name="section_account">Account</string>
-    <string name="sign_in_hint">Sign in with the print account made for this tablet. The password is not kept on the device.</string>
+    <string name="sign_in_hint">Sign in with your account from the website — the one you open /orders with. A tablet that only prints signs in with its print account. The password is not kept on the device.</string>
     <string name="email">Email</string>
     <string name="password">Password</string>
     <string name="sign_in">Sign in</string>
     <string name="sign_out">Sign out</string>
     <string name="signed_in">Signed in.</string>
-    <string name="signed_out">Signed out. Printing is off on this tablet.</string>
+    <string name="signed_in_staff">Signed in. \"Start shift\" to have this device ring for new orders.</string>
+    <string name="signed_out">Signed out. Nothing rings or prints on this device any more.</string>
     <string name="signed_in_as">Signed in as %1$s</string>
     <string name="sign_in_wrong">Wrong email or password.</string>
     <string name="sign_in_unconfirmed">The address is not confirmed yet: open the link in the email from the site first.</string>
@@ -51,5 +96,142 @@
 
     <string name="section_background">Keep printing in the background</string>
     <string name="battery_hint">Android may stop the app to save battery, and then nothing prints. Allow it to run in the background. On Samsung and Xiaomi, also follow dontkillmyapp.com for your model.</string>
+    <string name="battery_hint_staff">Samsung and Xiaomi stop apps anyway: there, also follow dontkillmyapp.com for the model (Samsung: Battery → Background usage limits → Never sleeping apps).</string>
     <string name="battery_button">Allow background running</string>
+
+    <!-- The queue -->
+    <string name="queue_title">Orders</string>
+    <string name="queue_title_waiting">Orders (%1$d new)</string>
+    <string name="queue_empty">No open orders right now.</string>
+    <string name="queue_decide">New — accept or decline</string>
+    <string name="queue_cook">In the kitchen</string>
+    <string name="queue_out">On the way &amp; ready to collect</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="retry">Retry</string>
+    <string name="shift_off_banner">Not on shift: this device does not ring for new orders.</string>
+    <string name="shift_start">Start shift</string>
+    <string name="alarm_limited">The alarm is limited — missing: %1$s. Fix it in the settings.</string>
+    <string name="need_notifications">notifications</string>
+    <string name="need_full_screen">full screen over the lock screen</string>
+    <string name="need_background">background running</string>
+    <string name="order_moved">That order had already been changed — this is where it stands now.</string>
+    <string name="step_failed">Not sent: %1$s</string>
+    <string name="printed_by_hand">Ticket #%1$d printed.</string>
+
+    <string name="waiting_for">waiting %1$d min</string>
+    <string name="due_at">due %1$s</string>
+    <string name="due_in">%1$d min left</string>
+    <string name="due_late">%1$d min late</string>
+    <string name="cook_from">start cooking %1$s</string>
+    <string name="cook_now">Start cooking now</string>
+
+    <string name="status_new">New</string>
+    <string name="status_confirmed">Accepted</string>
+    <string name="status_ready">Ready to collect</string>
+    <string name="status_on_the_way">On the way</string>
+    <string name="status_delivered">Delivered</string>
+    <string name="status_collected">Collected</string>
+    <string name="status_cancelled">Cancelled</string>
+
+    <string name="preorder_badge">For %1$s</string>
+    <string name="pickup_badge">Collected by the customer</string>
+    <string name="ordered_at">Ordered %1$s</string>
+    <string name="kitchen_note">Note for the kitchen</string>
+    <string name="collect">Collect %1$s</string>
+    <string name="fee_label">delivery %1$s</string>
+    <string name="deposit_label">deposit %1$s</string>
+    <string name="pickup_discount_label">pickup discount −%1$s</string>
+    <string name="discount_label">discount %1$s −%2$s</string>
+    <string name="stamp_label">stamp card −%1$s</string>
+    <string name="new_customer">First order — worth a quick call</string>
+    <string name="door_note">At the door</string>
+    <string name="unverified_address">Address not verified — confirm it on the call</string>
+    <string name="cancel_reason_shown">Reason: %1$s</string>
+    <string name="ticket_printed">Ticket printed %1$s</string>
+    <string name="ticket_not_printed">Ticket not printed yet</string>
+
+    <string name="accept_delivery_in">Accept — at the door in</string>
+    <string name="accept_pickup_in">Accept — ready in</string>
+    <string name="accept_scheduled">Accept for %1$s</string>
+    <string name="eta_button">%1$d min</string>
+    <string name="step_on_the_way">On the way</string>
+    <string name="step_ready">Ready to collect</string>
+    <string name="step_delivered">Delivered</string>
+    <string name="step_collected">Collected</string>
+    <string name="decline">Decline</string>
+    <string name="cancel_later">Cancel</string>
+    <string name="cancel_why">Why? The customer is told.</string>
+    <string name="cancel_back">Back</string>
+    <string name="reason_busy">Too busy</string>
+    <string name="reason_sold_out">Sold out</string>
+    <string name="reason_unreachable">Can\'t reach them</string>
+    <string name="reason_address">Address problem</string>
+    <string name="reason_none">No reason</string>
+    <string name="pending_sending">%1$s — sending in a moment</string>
+    <string name="pending_accepted">Accepted, %1$d min</string>
+    <string name="pending_declined">Declined</string>
+    <string name="pending_cancelled">Cancelled</string>
+    <string name="undo">Undo</string>
+    <string name="print_ticket">Print ticket</string>
+
+    <!-- Settings -->
+    <string name="section_shift">Shift</string>
+    <string name="shift_switch">On shift — this device rings</string>
+    <string name="shift_hint">On shift, the app runs in the background, keeps its connection to the shop and is listed on the website under \"Wer von Bestellungen erfährt\". On the shop\'s tablet, simply leave it on; on a driver\'s phone, switch it off after work.</string>
+    <string name="device_name">Name of this device</string>
+    <string name="device_name_hint">e.g. Tablet, Driver 1</string>
+
+    <string name="section_alarm">Alarm</string>
+    <string name="alarm_mode">When a new order comes in</string>
+    <string name="alarm_mode_loop">Ring loudly until somebody accepts or declines it — on any device</string>
+    <string name="alarm_mode_once">Say so once, like a message</string>
+    <string name="alarm_mode_off">Nothing — only in the list</string>
+    <string name="alarm_sound">Sound</string>
+    <string name="sound_beeps">Beeps</string>
+    <string name="sound_bell">Bell</string>
+    <string name="sound_siren">Siren</string>
+    <string name="sound_device">Device alarm</string>
+    <string name="alarm_test">Listen</string>
+    <string name="alarm_full_volume">Full volume while it rings (and back afterwards)</string>
+    <string name="alarm_vibrate">Vibrate</string>
+    <string name="alarm_silence_for">\"Silence\" lasts</string>
+    <string name="alarm_quiet">Night window</string>
+    <string name="alarm_quiet_hint">In the night window nothing rings; an order arrives as a silent notification — a pre-order placed at one in the morning, say. A pre-order still waiting then rings in the hour before its time.</string>
+    <string name="alarm_cook_now">Pre-order: say when it has to go on</string>
+    <string name="alarm_printer">Printer: say when a ticket did not print</string>
+    <string name="alarm_connection">Say when the connection to the shop is gone</string>
+    <string name="minutes_n">%1$d min</string>
+    <string name="seconds_n">%1$d s</string>
+    <string name="quiet_never">None</string>
+    <string name="quiet_window">%1$s–%2$s</string>
+
+    <string name="section_ringing">So that it rings</string>
+    <string name="ringing_ok">All allowed: this device rings locked, on silent and in the background.</string>
+    <string name="ringing_missing">Something is missing — without it the alarm may stay silent:</string>
+    <string name="fix_notifications">Allow notifications</string>
+    <string name="fix_full_screen">Allow full screen</string>
+    <string name="ringing_dnd_hint">The alarm uses the alarm stream: it rings on silent and through Do Not Disturb, as long as alarms are allowed there (the default).</string>
+
+    <string name="section_accept">Accepting</string>
+    <string name="eta_ladder">Minute buttons beside the suggestion</string>
+    <string name="undo_window">Undo window</string>
+    <string name="undo_none">Send at once</string>
+
+    <string name="section_route">Route</string>
+    <string name="nav_google">Google Maps</string>
+    <string name="nav_apple">Apple Maps</string>
+    <string name="nav_waze">Waze</string>
+    <string name="nav_geo">Device asks</string>
+    <string name="travel_bike">Bike</string>
+    <string name="travel_car">Car</string>
+
+    <string name="section_screen">Screen</string>
+    <string name="keep_awake">Keep the screen on while the queue is open</string>
+
+    <string name="section_printer_staff">Receipt printer (on the shop\'s tablet)</string>
+
+    <string name="section_website">On the website</string>
+    <string name="website_hint">Sold-out switches, the menu and \"Letzte Bestellungen\" stay on the website.</string>
+    <string name="website_open">Open the website</string>
 </resources>
