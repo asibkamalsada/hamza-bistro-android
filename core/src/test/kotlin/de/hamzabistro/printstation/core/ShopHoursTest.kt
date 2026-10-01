@@ -1,0 +1,145 @@
+package de.hamzabistro.printstation.core
+
+import java.time.Instant
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlinx.coroutines.runBlocking
+
+class ShopHoursTest {
+    private val test = TestServer()
+    private val store = MemorySessionStore(StoredSession("refresh-0", Account("user-1", null)))
+    private val sessions = SessionManager(SupabaseAuth(test.config, test.client) { 0L }, store) { 0L }
+    private val backend = SupabaseShopBackend(test.config, test.client, sessions)
+
+    @AfterTest fun close() = test.close()
+
+    private val now = Instant.parse("2026-10-02T10:30:00Z")
+
+    /** What shop_hours() answers, the week included, which the app does not read. */
+    private fun answer(openNow: Boolean, closures: String = "[]", extra: String = "") =
+        """{"delivery":[{"day":0,"delivers":true,"opens":720,"closes":1200}],""" +
+            """"closures":$closures,"open_now":$openNow,""" +
+            """"open_until":${if (openNow) "\"2026-10-02T18:00:00+00:00\"" else "null"},""" +
+            """"next_open":${if (openNow) "null" else "\"2026-10-02T11:10:00+00:00\""}$extra}"""
+
+    @Test
+    fun `reads where the shop stands, as the signed-in account`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, answer(openNow = true))
+
+        val hours = backend.hours()!!
+        assertEquals(ShopState.OPEN, hours.state(now))
+        assertEquals(Instant.parse("2026-10-02T18:00:00Z"), hours.openUntil)
+
+        test.server.takeRequest()
+        val request = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/shop_hours", request.url.encodedPath)
+        assertEquals("Bearer access-1", request.headers["Authorization"])
+    }
+
+    @Test
+    fun `a closure running now is the shop closed, and who closed it is said`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(
+            200,
+            answer(
+                openNow = false,
+                closures =
+                    """[{"id":4,"starts_at":"2026-10-02T10:00:00+00:00","ends_at":"2026-10-02T11:10:00+00:00","by":"koch@example.com"},""" +
+                        """{"id":5,"starts_at":"2026-12-24T13:00:00+00:00","ends_at":null,"by":null}]""",
+            ),
+        )
+
+        val hours = backend.hours()!!
+        assertEquals(ShopState.CLOSED, hours.state(now))
+        assertEquals(4, hours.closureAt(now)?.id)
+        assertEquals("koch@example.com", hours.closureAt(now)?.by)
+        assertEquals(Instant.parse("2026-10-02T11:10:00Z"), hours.nextOpen)
+    }
+
+    @Test
+    fun `outside the hours with nothing closed is neither open nor closed`() {
+        val hours = ShopHours(openNow = false, nextOpen = Instant.parse("2026-10-03T09:00:00Z"))
+        assertEquals(ShopState.OUTSIDE, hours.state(now))
+        assertNull(hours.closureAt(now))
+    }
+
+    @Test
+    fun `reads the time passed since the last read`() {
+        val paused =
+            ShopHours(
+                openNow = false,
+                nextOpen = Instant.parse("2026-10-02T11:10:00Z"),
+                closures = listOf(ShopClosure(4, Instant.parse("2026-10-02T10:00:00Z"), Instant.parse("2026-10-02T11:10:00Z"))),
+            )
+        assertEquals(ShopState.CLOSED, paused.state(now))
+        assertEquals(Instant.parse("2026-10-02T11:10:00Z"), paused.reopensAt(now))
+        // The pause ran out before the next read.
+        assertEquals(ShopState.OPEN, paused.state(Instant.parse("2026-10-02T11:10:05Z")))
+
+        val open =
+            ShopHours(
+                openNow = true,
+                openUntil = Instant.parse("2026-10-02T11:00:00Z"),
+                closures = listOf(ShopClosure(5, Instant.parse("2026-10-02T11:00:00Z"), null)),
+            )
+        assertEquals(ShopState.OPEN, open.state(now))
+        // A closure planned for eleven started since: closed, and nobody knows until when.
+        val later = Instant.parse("2026-10-02T11:00:10Z")
+        assertEquals(ShopState.CLOSED, open.state(later))
+        assertNull(open.reopensAt(later))
+        // And the day's hours ending since is simply outside them.
+        assertEquals(ShopState.OUTSIDE, open.copy(closures = emptyList()).state(later))
+    }
+
+    @Test
+    fun `of two closures running at once, the one without an end is the one that counts`() {
+        val hours =
+            ShopHours(
+                openNow = false,
+                closures =
+                    listOf(
+                        ShopClosure(1, Instant.parse("2026-10-02T10:00:00Z"), Instant.parse("2026-10-02T12:00:00Z")),
+                        ShopClosure(2, Instant.parse("2026-10-02T10:15:00Z"), null),
+                    ),
+            )
+        assertEquals(2, hours.closureAt(now)?.id)
+    }
+
+    @Test
+    fun `closes until a time, or until further notice, and opens again`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, answer(openNow = false, extra = ""","preorders_inside":2"""))
+        test.reply(200, answer(openNow = false))
+        test.reply(200, answer(openNow = true))
+
+        assertEquals(2, backend.close(Instant.parse("2026-10-02T11:10:00Z")).preordersInside)
+        backend.close(null)
+        assertEquals(ShopState.OPEN, backend.open().state(now))
+
+        test.server.takeRequest()
+        val pause = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/shop_close", pause.url.encodedPath)
+        assertEquals("""{"p_until":"2026-10-02T11:10:00Z"}""", pause.body!!.utf8())
+        val forGood = test.server.takeRequest()
+        assertEquals("""{"p_until":null}""", forGood.body!!.utf8())
+        assertEquals("/rest/v1/rpc/shop_open", test.server.takeRequest().url.encodedPath)
+    }
+
+    @Test
+    fun `a database without closing answers nothing rather than failing`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(404, """{"code":"PGRST202","message":"Could not find the function public.shop_hours"}""")
+        assertNull(backend.hours())
+    }
+
+    @Test
+    fun `an account that is not staff may not close the shop`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(400, """{"code":"P0001","message":"staff only"}""")
+        assertFailsWith<NotAllowedException> { backend.close(null) }
+    }
+}

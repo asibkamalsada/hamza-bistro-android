@@ -9,13 +9,17 @@ import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
+import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.QueueState
+import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.queue.Pending
 import de.hamzabistro.printstation.queue.StepFailure
 import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.ShiftService
+import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -40,6 +45,8 @@ data class StaffState(
     val now: Instant = Instant.now(),
     /** Whether this device has a printer to print a ticket on by hand. */
     val canPrint: Boolean = false,
+    /** Whether customers can order right now. */
+    val shop: ShopView = ShopView(),
 )
 
 /** What happened that the screen should say once. */
@@ -49,6 +56,12 @@ sealed interface StaffEvent {
     data class Printed(val order: Long) : StaffEvent
 
     data class PrintFailed(val reason: String) : StaffEvent
+
+    /** Opening or closing the shop did not go through. */
+    data class ShopFailed(val reason: String) : StaffEvent
+
+    /** Orders already booked for a time inside a closure just made: they stand. */
+    data class PreordersInside(val count: Int) : StaffEvent
 }
 
 /**
@@ -72,10 +85,24 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
             StaffState(queue = queue, prefs = prefs, pending = pending, busy = busy)
         }
 
+    private val shop = MutableStateFlow(ShopView())
+
+    /** Reads whether the shop is open, now and then for as long as it is collected. */
+    private val shopPoll: Flow<ShopView> =
+        merge(
+            flow<Nothing> {
+                while (true) {
+                    refreshShop()
+                    delay(SHOP_POLL)
+                }
+            },
+            shop,
+        )
+
     /** Read only while the screen collects it: the poll stops a few seconds after it goes. */
     val state: StateFlow<StaffState> =
-        combine(parts, graph.alarm, ticks) { state, alarm, now ->
-                state.copy(alarm = alarm, now = now, canPrint = graph.settings.printer != null)
+        combine(parts, graph.alarm, ticks, shopPoll) { state, alarm, now, shop ->
+                state.copy(alarm = alarm, now = now, canPrint = graph.settings.printer != null, shop = shop)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StaffState())
 
@@ -137,6 +164,58 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePrefs(change: (DevicePrefs) -> DevicePrefs) = graph.settings.update(change)
 
+    // -------------------------------------------------------------------
+    // The shop: open, paused, closed
+    // -------------------------------------------------------------------
+
+    /** Closed for [minutes] from now, rounded up to five: "wieder ab 18:40", not 18:37. */
+    fun pauseShop(minutes: Long) {
+        val step = Duration.ofMinutes(PAUSE_ROUNDING).toMillis()
+        val until = Instant.now().plus(minutes, ChronoUnit.MINUTES).toEpochMilli()
+        closeShop(Instant.ofEpochMilli((until + step - 1) / step * step))
+    }
+
+    /** Closed until midnight in Leipzig: tomorrow opens as usual. */
+    fun closeShopForToday() =
+        closeShop(
+            Instant.now().atZone(AlarmPolicy.LEIPZIG).toLocalDate().plusDays(1).atStartOfDay(AlarmPolicy.LEIPZIG).toInstant()
+        )
+
+    /** Closed until somebody opens again — here, on another device, or on the website. */
+    fun closeShopForGood() = closeShop(null)
+
+    fun openShop() = switchShop { graph.shop.open() }
+
+    private fun closeShop(until: Instant?) = switchShop { graph.shop.close(until) }
+
+    private fun switchShop(call: suspend () -> ShopHours) {
+        shop.value = shop.value.copy(busy = true)
+        viewModelScope.launch {
+            try {
+                val hours = call()
+                shop.value = ShopView(hours)
+                if (hours.preordersInside > 0) _events.value = StaffEvent.PreordersInside(hours.preordersInside)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                shop.value = shop.value.copy(busy = false)
+                _events.value = StaffEvent.ShopFailed(e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    /** A failure keeps what was last read: the queue's own banner says when the shop is out of reach. */
+    private suspend fun refreshShop() {
+        try {
+            val hours = graph.shop.hours()
+            if (!shop.value.busy) shop.value = ShopView(hours)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            graph.logger.warn("Reading the shop hours failed: ${e.javaClass.simpleName}")
+        }
+    }
+
     /** Three seconds of the alarm, to hear what it will sound like. */
     fun testSound() {
         val prefs = graph.settings.device.value
@@ -152,5 +231,9 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         val TICK = 5.seconds
         val TEST_SOUND = 3.seconds
+
+        /** As often as the queue's own poll: somebody may close the shop from another device. */
+        val SHOP_POLL = 25.seconds
+        const val PAUSE_ROUNDING = 5L
     }
 }

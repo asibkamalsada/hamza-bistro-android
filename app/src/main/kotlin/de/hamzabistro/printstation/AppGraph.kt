@@ -22,6 +22,7 @@ import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabasePrintBackend
+import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
 import de.hamzabistro.printstation.printer.BlePrinter
 import de.hamzabistro.printstation.queue.PendingSteps
@@ -77,6 +78,9 @@ class AppGraph(context: Context) {
     val backend = SupabasePrintBackend(config, http, sessions)
 
     val staff = SupabaseStaffBackend(config, http, sessions)
+
+    /** Opening and closing the shop: see hamza-bistro-web's /orders/hours. */
+    val shop = SupabaseShopBackend(config, http, sessions)
 
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 

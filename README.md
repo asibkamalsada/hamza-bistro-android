@@ -95,6 +95,33 @@ rules, ported to Kotlin with the site's own test cases
 Sold-out switches, the menu and "Letzte Bestellungen" stay on the website;
 the settings link there.
 
+### Open, paused, closed
+
+Above the queue, the same line as on `/orders`: whether customers can order
+right now, and the switch for it
+([`ShopHours`](core/src/main/kotlin/de/hamzabistro/printstation/core/ShopHours.kt),
+`ui/ShopSwitch.kt`).
+
+- **Open**: "Bestellungen werden angenommen – bis 20:00 Uhr", and
+  **Pausieren …** — 30 minutes, an hour, the rest of the day, or until
+  further notice. Two taps, the second saying for how long.
+- **Closed**: in red, until when, and who closed it, with **Wieder öffnen**
+  one tap away.
+- **Outside the hours**: when orders come in again; pre-orders still do.
+
+Closing is the website's (`shop_close` in
+[`20261001150000_shop_hours.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261001150000_shop_hours.sql)):
+the checkout stops taking orders for that time, for right now and for
+later, and the database refuses them too. Orders already in the queue are
+not touched; closing says how many were booked for a time inside it, so
+somebody accepts or declines them. The line is read with the queue, every
+25 seconds, so a closure made on another phone or on the website shows
+here within one poll.
+
+The week's delivery hours and closures planned ahead (a holiday, a day
+off) are set on the website, at `/orders/hours`, which **Lieferzeiten**
+opens. Without that migration the line is simply not there.
+
 ### The alarm
 
 [`AlarmPolicy`](core/src/main/kotlin/de/hamzabistro/printstation/core/AlarmPolicy.kt)
@@ -184,8 +211,9 @@ kept in a small file and reported later, never printed twice.
 
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
-  `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the alarm's
-  rules (`AlarmPolicy`), Realtime (`OrdersRealtime`), and printing
+  `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), opening and
+  closing the shop (`ShopHours`, `SupabaseShopBackend`), the alarm's rules
+  (`AlarmPolicy`), Realtime (`OrdersRealtime`), and printing
   (`SupabasePrintBackend`, `PrintStation`).
 - [`app/`](app) — what only Android can do: the service and the boot
   receiver (`station/`), the alarm's sound and screen (`alarm/`), the undo
@@ -262,6 +290,9 @@ In hamza-bistro-web:
    station" in the site's README.
 3. The tablet's own account in `staff` (see Security), and each driver who
    uses the app with their own, as for `/orders`.
+4. For opening and closing the shop from the app:
+   `20261001150000_shop_hours.sql`. Without it the line above the queue is
+   not shown, and everything else works as before.
 
 ### 2. Each device
 

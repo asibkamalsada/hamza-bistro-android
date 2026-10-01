@@ -234,4 +234,31 @@
     <string name="section_website">Auf der Website</string>
     <string name="website_hint">Ausverkauft-Schalter, Speisekarte und „Letzte Bestellungen“ bleiben auf der Website.</string>
     <string name="website_open">Website öffnen</string>
+
+    <!-- Ob der Laden Bestellungen annimmt: die Zeile über der Liste (ShopSwitch.kt). -->
+    <string name="shop_open">Bestellungen werden angenommen.</string>
+    <string name="shop_open_until">Bestellungen werden angenommen – bis %1$s Uhr.</string>
+    <string name="shop_closed_until">Geschlossen – Bestellungen wieder %1$s.</string>
+    <string name="shop_closed_for_good">Geschlossen bis auf Weiteres – es kommen keine Bestellungen.</string>
+    <string name="shop_outside_hours">Außerhalb der Lieferzeiten – Bestellungen wieder %1$s. Vorbestellen geht.</string>
+    <string name="shop_no_hours">Keine Lieferzeiten eingetragen – es kommen keine Bestellungen.</string>
+    <string name="shop_closed_by">Geschlossen von %1$s.</string>
+    <string name="shop_pause">Pausieren …</string>
+    <string name="shop_close">Schließen …</string>
+    <string name="shop_for_30">30 Min.</string>
+    <string name="shop_for_60">1 Std.</string>
+    <string name="shop_for_today">Rest des Tages</string>
+    <string name="shop_for_good">Bis auf Weiteres</string>
+    <string name="shop_keep_open">Doch nicht</string>
+    <string name="shop_open_now">Wieder öffnen</string>
+    <string name="shop_hours_link">Lieferzeiten</string>
+    <string name="shop_failed">Hat nicht geklappt: %1$s</string>
+    <string name="shop_when_today">heute ab %1$s Uhr</string>
+    <string name="shop_when_tomorrow">morgen ab %1$s Uhr</string>
+    <string name="shop_when_day">%1$s ab %2$s Uhr</string>
+    <string name="shop_when_date">am %1$s ab %2$s Uhr</string>
+    <plurals name="shop_preorders_inside">
+        <item quantity="one">%1$d schon gebuchte Bestellung fällt in diese Zeit und bleibt in der Liste – bitte annehmen oder ablehnen.</item>
+        <item quantity="other">%1$d schon gebuchte Bestellungen fallen in diese Zeit und bleiben in der Liste – bitte annehmen oder ablehnen.</item>
+    </plurals>
 </resources>
