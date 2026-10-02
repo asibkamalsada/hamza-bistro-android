@@ -118,6 +118,7 @@ class StationSettings(context: Context) {
                     newOrders = enumOr(prefs.getString(NEW_ORDERS, null), a.newOrders)!!,
                     cookNow = prefs.getBoolean(COOK_NOW, a.cookNow),
                     printer = prefs.getBoolean(PRINTER_ALARM, a.printer),
+                    unprinted = prefs.getBoolean(UNPRINTED_ALARM, a.unprinted),
                     connection = prefs.getBoolean(CONNECTION_ALARM, a.connection),
                     quietFrom = time(QUIET_FROM, a.quietFrom),
                     quietTo = time(QUIET_TO, a.quietTo),
@@ -148,6 +149,7 @@ class StationSettings(context: Context) {
             .putString(NEW_ORDERS, p.alarm.newOrders.name)
             .putBoolean(COOK_NOW, p.alarm.cookNow)
             .putBoolean(PRINTER_ALARM, p.alarm.printer)
+            .putBoolean(UNPRINTED_ALARM, p.alarm.unprinted)
             .putBoolean(CONNECTION_ALARM, p.alarm.connection)
             .putString(QUIET_FROM, p.alarm.quietFrom?.toString() ?: NEVER)
             .putString(QUIET_TO, p.alarm.quietTo?.toString() ?: NEVER)
@@ -187,6 +189,7 @@ class StationSettings(context: Context) {
         private const val NEW_ORDERS = "alarm_new_orders"
         private const val COOK_NOW = "alarm_cook_now"
         private const val PRINTER_ALARM = "alarm_printer"
+        private const val UNPRINTED_ALARM = "alarm_unprinted"
         private const val CONNECTION_ALARM = "alarm_connection"
         private const val QUIET_FROM = "quiet_from"
         private const val QUIET_TO = "quiet_to"

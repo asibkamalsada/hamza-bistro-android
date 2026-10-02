@@ -57,6 +57,8 @@
     <string name="chime_cook_now_text">Due %1$s · %2$s</string>
     <string name="chime_printer">Ticket #%1$d did not print</string>
     <string name="chime_printer_text">%1$s. Printer on, paper in?</string>
+    <string name="chime_unprinted">Ticket #%1$d not printed</string>
+    <string name="chime_unprinted_text">Accepted at %1$s, and no printer has put out its ticket. Printer on, paper in?</string>
     <string name="chime_offline">No connection to the shop</string>
     <string name="chime_offline_text">Since %1$s — new orders do not reach this device just now. Check Wi-Fi or mobile data.</string>
 
@@ -64,7 +66,7 @@
     <string name="slot_tomorrow">tomorrow</string>
 
     <string name="section_account">Account</string>
-    <string name="sign_in_hint">Sign in with your account from the website — the one you open /orders with. A tablet that only prints signs in with its print account. The password is not kept on the device.</string>
+    <string name="sign_in_hint">Sign in with your account from the website — the one on the staff list. A tablet that only prints signs in with its print account. The password is not kept on the device.</string>
     <string name="email">Email</string>
     <string name="password">Password</string>
     <string name="sign_in">Sign in</string>
@@ -92,7 +94,7 @@
     <string name="station_switch">Print every accepted order</string>
     <string name="station_one_printer">The printer takes one connection at a time: on this tablet, switch \"Print every accepted order\" off on the website.</string>
     <string name="station_stopped">Off.</string>
-    <string name="station_off_failed">Printing is off here, but the station could not be taken off the list (%1$s). Remove it under \"Druckstationen\" on the site.</string>
+    <string name="station_off_failed">Printing is off here, but the station could not be taken off the list (%1$s). Remove it under \"Print stations\" in the settings.</string>
 
     <string name="section_background">Keep printing in the background</string>
     <string name="battery_hint">Android may stop the app to save battery, and then nothing prints. Allow it to run in the background. On Samsung and Xiaomi, also follow dontkillmyapp.com for your model.</string>
@@ -178,7 +180,7 @@
     <!-- Settings -->
     <string name="section_shift">Shift</string>
     <string name="shift_switch">On shift — this device rings</string>
-    <string name="shift_hint">On shift, the app runs in the background, keeps its connection to the shop and is listed on the website under \"Wer von Bestellungen erfährt\". On the shop\'s tablet, simply leave it on; on a driver\'s phone, switch it off after work.</string>
+    <string name="shift_hint">On shift, the app runs in the background, keeps its connection to the shop and is listed under \"Who hears about orders\", here in the settings and on every other device. On the shop\'s tablet, simply leave it on; on a driver\'s phone, switch it off after work.</string>
     <string name="device_name">Name of this device</string>
     <string name="device_name_hint">e.g. Tablet, Driver 1</string>
 
@@ -200,6 +202,7 @@
     <string name="alarm_quiet_hint">In the night window nothing rings; an order arrives as a silent notification — a pre-order placed at one in the morning, say. A pre-order still waiting then rings in the hour before its time.</string>
     <string name="alarm_cook_now">Pre-order: say when it has to go on</string>
     <string name="alarm_printer">Printer: say when a ticket did not print</string>
+    <string name="alarm_unprinted">Say when an accepted order has not printed anywhere two minutes on</string>
     <string name="alarm_connection">Say when the connection to the shop is gone</string>
     <string name="minutes_n">%1$d min</string>
     <string name="seconds_n">%1$d s</string>
@@ -231,9 +234,6 @@
 
     <string name="section_printer_staff">Receipt printer (on the shop\'s tablet)</string>
 
-    <string name="section_website">On the website</string>
-    <string name="website_hint">Sold-out switches, the menu and \"Letzte Bestellungen\" stay on the website.</string>
-    <string name="website_open">Open the website</string>
 
     <!-- Whether the shop takes orders: the line above the queue (ShopSwitch.kt). -->
     <string name="shop_open">Taking orders.</string>
@@ -261,4 +261,130 @@
         <item quantity="one">%1$d order already booked falls in this time and stays in the queue — accept or decline it.</item>
         <item quantity="other">%1$d orders already booked fall in this time and stay in the queue — accept or decline them.</item>
     </plurals>
+
+    <!-- Shared by the screens below. -->
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="reload">Reload</string>
+    <string name="please_wait">Please wait…</string>
+    <string name="remove">Remove</string>
+    <string name="settings_reset">Reset this device\'s settings</string>
+    <string name="more_menu">More</string>
+    <string name="problem_not_staff">This account may not do that: it is not (or no longer) on the staff list.</string>
+    <string name="address_failing_banner">The address check is not working properly — details in the settings.</string>
+
+    <!-- Recent orders (HistoryScreen.kt) -->
+    <string name="history_title">Recent orders</string>
+    <string name="history_empty">No orders in the last few days.</string>
+    <plurals name="history_takings">
+        <item quantity="one">Delivered today: %1$d order · %2$s</item>
+        <item quantity="other">Delivered today: %1$d orders · %2$s</item>
+    </plurals>
+
+    <!-- Delivery hours (HoursScreen.kt) -->
+    <string name="hours_title">Delivery hours</string>
+    <string name="hours_now">Right now</string>
+    <string name="hours_unknown">Not read yet — or the shop\'s database does not know about delivery hours yet.</string>
+    <string name="hours_planned">Closures</string>
+    <string name="hours_planned_note">Holidays, a day off, an evening without a driver: no orders in that time, not even for later.</string>
+    <string name="hours_planned_none">None planned.</string>
+    <string name="hours_plan_running">running now</string>
+    <string name="hours_plan_from">Closed from</string>
+    <string name="hours_plan_until">until</string>
+    <string name="hours_plan_open_ended">No end — until somebody opens again</string>
+    <string name="hours_plan_add">Add closure</string>
+    <string name="hours_plan_range">%1$s to %2$s</string>
+    <string name="hours_plan_from_only">from %1$s, no end</string>
+    <string name="hours_plan_invalid">Give a start, and an end after it.</string>
+    <string name="hours_week">Every week</string>
+    <string name="hours_week_note">Orders, collection included, are taken within these hours; outside them only for a set time in the next ones. Times go on the quarter hour.</string>
+    <string name="hours_day_off">no delivery</string>
+    <string name="hours_week_save">Save hours</string>
+    <string name="hours_week_reset">Never mind</string>
+    <string name="hours_week_invalid">On %1$s delivery ends before it starts.</string>
+    <string name="hours_saved">Saved.</string>
+    <string name="hours_invalid">The database refused that: a day that closes before it opens, or a closure that ends before it starts.</string>
+
+    <!-- The menu (MenuScreen.kt) -->
+    <string name="menu_title">Menu</string>
+    <string name="menu_tab_dishes">Dishes</string>
+    <string name="menu_tab_options">Options</string>
+    <string name="menu_tab_ingredients">Ingredients</string>
+    <string name="menu_intro">Switch a dish off and customers stop seeing it right away.</string>
+    <string name="menu_dashboard_note">Deposits, new dishes and new option groups still live in the Supabase dashboard.</string>
+    <string name="menu_sold_out_count">Sold out: %1$d</string>
+    <string name="menu_available">On the menu</string>
+    <string name="menu_sold_out">Sold out</string>
+    <string name="menu_edit">Edit</string>
+    <string name="menu_name">Name</string>
+    <string name="menu_description">Description</string>
+    <string name="menu_price">Price (€)</string>
+    <string name="menu_prep">Prep (min)</string>
+    <string name="menu_position">Position</string>
+    <string name="menu_prep_hint">How long the kitchen needs for one of these. The queue suggests the delivery time from it — 0 for anything that is not cooked, like a drink.</string>
+    <string name="menu_tags">Labels on the menu</string>
+    <string name="menu_photo_pick">Choose photo</string>
+    <string name="menu_photo_hint">Take it with the device and pick it here — it is cropped square and shrunk for you. Save afterwards to put it on the menu.</string>
+    <string name="menu_photo_uploading">Uploading the photo…</string>
+    <string name="menu_photo_ready">Photo ready. Save to put it on the menu.</string>
+    <string name="menu_photo_url">Photo URL</string>
+    <string name="menu_photo_preview">The photo this dish shows</string>
+    <string name="photo_unreadable">This device cannot read that photo. Try a JPEG or a PNG.</string>
+    <string name="menu_form_invalid">Check the fields: a name of at least two letters, a price, a prep time of 0–120 minutes and a position.</string>
+    <string name="menu_saved">Saved: %1$s</string>
+    <string name="menu_options_intro">Switch a single choice off — the chicken, one sauce — without losing the dish.</string>
+    <string name="menu_options_shared">A group of choices is shared by every dish that offers it, so switching one off switches it off in all of them.</string>
+    <string name="menu_option_used_in">Offered with: %1$s</string>
+    <string name="menu_ingredients_intro">When something runs out, switch it off here and every dish and choice made of it goes off the menu at once. Switch it back on and each returns to what it was before — anything sold out on its own stays sold out.</string>
+    <string name="menu_ingredients_out_count">Out: %1$d</string>
+    <string name="menu_ingredients_empty">No ingredients yet.</string>
+    <string name="menu_ingredient_in">In stock</string>
+    <string name="menu_ingredient_out">Out</string>
+    <string name="menu_ingredient_links_count">Dishes: %1$d · choices: %2$d</string>
+    <string name="menu_ingredient_unused">Not used in anything yet, so switching it off changes nothing.</string>
+    <string name="menu_ingredient_links">What it is used in</string>
+    <string name="menu_ingredient_delete">Delete</string>
+    <string name="menu_ingredient_delete_confirm">Delete this ingredient? Everything it holds back comes back on sale.</string>
+    <string name="menu_ingredient_new">New ingredient</string>
+    <string name="menu_ingredient_add">Add</string>
+
+    <!-- Settings: who hears about orders, print stations, the address check (HealthSections.kt) -->
+    <string name="who_hears">Who hears about orders</string>
+    <string name="who_hears_nobody">Nobody hears about the next order right now: no device is on shift and ringing, and no phone gets notifications.</string>
+    <string name="who_hears_app_hint">Devices with this app ring by themselves until somebody answers the order.</string>
+    <string name="who_hears_push_hint">Phones and browsers with the website\'s notifications, switched on and off on the website itself.</string>
+    <string name="device_unnamed">Unnamed device</string>
+    <string name="device_this">this device</string>
+    <string name="device_mine">yours</string>
+    <string name="device_app">Hamza Team app</string>
+    <string name="device_alarm_loop">rings until somebody answers</string>
+    <string name="device_alarm_once">says so once</string>
+    <string name="device_alarm_off">does not ring</string>
+    <string name="device_seen">on shift since %1$s · last heard from %2$s</string>
+    <string name="device_silent">not heard from since %1$s — open the app there, or remove it</string>
+    <string name="device_push_failed">failed %1$s: %2$s</string>
+    <string name="device_push_sent">last notified %1$s</string>
+    <string name="device_push_never">nothing sent yet</string>
+    <string name="kind_new">new orders</string>
+    <string name="kind_reminders">reminders</string>
+    <string name="kind_preorders">pre-orders</string>
+    <string name="kind_unprinted">unprinted tickets</string>
+    <string name="kind_loud">loud</string>
+    <string name="kind_quiet">quiet %1$s–%2$s</string>
+    <string name="print_stations">Print stations</string>
+    <string name="print_stations_hint">Devices that print every accepted order by themselves. While one is listed, the phones are told about any accepted order not printed within two minutes. Remove one that no longer prints.</string>
+    <string name="print_station_unnamed">Print station</string>
+    <string name="print_station_seen">last active %1$s</string>
+    <string name="address_check">Address check</string>
+    <string name="address_ok">Working — last address found %1$s</string>
+    <string name="address_failing">Failing since %1$s: %2$s</string>
+    <string name="address_fallback">Running on the fallback service (last %1$s) — the main one said: %2$s</string>
+    <string name="address_unconfigured">Not set up — no geocoder is configured, so no address is verified</string>
+    <string name="address_no_data">No lookups recorded yet</string>
+    <string name="address_require_off">Warning: orders are currently accepted without an address check</string>
+    <string name="address_unverified">Deliveries in the last 7 days not verified: %1$d of %2$d</string>
+    <string name="address_test">Test now</string>
+    <string name="address_test_ok">Test passed — the shop\'s address was found in %1$s (%2$d ms)</string>
+    <string name="address_test_fallback">Test passed only via the fallback %1$s — the main one said: %2$s</string>
+    <string name="address_test_failed">Test failed: %1$s</string>
 </resources>

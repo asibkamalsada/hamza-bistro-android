@@ -22,6 +22,9 @@ import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabasePrintBackend
+import de.hamzabistro.printstation.core.SupabaseDevicesBackend
+import de.hamzabistro.printstation.core.SupabaseHistoryBackend
+import de.hamzabistro.printstation.core.SupabaseMenuBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
 import de.hamzabistro.printstation.printer.BlePrinter
@@ -31,6 +34,7 @@ import de.hamzabistro.printstation.station.Role
 import de.hamzabistro.printstation.station.StationSettings
 import de.hamzabistro.printstation.station.StationState
 import de.hamzabistro.printstation.station.wire
+import de.hamzabistro.printstation.ui.ShopView
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -45,8 +49,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /**
  * The app's objects, made once per process. By hand rather than with a DI
@@ -79,8 +86,23 @@ class AppGraph(context: Context) {
 
     val staff = SupabaseStaffBackend(config, http, sessions)
 
-    /** Opening and closing the shop: see hamza-bistro-web's /orders/hours. */
+    /** Opening and closing the shop, and its delivery hours. */
     val shop = SupabaseShopBackend(config, http, sessions)
+
+    /**
+     * Whether the shop takes orders, as last read or switched — one line
+     * for the queue and the hours screen alike, so they never disagree.
+     */
+    val shopView = MutableStateFlow(ShopView())
+
+    /** "Letzte Bestellungen" and today's takings. */
+    val history = SupabaseHistoryBackend(config, http, sessions)
+
+    /** Who hears about orders, the print stations, the address check. */
+    val devices = SupabaseDevicesBackend(config, http, sessions)
+
+    /** What is sold out, and what a dish is and costs. */
+    val menu = SupabaseMenuBackend(config, http, sessions)
 
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 
@@ -218,7 +240,26 @@ class AppGraph(context: Context) {
         queue.refresh()
     }
 
+    /**
+     * A dish's photo, for the preview beside its form: at most
+     * [PHOTO_PREVIEW_BYTES], over HTTPS like everything else, or null.
+     */
+    suspend fun photoPreview(url: String): ByteArray? =
+        withContext(Dispatchers.IO) {
+            val address = url.toHttpUrlOrNull()?.takeIf { it.isHttps } ?: return@withContext null
+            runCatching {
+                http.newCall(Request.Builder().url(address).build()).execute().use { response ->
+                    val source = response.body.source()
+                    // More than the limit buffered is too big, whatever the length header said.
+                    if (!response.isSuccessful || source.request(PHOTO_PREVIEW_BYTES + 1)) null
+                    else source.buffer.readByteArray()
+                }
+            }.getOrNull()
+        }
+
     companion object {
+        private const val PHOTO_PREVIEW_BYTES = 2L * 1024 * 1024
+
         /** How the station is listed under "Druckstationen" on /orders/settings. */
         const val STATION_LABEL = "Android-App"
 

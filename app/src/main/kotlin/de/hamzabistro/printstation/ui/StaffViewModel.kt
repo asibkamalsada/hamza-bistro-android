@@ -47,6 +47,8 @@ data class StaffState(
     val canPrint: Boolean = false,
     /** Whether customers can order right now. */
     val shop: ShopView = ShopView(),
+    /** The delivery address check is failing: orders are priced on what the customer typed. */
+    val addressFailing: Boolean = false,
 )
 
 /** What happened that the screen should say once. */
@@ -85,7 +87,10 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
             StaffState(queue = queue, prefs = prefs, pending = pending, busy = busy)
         }
 
-    private val shop = MutableStateFlow(ShopView())
+    /** Shared with the hours screen, which changes it too. */
+    private val shop = graph.shopView
+
+    private val addressFailing = MutableStateFlow(false)
 
     /** Reads whether the shop is open, now and then for as long as it is collected. */
     private val shopPoll: Flow<ShopView> =
@@ -101,8 +106,8 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Read only while the screen collects it: the poll stops a few seconds after it goes. */
     val state: StateFlow<StaffState> =
-        combine(parts, graph.alarm, ticks, shopPoll) { state, alarm, now, shop ->
-                state.copy(alarm = alarm, now = now, canPrint = graph.settings.printer != null, shop = shop)
+        combine(parts, graph.alarm, ticks, shopPoll, addressFailing) { state, alarm, now, shop, address ->
+                state.copy(alarm = alarm, now = now, canPrint = graph.settings.printer != null, shop = shop, addressFailing = address)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StaffState())
 
@@ -134,7 +139,25 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     /** The screen went away: what waits on its undo window goes now, as on /orders. */
     fun flush() = graph.steps.flushAll()
 
-    fun refresh() = graph.queue.refresh()
+    /** The queue now, and whether the address check works — on every return to the screen. */
+    fun refresh() {
+        graph.queue.refresh()
+        viewModelScope.launch { checkAddress() }
+    }
+
+    /**
+     * One line above the queue when the address check fails; the detail is
+     * in the settings. Unknown is not failing, so a failed read says nothing.
+     */
+    private suspend fun checkAddress() {
+        try {
+            addressFailing.value = !graph.devices.addressHealth().verdict().ok
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            graph.logger.warn("Reading the address check failed: ${e.javaClass.simpleName}")
+        }
+    }
 
     fun silence() = graph.silence()
 

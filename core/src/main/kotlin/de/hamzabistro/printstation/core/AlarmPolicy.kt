@@ -24,6 +24,12 @@ data class AlarmSettings(
     val cookNow: Boolean = true,
     /** A chime when this device's own printer did not print a ticket. */
     val printer: Boolean = true,
+    /**
+     * A chime when an accepted order has no ticket two minutes on, while a
+     * device is meant to print every one — the "unprinted" push the site
+     * sends the phones.
+     */
+    val unprinted: Boolean = true,
     /** A chime when the queue could not be read for a while. */
     val connection: Boolean = true,
     /**
@@ -44,6 +50,9 @@ sealed interface Chime {
     data class CookNow(val order: StaffOrder) : Chime
 
     data class PrinterFailed(val order: Long, val reason: String) : Chime
+
+    /** Accepted two minutes ago, and no ticket came out anywhere. */
+    data class Unprinted(val order: StaffOrder) : Chime
 
     /** The queue has not been read for a while: this device would not hear of an order. */
     data class Offline(val since: Instant) : Chime
@@ -80,6 +89,10 @@ data class AlarmDecision(
  *   * An accepted pre-order chimes once when it has to go on; this device's
  *     printer failing chimes after half a minute and every three minutes
  *     while it lasts; a queue that cannot be read chimes once after two.
+ *   * An accepted order with no ticket two minutes on chimes once, while a
+ *     print station registered before it was accepted is meant to print it
+ *     — the rule of remind_staff_of_waiting_orders()'s "unprinted" stamp in
+ *     20260930150000_order_printing.sql.
  *
  * Holds what it has already said, so it is one per device; [decide] is
  * pure otherwise, with the clock passed in.
@@ -88,6 +101,8 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     private val chimedNew = mutableSetOf<String>()
     private val cookDone = mutableSetOf<String>()
     private var cookPrimed = false
+    private val unprintedDone = mutableSetOf<String>()
+    private var unprintedPrimed = false
     private var silenced: Set<String> = emptySet()
     private var silencedUntil: Instant? = null
     private var printerSince: Instant? = null
@@ -108,7 +123,9 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     /**
      * What to do, given the queue ([orders], null until it was read once),
      * whether reading it fails just now, this device's printer's trouble if
-     * any, how long each pre-order needs ([lead]), and the time.
+     * any, since when some other device has been meant to print every
+     * accepted order ([printingSince], null for none or not known), how long
+     * each pre-order needs ([lead]), and the time.
      */
     @Synchronized
     fun decide(
@@ -117,6 +134,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         printer: Problem?,
         settings: AlarmSettings,
         now: Instant,
+        printingSince: Instant? = null,
         lead: (StaffOrder) -> Int,
     ): AlarmDecision {
         val chimes = mutableListOf<Chime>()
@@ -150,9 +168,24 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
                 if (cookPrimed && settings.cookNow && from.isAfter(now.minus(LATE_START))) chimes += Chime.CookNow(order)
             }
             cookPrimed = true
+            if (printingSince != null) {
+                for (order in orders) {
+                    if (order.status != OrderStatus.CONFIRMED || order.printedAt != null || order.id in unprintedDone) continue
+                    val accepted = order.confirmedAt ?: continue
+                    if (accepted.isAfter(now.minus(UNPRINTED_GRACE))) continue
+                    unprintedDone += order.id
+                    // Already overdue when this device first knew it, accepted
+                    // before anything was meant to print it, or over an hour
+                    // ago: the card says so; it does not also chime.
+                    val due = unprintedPrimed && !printingSince.isAfter(accepted) && accepted.isAfter(now.minus(WINDOW))
+                    if (due && settings.unprinted) chimes += Chime.Unprinted(order)
+                }
+                unprintedPrimed = true
+            }
             val ids = orders.map { it.id }.toSet()
             chimedNew.retainAll(ids)
             cookDone.retainAll(ids)
+            unprintedDone.retainAll(ids)
         }
 
         if (printer is Problem.NotPrinted) {
@@ -216,5 +249,8 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         private val PRINTER_GRACE = Duration.ofSeconds(30)
         private val PRINTER_AGAIN = Duration.ofMinutes(3)
         private val OFFLINE_GRACE = Duration.ofMinutes(2)
+
+        /** Several of a station's looks, each trying a failed ticket again: as the server waits. */
+        private val UNPRINTED_GRACE = Duration.ofMinutes(2)
     }
 }

@@ -7,7 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +52,7 @@ import de.hamzabistro.printstation.core.NavApp
 import de.hamzabistro.printstation.core.NewOrderAlarm
 import de.hamzabistro.printstation.core.TravelMode
 import de.hamzabistro.printstation.station.AlarmSound
+import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.StationSettings
 import java.time.LocalTime
 
@@ -61,14 +61,14 @@ private val QUIET_WINDOWS: List<Pair<LocalTime, LocalTime>?> =
     listOf(null, LocalTime.of(22, 0) to LocalTime.of(9, 0), LocalTime.of(21, 30) to LocalTime.of(9, 30), LocalTime.of(23, 0) to LocalTime.of(8, 0))
 
 /**
- * Everything that is about this device: the shift, how it rings, how it
- * accepts and routes, the printer, the account. /orders/settings, for a
- * phone or tablet with the app.
+ * Everything that is about this device — the shift, how it rings, how it
+ * accepts and routes, the printer, the account — and the health of the
+ * shop's: who hears about orders, the print stations, the address check.
+ * /orders/settings, for a phone or tablet with the app.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
     val state by staff.state.collectAsStateWithLifecycle()
     val mainState by main.state.collectAsStateWithLifecycle()
     val prefs = state.prefs
@@ -159,6 +159,9 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                 SwitchRow(stringResource(R.string.alarm_printer), prefs.alarm.printer) { on ->
                     staff.updatePrefs { it.copy(alarm = it.alarm.copy(printer = on)) }
                 }
+                SwitchRow(stringResource(R.string.alarm_unprinted), prefs.alarm.unprinted) { on ->
+                    staff.updatePrefs { it.copy(alarm = it.alarm.copy(unprinted = on)) }
+                }
                 SwitchRow(stringResource(R.string.alarm_connection), prefs.alarm.connection) { on ->
                     staff.updatePrefs { it.copy(alarm = it.alarm.copy(connection = on)) }
                 }
@@ -223,9 +226,12 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
             PrinterSection(mainState, main)
             StationSection(mainState, main)
 
-            Section(stringResource(R.string.section_website)) {
-                Text(stringResource(R.string.website_hint), style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = { context.openWebsite() }) { Text(stringResource(R.string.website_open)) }
+            // Who hears about orders, the print stations, the address check.
+            HealthSections()
+
+            // Back to how the app comes; the account, the shift and the name stay.
+            TextButton(onClick = { staff.updatePrefs { DevicePrefs(role = it.role, onShift = it.onShift, label = it.label) } }) {
+                Text(stringResource(R.string.settings_reset))
             }
 
             AccountSection(mainState, main)
@@ -295,11 +301,6 @@ private fun Context.openFullScreenSettings() {
     }
 }
 
-/** The rest of the staff pages — sold-out switches, recent orders — are on the website. */
-private fun Context.openWebsite() {
-    tryToOpen(Intent(Intent.ACTION_VIEW, Uri.parse(WEBSITE_ORDERS)))
-}
-
 private fun Context.tryToOpen(intent: Intent) {
     try {
         startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -307,5 +308,3 @@ private fun Context.tryToOpen(intent: Intent) {
         // Not on this device; the screen says what is missing.
     }
 }
-
-private const val WEBSITE_ORDERS = "https://www.hamzabistro.de/orders"

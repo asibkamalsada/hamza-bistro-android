@@ -2,9 +2,10 @@
 
 The shop's own app for working the orders: on **the one tablet in the
 shop**, where orders are accepted and from which they print, and if wanted
-on the drivers' phones. No menu, no cart — the queue of
-[hamza-bistro-web](https://github.com/asibkamalsada/hamza-bistro-web)'s
-`/orders`, and the one thing a web page cannot do:
+on the drivers' phones. No cart — everything the staff pages of
+[hamza-bistro-web](https://github.com/asibkamalsada/hamza-bistro-web) had
+(the queue, the history, what is sold out, the delivery hours, who hears
+about orders), and the one thing a web page cannot do:
 
 **an alarm that rings until somebody answers the order.** In a loop, on
 the alarm stream, over the lock screen with the screen switched on, like an
@@ -92,8 +93,36 @@ rules, ported to Kotlin with the site's own test cases
 - held sideways on a tablet, the three headings stand side by side, like
   a kitchen pass.
 
-Sold-out switches, the menu and "Letzte Bestellungen" stay on the website;
-the settings link there.
+### Everything else the website's staff pages had
+
+The website still has `/orders`, `/orders/settings`, `/orders/hours` and
+`/menu-admin`, but links to none of them any more: they are a fallback,
+reached by typing the address. Everything they do is here, behind the
+queue's top bar (**Mehr** on a phone):
+
+- **Letzte Bestellungen** — the last 50 orders whatever became of them,
+  and what today's delivered orders came to, for the call about yesterday's
+  order and for cashing up. Read when opened, not polled; the cards are for
+  reading (the phone number and the route still open).
+- **Speisekarte** — what is sold out, in three tabs, as on `/menu-admin`:
+  a dish; a single choice, which goes off in every dish that offers it; an
+  ingredient, which takes everything made of it off at once and, switched
+  back on, puts back only what was not sold out on its own. A dish's name,
+  description, price, prep time, position and labels are edited behind
+  **Bearbeiten**; a photo picked there is cropped square, shrunk to 256 px
+  WebP on the device and uploaded to the `menu` bucket, and lands on the
+  menu when the form is saved. What an ingredient is used in is set behind
+  the count beside it. Deposits, new dishes and new option groups stay in
+  the Supabase dashboard, as before.
+- **Lieferzeiten** — the open/closed switch, closures planned ahead (a
+  holiday, a day off; also open-ended), and the week's delivery hours, saved
+  all at once, on the quarter hour.
+- **Einstellungen**, besides this device's own settings: **Wer von
+  Bestellungen erfährt** (the devices on shift with this app, with how they
+  ring and when they were last heard from — a lost one can be removed — and
+  the phones and browsers still getting the website's pushes), the
+  **Druckstationen**, and the **Adressprüfung** with its live test. A
+  failing address check also puts one line above the queue.
 
 ### Open, paused, closed
 
@@ -119,8 +148,8 @@ somebody accepts or declines them. The line is read with the queue, every
 here within one poll.
 
 The week's delivery hours and closures planned ahead (a holiday, a day
-off) are set on the website, at `/orders/hours`, which **Lieferzeiten**
-opens. Without that migration the line is simply not there.
+off) are set under **Lieferzeiten**, which the line also opens. Without that
+migration the line is simply not there.
 
 ### The alarm
 
@@ -144,21 +173,27 @@ decides, every few seconds and on every change of the queue:
   minute, again every three while it lasts — the server's push about it
   comes after two); the queue unreadable for two minutes, which is a
   device that would not hear about the next order.
+- **A ticket that printed nowhere**: on every device that does not print
+  itself, an accepted order with no ticket two minutes on chimes once,
+  while a print station registered before it was accepted is meant to
+  print it — the rule of the "nicht gedruckte Bons" push the server sends
+  the phones. The print stations are read every two minutes.
 
 The full-screen alarm shows the order number, what to cook and the total
 — never the customer's name, phone or address, which stay behind the lock
 screen — and the accept buttons, so an order can be taken without
 unlocking.
 
-### On the website
+### Who hears about orders
 
 A device on shift says so once a minute
 ([`staff_app_seen`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261001120000_staff_app_devices.sql)),
-so `/orders/settings` lists it under **"Wer von Bestellungen erfährt"**,
-with how it rings and when it was last heard from, and the red line on
-`/orders` ("nobody will hear about the next order") counts it. A device
-not heard from for three minutes is shown as not listening. Ending the
-shift takes it off the list; any staff phone can remove a lost one.
+so **Einstellungen → Wer von Bestellungen erfährt** on every device (and
+`/orders/settings` on the website) lists it, with how it rings and when it
+was last heard from, and says in red when nobody would hear about the next
+order. A device not heard from for three minutes is shown as not
+listening. Ending the shift takes it off the list; any staff device can
+remove a lost one.
 
 ## How it works
 
@@ -211,8 +246,11 @@ kept in a small file and reported later, never printed twice.
 
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
-  `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), opening and
-  closing the shop (`ShopHours`, `SupabaseShopBackend`), the alarm's rules
+  `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
+  and takings (`History`), opening and closing the shop, closures and the
+  week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
+  ingredients (`Menu`, `PhotoCrop`), who hears about orders, the print
+  stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), and printing
   (`SupabasePrintBackend`, `PrintStation`).
 - [`app/`](app) — what only Android can do: the service and the boot
@@ -313,8 +351,8 @@ In hamza-bistro-web:
    saver → No restrictions_), or those makers stop the app anyway.
 5. Give the device a name ("Tablet", "Fahrer 1"), choose how it rings, and
    press **Probehören**.
-6. Check on the website, `/orders/settings` → "Wer von Bestellungen
-   erfährt": the device is there, "im Dienst seit …".
+6. Check under **Einstellungen → Wer von Bestellungen erfährt** (on this
+   device or another): the device is there, "im Dienst seit …".
 7. On a phone that had the installed `/orders` with pushes on, switch the
    pushes off there ("Dieses Gerät" on `/orders/settings`), or it hears
    about every order twice.
