@@ -387,4 +387,15 @@
     <string name="address_test_ok">Test bestanden – Ladenadresse in %1$s gefunden (%2$d ms)</string>
     <string name="address_test_fallback">Test nur über den Ersatzdienst %1$s bestanden – der Hauptdienst meldete: %2$s</string>
     <string name="address_test_failed">Test fehlgeschlagen: %1$s</string>
+
+    <!-- Eine neuere Version auf GitHub: die Zeile über der Liste und der Abschnitt „App“ in den Einstellungen (AppUpdate.kt). -->
+    <string name="update_available">Update verfügbar: %1$s</string>
+    <string name="update_install">Installieren</string>
+    <string name="section_app">App</string>
+    <string name="app_version">Version %1$s</string>
+    <string name="update_current">Aktuell – geprüft um %1$s</string>
+    <string name="update_failing">Gerade nicht geprüft (keine Antwort von GitHub). Die App läuft wie bisher.</string>
+    <string name="update_check">Jetzt prüfen</string>
+    <string name="update_changes">Neu:</string>
+    <string name="update_hint">„Installieren“ lädt die APK im Browser; öffnen, und Android installiert sie über diese Version. Anmeldung und Drucker bleiben. Beim ersten Mal fragt Android, ob der Browser Apps installieren darf.</string>
 </resources>

@@ -387,4 +387,15 @@
     <string name="address_test_ok">Test passed — the shop\'s address was found in %1$s (%2$d ms)</string>
     <string name="address_test_fallback">Test passed only via the fallback %1$s — the main one said: %2$s</string>
     <string name="address_test_failed">Test failed: %1$s</string>
+
+    <!-- A newer build on GitHub: the line above the queue, and the "App" section in the settings (AppUpdate.kt). -->
+    <string name="update_available">Update available: %1$s</string>
+    <string name="update_install">Install</string>
+    <string name="section_app">App</string>
+    <string name="app_version">Version %1$s</string>
+    <string name="update_current">Up to date — checked at %1$s</string>
+    <string name="update_failing">Could not check for a newer version just now (no answer from GitHub). The app works as before.</string>
+    <string name="update_check">Check now</string>
+    <string name="update_changes">What\'s new:</string>
+    <string name="update_hint">\"Install\" downloads the APK in the browser; open it, and Android installs it over this version. The sign-in and the printer stay. The first time, Android asks whether the browser may install apps.</string>
 </resources>

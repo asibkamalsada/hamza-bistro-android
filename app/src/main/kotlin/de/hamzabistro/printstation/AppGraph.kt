@@ -10,6 +10,7 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.DeviceReport
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.FilePrintLog
+import de.hamzabistro.printstation.core.GitHubReleases
 import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrdersRealtime
@@ -27,6 +28,7 @@ import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
+import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.printer.BlePrinter
 import de.hamzabistro.printstation.queue.PendingSteps
 import de.hamzabistro.printstation.security.KeystoreSessionStore
@@ -170,6 +172,23 @@ class AppGraph(context: Context) {
             logger = logger,
             undoSeconds = { settings.device.value.undoSeconds },
             now = System::currentTimeMillis,
+        )
+
+    // -----------------------------------------------------------------------
+    // A newer build
+    // -----------------------------------------------------------------------
+
+    /**
+     * Whether CI has published a newer APK than this one, from GitHub: a
+     * host of its own, so a slow or refusing GitHub holds up no call to the
+     * shop's database.
+     */
+    val updates =
+        UpdateChecker(
+            source = GitHubReleases(http.newBuilder().callTimeout(20, TimeUnit.SECONDS).build(), "HamzaTeam/${BuildConfig.VERSION_NAME}"),
+            installed = BuildConfig.VERSION_CODE,
+            logger = logger,
+            now = monotonic,
         )
 
     // -----------------------------------------------------------------------
