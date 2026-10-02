@@ -13,18 +13,23 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -48,7 +53,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -58,6 +65,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.Allergen
+import de.hamzabistro.printstation.core.Allergens
 import de.hamzabistro.printstation.core.DishEdit
 import de.hamzabistro.printstation.core.Ingredient
 import de.hamzabistro.printstation.core.MenuDish
@@ -91,6 +100,8 @@ data class DishForm(
     val sortOrder: String,
     val imageUrl: String,
     val tags: Set<Long>,
+    /** The ticks, in the three states of [Allergens]: null until somebody says. */
+    val allergens: List<String>?,
 ) {
     /** What it says, or null while a number does not read as one or the edit cannot be right. */
     val edit: DishEdit?
@@ -111,6 +122,7 @@ data class DishForm(
                 sortOrder = dish.sortOrder.toString(),
                 imageUrl = dish.imageUrl,
                 tags = dish.tags.toSet(),
+                allergens = dish.allergens,
             )
     }
 }
@@ -137,6 +149,13 @@ data class MenuState(
     val linking: Long? = null,
     val linkDishes: Set<Long> = emptySet(),
     val linkOptions: Set<Long> = emptySet(),
+    /** The 14, for the ticks; empty until read. */
+    val allergens: List<Allergen> = emptyList(),
+    /** Only the dishes or choices nobody has stated allergens for: to work through them one by one. */
+    val onlyMissingAllergens: Boolean = false,
+    /** The choice whose allergens are open; one at a time. */
+    val allergenOption: Long? = null,
+    val allergenDraft: List<String>? = null,
 )
 
 /**
@@ -156,7 +175,7 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
     private fun fail(error: String) = _state.update { it.copy(error = error) }
 
     fun open(tab: MenuTab) {
-        _state.update { it.copy(tab = tab, error = null, saved = null, editing = null, form = null, linking = null) }
+        _state.update { it.copy(tab = tab, error = null, saved = null, editing = null, form = null, linking = null, allergenOption = null) }
         load()
     }
 
@@ -169,13 +188,15 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
                     when (tab) {
                         MenuTab.DISHES -> {
                             val tags = async { menu.tags() }
+                            val allergens = async { menu.allergens() }
                             val dishes = menu.dishes()
-                            _state.update { it.copy(dishes = dishes, tags = tags.await(), error = null) }
+                            _state.update { it.copy(dishes = dishes, tags = tags.await(), allergens = allergens.await(), error = null) }
                         }
                         MenuTab.OPTIONS -> {
                             val tags = async { menu.tags() }
+                            val allergens = async { menu.allergens() }
                             val groups = menu.optionGroups()
-                            _state.update { it.copy(groups = groups, tags = tags.await(), error = null) }
+                            _state.update { it.copy(groups = groups, tags = tags.await(), allergens = allergens.await(), error = null) }
                         }
                         MenuTab.INGREDIENTS -> {
                             val dishes = async { menu.dishes() }
@@ -224,11 +245,19 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFormTag(tag: MenuTag) = updateForm { form -> form.copy(tags = if (tag.id in form.tags) form.tags - tag.id else form.tags + tag.id) }
 
+    fun toggleFormAllergen(code: String) = updateForm { it.copy(allergens = Allergens.toggle(it.allergens, code)) }
+
+    fun toggleFormAllergenNone() = updateForm { it.copy(allergens = Allergens.toggleNone(it.allergens)) }
+
+    fun toggleOnlyMissingAllergens() = _state.update { it.copy(onlyMissingAllergens = !it.onlyMissingAllergens) }
+
     /**
      * The dish first, then its tags, and only if the dish saved: a refused
      * price is the thing worth saying, and tags on a dish whose edit did not
      * land would leave the two halves disagreeing. Read again after, since
      * the database trims and rounds, and a new position moves the dish.
+     * Allergens last, and only when the ticks differ from what was read:
+     * an untouched form sends nothing, so it never claims "none".
      */
     fun saveDish() {
         val id = _state.value.editing ?: return
@@ -238,6 +267,7 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
             fail(app.getString(R.string.menu_form_invalid))
             return
         }
+        val allergens = Allergens.toSave(_state.value.dishes.find { it.id == id }?.allergens, form.allergens)
         val key = "d$id"
         _state.update { it.copy(busy = it.busy + key, error = null) }
         viewModelScope.launch {
@@ -245,6 +275,7 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
                 attempt(app, ::fail) {
                     menu.saveDish(id, edit)
                     menu.setDishTags(id, form.tags.toList())
+                    if (allergens != null) menu.setDishAllergens(id, allergens.codes)
                     menu.dishes()
                 }
             _state.update {
@@ -305,6 +336,43 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
         val on = tag.id !in option.tags
         flip("o${option.id}", { add -> updateOption(option.id) { it.copy(tags = if (add) it.tags + tag.id else it.tags - tag.id) } }, on) {
             menu.setOptionTag(option.id, tag.id, on)
+        }
+    }
+
+    fun startOptionAllergens(option: MenuOption) =
+        _state.update { it.copy(allergenOption = option.id, allergenDraft = option.allergens, error = null) }
+
+    fun cancelOptionAllergens() = _state.update { it.copy(allergenOption = null) }
+
+    fun toggleOptionAllergen(code: String) = _state.update { it.copy(allergenDraft = Allergens.toggle(it.allergenDraft, code)) }
+
+    fun toggleOptionAllergenNone() = _state.update { it.copy(allergenDraft = Allergens.toggleNone(it.allergenDraft)) }
+
+    /**
+     * Once for the choice, which every dish offering it shares — the
+     * Kräutersauce is one row. Nothing is sent when the ticks are what was
+     * read; the row shows what the database stored, sorted.
+     */
+    fun saveOptionAllergens() {
+        val state = _state.value
+        val id = state.allergenOption ?: return
+        val stored = state.groups.firstNotNullOfOrNull { g -> g.options.find { it.id == id } }?.allergens
+        val change = Allergens.toSave(stored, state.allergenDraft)
+        if (change == null) {
+            cancelOptionAllergens()
+            return
+        }
+        val key = "o$id"
+        if (key in state.busy) return
+        _state.update { it.copy(busy = it.busy + key, error = null) }
+        viewModelScope.launch {
+            // Wrapped, because null is an answer here ("not stated") and attempt's null is a failure.
+            val saved = attempt(app, ::fail) { Allergens.Change(menu.setOptionAllergens(id, change.codes)) }
+            if (saved != null) updateOption(id) { it.copy(allergens = saved.codes) }
+            _state.update { s ->
+                if (saved == null) s.copy(busy = s.busy - key)
+                else s.copy(busy = s.busy - key, allergenOption = s.allergenOption.takeIf { it != id })
+            }
         }
     }
 
@@ -472,6 +540,83 @@ private fun SwitchLine(
 }
 
 // -----------------------------------------------------------------------
+// Allergens
+// -----------------------------------------------------------------------
+
+/** On every row: the letters, "none", or in red that nobody has said yet — what the menu shows as "Angaben folgen". */
+@Composable
+private fun AllergenLine(allergens: List<String>?) {
+    when {
+        allergens == null ->
+            Text(stringResource(R.string.menu_allergens_not_stated), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        allergens.isEmpty() -> Hint(stringResource(R.string.menu_allergens_none))
+        else -> Hint(stringResource(R.string.menu_allergens_list, allergens.joinToString(", ")))
+    }
+}
+
+/** How many rows are still "not stated", and a switch to show only those, to work through them on the tablet. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MissingAllergens(count: Int, only: Boolean, onToggle: () -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            stringResource(R.string.menu_allergens_missing_count, count),
+            fontWeight = FontWeight.SemiBold,
+            color = if (count > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.align(Alignment.CenterVertically),
+        )
+        FilterChip(selected = only, onClick = onToggle, label = { Text(stringResource(R.string.menu_allergens_missing_only)) })
+    }
+}
+
+/**
+ * The 14 ticks and a separate "Keines der 14", like the site's picker: see
+ * [Allergens] for why nothing ticked is "not stated" and not "none".
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AllergenPicker(
+    all: List<Allergen>,
+    value: List<String>?,
+    enabled: Boolean,
+    onToggle: (String) -> Unit,
+    onNone: () -> Unit,
+) {
+    val german = LocalConfiguration.current.locales[0].language == "de"
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.menu_allergens), style = MaterialTheme.typography.labelLarge)
+        Hint(stringResource(R.string.menu_allergens_hint))
+        FlowRow {
+            for (allergen in all) {
+                Tick(checked = value?.contains(allergen.code) == true, enabled = enabled, onToggle = { onToggle(allergen.code) }, modifier = Modifier.width(260.dp)) {
+                    Text(allergen.code, fontWeight = FontWeight.Bold)
+                    Text(" " + allergen.name(german), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        Tick(checked = value?.isEmpty() == true, enabled = enabled, onToggle = onNone) {
+            Text(stringResource(R.string.menu_allergens_none_box), fontWeight = FontWeight.SemiBold)
+        }
+        if (value == null) {
+            Text(stringResource(R.string.menu_allergens_not_stated), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** A checkbox with its label, the whole row a target for a finger. */
+@Composable
+private fun Tick(checked: Boolean, enabled: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, label: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.heightIn(min = 48.dp).toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() }),
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Spacer(Modifier.width(8.dp))
+        label()
+    }
+}
+
+// -----------------------------------------------------------------------
 // Dishes
 // -----------------------------------------------------------------------
 
@@ -481,9 +626,11 @@ private fun LazyListScope.dishes(state: MenuState, menu: MenuViewModel) {
             Hint(stringResource(R.string.menu_intro))
             Hint(stringResource(R.string.menu_dashboard_note))
             Text(stringResource(R.string.menu_sold_out_count, state.dishes.count { !it.available }), fontWeight = FontWeight.SemiBold)
+            MissingAllergens(Allergens.missing(state.dishes.map { it.allergens }), state.onlyMissingAllergens, menu::toggleOnlyMissingAllergens)
         }
     }
-    for ((category, dishes) in state.dishes.groupBy { it.category }) {
+    val shown = if (state.onlyMissingAllergens) state.dishes.filter { it.allergens == null } else state.dishes
+    for ((category, dishes) in shown.groupBy { it.category }) {
         item(key = "category-$category") { Heading(category) }
         items(dishes, key = { "d${it.id}" }) { dish ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -502,6 +649,7 @@ private fun LazyListScope.dishes(state: MenuState, menu: MenuViewModel) {
                             }
                         },
                     )
+                    AllergenLine(dish.allergens)
                     val form = state.form
                     if (editing && form != null) DishFormView(dish, form, state, menu)
                 }
@@ -546,6 +694,10 @@ private fun DishFormView(dish: MenuDish, form: DishForm, state: MenuState, menu:
                 FilterChip(selected = tag.id in form.tags, onClick = { menu.toggleFormTag(tag) }, label = { Text(tag.name) })
             }
         }
+    }
+
+    if (state.allergens.isNotEmpty()) {
+        AllergenPicker(state.allergens, form.allergens, enabled = true, onToggle = menu::toggleFormAllergen, onNone = menu::toggleFormAllergenNone)
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -628,11 +780,19 @@ private fun LazyListScope.options(state: MenuState, menu: MenuViewModel) {
             Hint(stringResource(R.string.menu_options_shared))
             val out = state.groups.sumOf { group -> group.options.count { !it.available } }
             Text(stringResource(R.string.menu_sold_out_count, out), fontWeight = FontWeight.SemiBold)
+            MissingAllergens(
+                Allergens.missing(state.groups.flatMap { group -> group.options.map { it.allergens } }),
+                state.onlyMissingAllergens,
+                menu::toggleOnlyMissingAllergens,
+            )
         }
     }
     // The database allows some tags on a choice — the vegan leaf — and refuses others.
     val tags = state.tags.filter { it.onOptions }
-    for (group in state.groups) {
+    val shown =
+        if (!state.onlyMissingAllergens) state.groups
+        else state.groups.map { g -> g.copy(options = g.options.filter { it.allergens == null }) }.filter { it.options.isNotEmpty() }
+    for (group in shown) {
         item(key = "group-${group.id}") {
             Column {
                 Heading(group.name)
@@ -644,6 +804,7 @@ private fun LazyListScope.options(state: MenuState, menu: MenuViewModel) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val busy = "o${option.id}" in state.busy
+                    val editingAllergens = state.allergenOption == option.id
                     SwitchLine(
                         name = option.name,
                         on = option.available,
@@ -651,7 +812,15 @@ private fun LazyListScope.options(state: MenuState, menu: MenuViewModel) {
                         offText = stringResource(R.string.menu_sold_out),
                         busy = busy,
                         onToggle = { menu.toggleOption(option) },
+                        extra = {
+                            if (state.allergens.isNotEmpty()) {
+                                TextButton(onClick = { if (editingAllergens) menu.cancelOptionAllergens() else menu.startOptionAllergens(option) }) {
+                                    Text(stringResource(if (editingAllergens) R.string.cancel else R.string.menu_allergens))
+                                }
+                            }
+                        },
                     )
+                    AllergenLine(option.allergens)
                     if (tags.isNotEmpty()) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             for (tag in tags) {
@@ -661,6 +830,25 @@ private fun LazyListScope.options(state: MenuState, menu: MenuViewModel) {
                                     onClick = { menu.toggleOptionTag(option, tag) },
                                     label = { Text(tag.name) },
                                 )
+                            }
+                        }
+                    }
+                    if (editingAllergens) {
+                        Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            HorizontalDivider()
+                            Hint(stringResource(R.string.menu_allergens_option_shared))
+                            AllergenPicker(
+                                state.allergens,
+                                state.allergenDraft,
+                                enabled = !busy,
+                                onToggle = menu::toggleOptionAllergen,
+                                onNone = menu::toggleOptionAllergenNone,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = menu::cancelOptionAllergens) { Text(stringResource(R.string.cancel)) }
+                                Button(onClick = menu::saveOptionAllergens, enabled = !busy) {
+                                    Text(stringResource(if (busy) R.string.please_wait else R.string.save))
+                                }
                             }
                         }
                     }

@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
@@ -231,6 +232,91 @@ class MenuTest {
         val added = sent.drop(2).single()
         assertEquals("/rest/v1/ingredient_items", added.url.encodedPath)
         assertEquals("""[{"ingredient_id":1,"item_id":3},{"ingredient_id":1,"item_id":5}]""", added.body!!.utf8())
+    }
+
+    @Test
+    fun `keeps not stated, none and letters apart on dishes and choices`() = runBlocking<Unit> {
+        test.routes(
+            mapOf(
+                "/rest/v1/menu_categories" to """[{"id":1,"name":"Döner"}]""",
+                "/rest/v1/menu_items" to
+                    """[{"id":3,"category_id":1,"name":"Döner","price":7.5,"allergens":null},""" +
+                    """{"id":4,"category_id":1,"name":"Cola","price":2.5,"allergens":[]},""" +
+                    """{"id":5,"category_id":1,"name":"Dürüm","price":8,"allergens":["a","g"]},""" +
+                    // A column the server does not send yet reads as "not stated", never as "none".
+                    """{"id":6,"category_id":1,"name":"Alt","price":1}]""",
+                "/rest/v1/menu_item_tags" to "[]",
+                "/rest/v1/menu_option_groups" to """[{"id":1,"name":"Extra Zutat"}]""",
+                "/rest/v1/menu_options" to
+                    """[{"id":11,"group_id":1,"name":"extra Käse","price":1,"available":true,"allergens":["g"]},""" +
+                    """{"id":12,"group_id":1,"name":"extra Zwiebeln","price":0.5,"available":true,"allergens":[]},""" +
+                    """{"id":13,"group_id":1,"name":"Kräutersauce","price":0,"available":true,"allergens":null}]""",
+                "/rest/v1/menu_item_option_groups" to """[{"item_id":3,"group_id":1}]""",
+                "/rest/v1/menu_option_tags" to "[]",
+            )
+        )
+
+        val dishes = backend.dishes()
+        assertEquals(listOf(null, emptyList(), listOf("a", "g"), null), dishes.map { it.allergens })
+        assertEquals(2, Allergens.missing(dishes.map { it.allergens }))
+        val items = test.requests().first { it.url.encodedPath == "/rest/v1/menu_items" }
+        assertTrue(items.url.queryParameter("select")!!.split(",").contains("allergens"))
+
+        val options = backend.optionGroups().single().options
+        assertEquals(listOf(listOf("g"), emptyList(), null), options.map { it.allergens })
+        val optionRows = test.requests().single { it.url.encodedPath == "/rest/v1/menu_options" }
+        assertTrue(optionRows.url.queryParameter("select")!!.split(",").contains("allergens"))
+    }
+
+    @Test
+    fun `reads the 14 allergens in the menu's order`() = runBlocking<Unit> {
+        test.routes(
+            mapOf(
+                "/rest/v1/allergens" to
+                    """[{"code":"a","name_de":"Glutenhaltiges Getreide","name_en":"Cereals containing gluten"},""" +
+                    """{"code":"g","name_de":"Milch (einschließlich Laktose)","name_en":"Milk (including lactose)"}]"""
+            )
+        )
+
+        val allergens = backend.allergens()
+        assertEquals(listOf("a", "g"), allergens.map { it.code })
+        assertEquals("Milch (einschließlich Laktose)", allergens[1].nameDe)
+        val request = test.requests().single { it.url.encodedPath == "/rest/v1/allergens" }
+        assertEquals("code,name_de,name_en", request.url.queryParameter("select"))
+        assertEquals("sort_order", request.url.queryParameter("order"))
+    }
+
+    @Test
+    fun `states allergens through the staff functions, null included`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, """["a","g"]""")
+        test.reply(200, "[]")
+        test.reply(200, "null")
+
+        assertEquals(listOf("a", "g"), backend.setDishAllergens(12, listOf("g", "a")))
+        assertEquals(emptyList(), backend.setOptionAllergens(34, emptyList()))
+        assertNull(backend.setDishAllergens(12, null))
+
+        test.server.takeRequest()
+        val letters = test.server.takeRequest()
+        assertEquals("POST", letters.method)
+        assertEquals("/rest/v1/rpc/set_item_allergens", letters.url.encodedPath)
+        assertEquals("""{"p_item_id":12,"p_codes":["g","a"]}""", letters.body!!.utf8())
+        val none = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/set_option_allergens", none.url.encodedPath)
+        assertEquals("""{"p_option_id":34,"p_codes":[]}""", none.body!!.utf8())
+        // "Not stated" is sent, as null — not left out, which PostgREST would refuse.
+        assertEquals("""{"p_item_id":12,"p_codes":null}""", test.server.takeRequest().body!!.utf8())
+    }
+
+    @Test
+    fun `says which allergen the database does not know, and who may not set them`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(400, """{"code":"HB433","message":"there is no allergen \"z\""}""")
+        test.reply(400, """{"code":"P0001","message":"staff only"}""")
+
+        assertFailsWith<UnknownAllergenException> { backend.setDishAllergens(12, listOf("z")) }
+        assertFailsWith<NotAllowedException> { backend.setOptionAllergens(34, emptyList()) }
     }
 
     @Test

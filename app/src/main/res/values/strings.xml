@@ -347,6 +347,16 @@
     <string name="menu_ingredient_delete_confirm">Delete this ingredient? Everything it holds back comes back on sale.</string>
     <string name="menu_ingredient_new">New ingredient</string>
     <string name="menu_ingredient_add">Add</string>
+    <string name="menu_allergens">Allergens</string>
+    <string name="menu_allergens_list">Allergens: %1$s</string>
+    <string name="menu_allergens_none">Allergens: none</string>
+    <string name="menu_allergens_not_stated">Allergens not stated yet</string>
+    <string name="menu_allergens_hint">From the recipe and the supplier sheets. Nothing ticked means “not stated yet”, and the menu says the details are to follow.</string>
+    <string name="menu_allergens_none_box">None of the 14</string>
+    <string name="menu_allergens_missing_count">Allergens not stated: %1$d</string>
+    <string name="menu_allergens_missing_only">Show only these</string>
+    <string name="menu_allergens_option_shared">Set once for this choice, on every dish that offers it.</string>
+    <string name="menu_allergen_unknown">The database does not know one of these allergen letters. Reload and tick them again.</string>
 
     <!-- Settings: who hears about orders, print stations, the address check (HealthSections.kt) -->
     <string name="who_hears">Who hears about orders</string>

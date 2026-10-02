@@ -45,5 +45,11 @@ class OrderMovedException : Exception("the order had already moved on")
  */
 class InvalidHoursException(message: String) : Exception(message)
 
+/**
+ * The database does not know an allergen letter that was sent (HB433):
+ * public.allergens was changed in the dashboard while a form was open.
+ */
+class UnknownAllergenException(message: String) : Exception(message)
+
 /** The ticket did not come out: printer off, out of range, or not answering. */
 class PrinterException(message: String, cause: Throwable? = null) : IOException(message, cause)
