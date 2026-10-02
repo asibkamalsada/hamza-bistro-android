@@ -130,6 +130,13 @@ data class StaffOrder(
      * off.
      */
     @SerialName("auto_decline_at") @Serializable(with = InstantSerializer::class) val autoDeclineAt: Instant? = null,
+    /**
+     * Minutes staff added to the promise after accepting it — "+10 Min."
+     * (20261002170000_order_delay.sql). 0 when never delayed.
+     */
+    @SerialName("delay_minutes") val delayMinutes: Int = 0,
+    /** When the delay last grew, from the database clock. Null if it never did. */
+    @SerialName("delayed_at") @Serializable(with = InstantSerializer::class) val delayedAt: Instant? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -152,16 +159,19 @@ data class StaffOrder(
             "id,order_number,created_at,confirmed_at,scheduled_for,customer_name,phone,address,street," +
                 "postal_code,city,address_note,notes,items,total,status,eta_minutes,cancel_reason," +
                 "returning_customer,delivery_fee,small_order_fee,discount,discount_code,pickup," +
-                "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at,auto_decline_at"
+                "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at,auto_decline_at," +
+                "delay_minutes,delayed_at"
     }
 }
 
 /**
  * One step on an order: where it goes, and what goes with it. Exactly the
- * steps /orders offers; the database refuses any other (HB412).
+ * steps /orders offers; the database refuses any other (HB412) — and the
+ * one that moves no status, [Delay].
  */
 sealed interface OrderStep {
-    val to: OrderStatus
+    /** The status it goes to; null for [Delay], which leaves it where it is. */
+    val to: OrderStatus?
 
     /** Accepted for right away, with the minutes promised. */
     data class Accept(val etaMinutes: Int) : OrderStep {
@@ -186,6 +196,15 @@ sealed interface OrderStep {
     /** Declined while new, or cancelled later; [reason] is what the customer is told. */
     data class Cancel(val reason: CancelReason?) : OrderStep {
         override val to = OrderStatus.CANCELLED
+    }
+
+    /**
+     * "+10 Min.": the promise [minutes] later, on an accepted order. Added
+     * to whatever delay it has, by the database (delay_order), so a second
+     * phone tapping at the same time adds its own rather than overwriting.
+     */
+    data class Delay(val minutes: Int) : OrderStep {
+        override val to: OrderStatus? = null
     }
 }
 

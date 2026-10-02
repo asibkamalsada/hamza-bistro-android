@@ -122,6 +122,7 @@
     <string name="need_full_screen">Vollbild über dem Sperrbildschirm</string>
     <string name="need_background">Hintergrundbetrieb</string>
     <string name="order_moved">Diese Bestellung wurde inzwischen geändert – so steht sie jetzt.</string>
+    <string name="order_not_delayable">Diese Bestellung lässt sich nicht mehr verschieben – so steht sie jetzt.</string>
     <string name="step_failed">Nicht gesendet: %1$s</string>
     <string name="printed_by_hand">Bon #%1$d gedruckt.</string>
 
@@ -132,6 +133,7 @@
     <string name="due_at">fällig %1$s</string>
     <string name="due_in">noch %1$d Min.</string>
     <string name="due_late">%1$d Min. drüber</string>
+    <string name="due_delayed">verschoben +%1$d Min.</string>
     <string name="cook_from">kochen ab %1$s</string>
     <string name="cook_now">Jetzt kochen</string>
 
@@ -182,6 +184,20 @@
     <string name="pending_accepted">Angenommen, %1$d Min.</string>
     <string name="pending_declined">Abgelehnt</string>
     <string name="pending_cancelled">Storniert</string>
+    <string name="pending_delayed">+%1$d Min. verschoben</string>
+    <string name="delay_button">+%1$d Min.</string>
+    <string name="delay_all">Alle +%1$d Min.</string>
+    <plurals name="delay_all_confirm">
+        <item quantity="one">%1$d angenommene Bestellung um %2$d Min. verschieben? Wer Updates wollte, bekommt eine E-Mail.</item>
+        <item quantity="other">%1$d angenommene Bestellungen um %2$d Min. verschieben? Wer Updates wollte, bekommt eine E-Mail.</item>
+    </plurals>
+    <string name="delay_all_yes">Ja, verschieben</string>
+    <plurals name="delay_all_done">
+        <item quantity="one">%1$d Bestellung um %2$d Min. verschoben.</item>
+        <item quantity="other">%1$d Bestellungen um %2$d Min. verschoben.</item>
+    </plurals>
+    <string name="delay_all_none">Keine angenommene Bestellung für sofort zum Verschieben.</string>
+    <string name="delay_all_failed">Verschieben hat nicht geklappt: %1$s</string>
     <string name="undo">Rückgängig</string>
     <string name="print_ticket">Bon drucken</string>
 

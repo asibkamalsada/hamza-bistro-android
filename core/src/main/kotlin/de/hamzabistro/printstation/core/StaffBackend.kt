@@ -30,9 +30,16 @@ interface StaffBackend {
 
     /**
      * Moves [order] one [step] on — but only from where this device saw it.
-     * Throws [OrderMovedException] when it had moved on meanwhile.
+     * Throws [OrderMovedException] when it had moved on meanwhile, and
+     * [NotDelayableException] for an [OrderStep.Delay] the database refused.
      */
     suspend fun move(order: StaffOrder, step: OrderStep)
+
+    /**
+     * "Alle +[minutes] Min.": every accepted order for right away, at once
+     * (delay_open_orders). Answers how many it moved.
+     */
+    suspend fun delayOpen(minutes: Int): Int
 
     /** Minutes per dish, for the suggested ETA. */
     suspend fun prepMinutes(): Map<Long, Int>
@@ -80,6 +87,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     }
 
     override suspend fun move(order: StaffOrder, step: OrderStep) {
+        if (step is OrderStep.Delay) return delay(order, step.minutes)
         val url =
             rest.endpoint("rest/v1/orders")
                 .addQueryParameter("id", "eq.${order.id}")
@@ -103,6 +111,35 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
                 json.decodeFromString(ListSerializer(IdRow.serializer()), text)
             }
         if (moved.isEmpty()) throw OrderMovedException()
+    }
+
+    /**
+     * Sends the minutes to add, never the total: the database adds them to
+     * whatever the order has by then, so two phones tapping +10 at once make
+     * +20, not +10 twice over.
+     */
+    private suspend fun delay(order: StaffOrder, minutes: Int) {
+        try {
+            rest.rpc("delay_order", buildJsonObject {
+                put("p_order_id", order.id)
+                put("p_minutes", minutes)
+            })
+        } catch (e: BackendException) {
+            // Not accepted any more, at its three hours, or gone.
+            if (e.code == "HB435" || e.code == "P0002") throw NotDelayableException()
+            throw e
+        }
+    }
+
+    override suspend fun delayOpen(minutes: Int): Int {
+        val body =
+            try {
+                rest.rpc("delay_open_orders", buildJsonObject { put("p_minutes", minutes) })
+            } catch (e: BackendException) {
+                if (e.code == "HB435") throw InvalidSettingException(e.message ?: "HB435")
+                throw e
+            }
+        return json.decodeFromString(DelayedRow.serializer(), body).delayed
     }
 
     override suspend fun prepMinutes(): Map<Long, Int> {
@@ -139,7 +176,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     }
 
     private fun stepBody(step: OrderStep): JsonObject = buildJsonObject {
-        put("status", step.to.column)
+        put("status", checkNotNull(step.to) { "not a status step: $step" }.column)
         when (step) {
             is OrderStep.Accept -> put("eta_minutes", step.etaMinutes)
             is OrderStep.Cancel -> {
@@ -152,6 +189,8 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     }
 
     @Serializable private class IdRow(val id: String)
+
+    @Serializable private class DelayedRow(val delayed: Int)
 
     @Serializable
     private class PrepRow(val id: Long, @SerialName("prep_minutes") val prepMinutes: Int)

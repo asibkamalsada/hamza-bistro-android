@@ -39,6 +39,14 @@ class BackendException(val status: Int, message: String, val code: String? = nul
 class OrderMovedException : Exception("the order had already moved on")
 
 /**
+ * The database would not delay the order (HB435, or P0002 for one that is
+ * gone): it is no longer accepted — delivered, cancelled, collected
+ * meanwhile — or it has reached the three hours a delay may add up to. Like
+ * [OrderMovedException], the queue is read again and shows it as it is.
+ */
+class NotDelayableException : Exception("the order can no longer be delayed")
+
+/**
  * The database refused what was sent as delivery hours or as a closure: a
  * day that closes before it opens, a time off the quarter hour, a closure
  * that ends before it starts (HB432).

@@ -15,25 +15,73 @@ object StaffQueue {
     /**
      * When the customer was promised the food: the time they chose for a
      * pre-order, or the acceptance plus the minutes given for one wanted
-     * now. Null while nothing has been promised.
+     * now — and any delay staff added since, on top of either. Null while
+     * nothing has been promised. The same rule as promised_at() in SQL.
      *
      * An accepted order from before confirmed_at existed falls back to when
      * it was placed, which errs early: late is called sooner, never not.
      */
     fun promisedAt(order: StaffOrder): Instant? {
-        order.scheduledFor?.let { return it }
+        val delay = Duration.ofMinutes(order.delayMinutes.toLong())
+        order.scheduledFor?.let { return it.plus(delay) }
         if (order.status == OrderStatus.NEW) return null
         val minutes = order.etaMinutes ?: return null
-        return (order.confirmedAt ?: order.createdAt).plus(Duration.ofMinutes(minutes.toLong()))
+        return (order.confirmedAt ?: order.createdAt).plus(Duration.ofMinutes(minutes.toLong())).plus(delay)
     }
 
     /**
      * When a pre-order has to be started to be at the door on time: its
      * time, less [leadMinutes] — the same estimate an order for right away is
-     * accepted with, so both kinds are timed by one rule.
+     * accepted with, so both kinds are timed by one rule. From the promise,
+     * so a delayed pre-order goes on the grill later too.
      */
-    fun cookFrom(order: StaffOrder, leadMinutes: Int): Instant? =
-        order.scheduledFor?.minus(Duration.ofMinutes(leadMinutes.toLong()))
+    fun cookFrom(order: StaffOrder, leadMinutes: Int): Instant? {
+        if (order.scheduledFor == null) return null
+        return promisedAt(order)?.minus(Duration.ofMinutes(leadMinutes.toLong()))
+    }
+
+    // -----------------------------------------------------------------------
+    // Running late: "+10 Min." (20261002170000_order_delay.sql)
+    // -----------------------------------------------------------------------
+
+    /** The delays a card offers. */
+    val DELAY_STEPS: List<Int> = listOf(10, 20)
+
+    /** "Alle +15 Min.", for every accepted order for right away at once. */
+    const val DELAY_ALL_MINUTES = 15
+
+    /** What all delays on one order may add up to; past that, call the customer. */
+    const val MAX_DELAY_MINUTES = 180
+
+    /** How far back "Alle" reaches: an order accepted yesterday and left open is not tonight's. */
+    private val DELAY_ALL_WINDOW: Duration = Duration.ofDays(1)
+
+    /** Whether staff have moved its promise later since accepting it. */
+    fun isDelayed(order: StaffOrder): Boolean = order.delayMinutes > 0
+
+    /**
+     * Whether a card offers "+[minutes] Min.": accepted, in the kitchen or
+     * out of it, with room left under [MAX_DELAY_MINUTES]. What
+     * orders_delay_step lets through; anything else comes back as HB435.
+     */
+    fun canDelay(order: StaffOrder, minutes: Int): Boolean =
+        (order.status == OrderStatus.CONFIRMED || order.status == OrderStatus.ON_THE_WAY) &&
+            order.delayMinutes + minutes <= MAX_DELAY_MINUTES
+
+    /**
+     * What "Alle +[minutes] Min." moves: every accepted order for right
+     * away, accepted within the last day, with room left — except a
+     * collection already on the counter, which waits on the customer, not
+     * the kitchen. Exactly the orders delay_open_orders() updates, so the
+     * question asked first counts what the answer will.
+     */
+    fun delayableAll(orders: List<StaffOrder>, minutes: Int, now: Instant): List<StaffOrder> =
+        orders.filter { order ->
+            canDelay(order, minutes) &&
+                order.scheduledFor == null &&
+                !(order.status == OrderStatus.ON_THE_WAY && order.pickup) &&
+                (order.confirmedAt ?: order.createdAt).isAfter(now.minus(DELAY_ALL_WINDOW))
+        }
 
     /**
      * Whole minutes from [now] until [at]; negative once it has passed —

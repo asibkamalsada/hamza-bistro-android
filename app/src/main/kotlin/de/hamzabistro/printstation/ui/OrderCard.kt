@@ -64,6 +64,9 @@ interface OrderActions {
 
     fun cancel(order: StaffOrder, reason: CancelReason?)
 
+    /** "+10 Min." on an accepted order. */
+    fun delay(order: StaffOrder, minutes: Int)
+
     fun undo(order: StaffOrder)
 
     fun print(order: StaffOrder)
@@ -96,7 +99,7 @@ fun timing(context: Context, order: StaffOrder, lead: Int, now: Instant): Timing
     }
     val due = StaffQueue.promisedAt(order) ?: return null
     val left = StaffQueue.minutesUntil(due, now)
-    val dueText = context.getString(R.string.due_at, Format.clock(due))
+    val dueText = dueText(context, order, due)
     if (order.status == OrderStatus.CONFIRMED && order.scheduledFor != null) {
         val from = StaffQueue.cookFrom(order, lead)
         if (from != null && from.isAfter(now)) {
@@ -106,6 +109,17 @@ fun timing(context: Context, order: StaffOrder, lead: Int, now: Instant): Timing
     }
     if (left < 0) return Timing("$dueText · ${context.getString(R.string.due_late, -left)}", Tone.LATE)
     return Timing("$dueText · ${context.getString(R.string.due_in, left)}", if (left <= 5) Tone.SOON else Tone.OK)
+}
+
+/**
+ * "fällig 18:45", and "fällig 18:45 · verschoben +10 Min." once delayed: the
+ * time is already the new one, and whoever reads the card should know it
+ * moved.
+ */
+fun dueText(context: Context, order: StaffOrder, due: Instant): String {
+    val at = context.getString(R.string.due_at, Format.clock(due))
+    if (!StaffQueue.isDelayed(order)) return at
+    return "$at · ${context.getString(R.string.due_delayed, order.delayMinutes)}"
 }
 
 /**
@@ -171,6 +185,7 @@ fun stepLabel(context: Context, order: StaffOrder, step: OrderStep): String =
         OrderStep.Done -> context.getString(if (order.pickup) R.string.step_collected else R.string.step_delivered)
         is OrderStep.Cancel ->
             context.getString(if (order.status == OrderStatus.NEW) R.string.pending_declined else R.string.pending_cancelled)
+        is OrderStep.Delay -> context.getString(R.string.pending_delayed, step.minutes)
     }
 
 /**
@@ -232,6 +247,11 @@ fun OrderCard(
             if (order.status.open) {
                 timing(context, order, estimate, now)?.let {
                     Text(it.text, color = toneColor(it.tone), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+            } else if (StaffQueue.isDelayed(order)) {
+                // In the history: it was late, and the customer was told so.
+                StaffQueue.promisedAt(order)?.let {
+                    Text(dueText(context, order, it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -435,10 +455,23 @@ private fun Actions(
                     }
                 }
             }
-            else ->
+            else -> {
                 Button(onClick = { actions.moveOn(order) }, modifier = Modifier.fillMaxWidth()) {
                     Text(stepLabel(context, order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done))
                 }
+                // The kitchen or the driver is behind: say so before the
+                // customer has to ring and ask.
+                val steps = StaffQueue.DELAY_STEPS.filter { StaffQueue.canDelay(order, it) }
+                if (steps.isNotEmpty()) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (minutes in steps) {
+                            OutlinedButton(onClick = { actions.delay(order, minutes) }) {
+                                Text(stringResource(R.string.delay_button, minutes))
+                            }
+                        }
+                    }
+                }
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (canPrint) TextButton(onClick = { actions.print(order) }) { Text(stringResource(R.string.print_ticket)) }
