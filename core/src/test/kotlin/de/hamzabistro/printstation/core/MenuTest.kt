@@ -73,9 +73,42 @@ class MenuTest {
 
         test.server.takeRequest()
         assertEquals(
-            """{"name":"Döner Teller","description":"mit Salat","price":12.5,"prep_minutes":9,"sort_order":20,"image_url":"https://x/y.webp"}""",
+            """{"name":"Döner Teller","description":"mit Salat","price":12.5,"prep_minutes":9,"sort_order":20,"image_url":"https://x/y.webp","volume_ml":null}""",
             test.server.takeRequest().body!!.utf8(),
         )
+    }
+
+    @Test
+    fun `reads and saves a drink's size, and clears it with null`() = runBlocking<Unit> {
+        test.routes(
+            mapOf(
+                "/rest/v1/menu_categories" to """[{"id":1,"name":"Getränke"}]""",
+                "/rest/v1/menu_items" to
+                    """[{"id":10,"category_id":1,"name":"Cola 0,33l","price":2.4,"deposit":0.25,"volume_ml":330},""" +
+                    """{"id":11,"category_id":1,"name":"Ayran","price":1.5,"volume_ml":null}]""",
+                "/rest/v1/menu_item_tags" to "[]",
+            )
+        )
+        val dishes = backend.dishes()
+        assertEquals(listOf(330, null), dishes.map { it.volumeMl })
+        assertEquals(0.25, dishes[0].deposit)
+        assertEquals(330, dishes[0].edit.volumeMl)
+        assertEquals("0,33 l · 6,52\u00a0€/l", dishes[0].unitPrice)
+        assertNull(dishes[1].unitPrice)
+        val items = test.requests().single { it.url.encodedPath == "/rest/v1/menu_items" }
+        val columns = items.url.queryParameter("select")!!.split(",")
+        assertTrue("volume_ml" in columns && "deposit" in columns)
+    }
+
+    @Test
+    fun `saves a drink's size in millilitres`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, """[{"id":10}]""")
+
+        backend.saveDish(10, DishEdit("Cola 0,33l", "", 2.4, 0, 10, "", volumeMl = 330))
+
+        test.server.takeRequest()
+        assertTrue(test.server.takeRequest().body!!.utf8().endsWith(""","volume_ml":330}"""))
     }
 
     @Test

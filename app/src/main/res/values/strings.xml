@@ -322,6 +322,8 @@
     <string name="menu_prep">Prep (min)</string>
     <string name="menu_position">Position</string>
     <string name="menu_prep_hint">How long the kitchen needs for one of these. The queue suggests the delivery time from it — 0 for anything that is not cooked, like a drink.</string>
+    <string name="menu_volume">Bottle size (ml)</string>
+    <string name="menu_volume_hint">Drinks only: 330 for 0.33 l. The menu prints the size and the price per litre under the drink, worked out without the deposit. Leave it blank for food.</string>
     <string name="menu_tags">Labels on the menu</string>
     <string name="menu_photo_pick">Choose photo</string>
     <string name="menu_photo_hint">Take it with the device and pick it here — it is cropped square and shrunk for you. Save afterwards to put it on the menu.</string>

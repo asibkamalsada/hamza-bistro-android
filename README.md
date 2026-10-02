@@ -117,7 +117,10 @@ queue's top bar (**Mehr** on a phone):
   nothing ticked stays "not stated" (the menu says "Angaben folgen"), and
   only the separate **Keines der 14** saves "none". Each row shows its
   letters or a red "noch nicht angegeben", and both tabs count what is
-  still missing with a filter to work through it. Deposits, new dishes and
+  still missing with a filter to work through it. A drink's **Füllmenge
+  (ml)** is set in the same form (blank for food; 1–10 000, as the database
+  allows), and its row shows "0,33 l · 6,52 €/l", the price per litre
+  without the Pfand, as the menu prints it. Deposits, new dishes and
   new option groups stay in the Supabase dashboard, as before.
 - **Lieferzeiten** — the open/closed switch, closures planned ahead (a
   holiday, a day off; also open-ended), and the week's delivery hours, saved
@@ -254,7 +257,7 @@ kept in a small file and reported later, never printed twice.
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
   and takings (`History`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
-  ingredients (`Menu`, `Allergens`, `PhotoCrop`), who hears about orders, the print
+  ingredients (`Menu`, `Allergens`, `DrinkVolume`, `PhotoCrop`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer

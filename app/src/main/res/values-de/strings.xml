@@ -322,6 +322,8 @@
     <string name="menu_prep">Zubereitung (Min.)</string>
     <string name="menu_position">Position</string>
     <string name="menu_prep_hint">Wie lange die Küche für eins davon braucht. Daraus schlägt die Bestellliste die Lieferzeit vor – 0 für alles, was nicht gekocht wird, etwa Getränke.</string>
+    <string name="menu_volume">Füllmenge (ml)</string>
+    <string name="menu_volume_hint">Nur für Getränke: 330 für 0,33 l. Die Speisekarte zeigt darunter Füllmenge und Literpreis, ohne Pfand gerechnet. Bei Speisen leer lassen.</string>
     <string name="menu_tags">Merkmale auf der Karte</string>
     <string name="menu_photo_pick">Foto wählen</string>
     <string name="menu_photo_hint">Mit dem Gerät fotografieren und hier auswählen – zugeschnitten und verkleinert wird automatisch. Danach speichern, damit es auf der Karte steht.</string>

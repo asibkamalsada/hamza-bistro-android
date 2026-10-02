@@ -46,10 +46,12 @@ data class DishEdit(
     val prepMinutes: Int,
     val sortOrder: Int,
     val imageUrl: String,
+    /** A drink's size in millilitres; null for food and a drink not sized. See [DrinkVolume]. */
+    val volumeMl: Int? = null,
 ) {
     /** What the form refuses before the database does: the rules of the site's form. */
     val valid: Boolean
-        get() = name.trim().length >= 2 && price >= 0 && prepMinutes in 0..MAX_PREP && sortOrder >= 0
+        get() = name.trim().length >= 2 && price >= 0 && prepMinutes in 0..MAX_PREP && sortOrder >= 0 && DrinkVolume.allowed(volumeMl)
 
     companion object {
         const val MAX_PREP = 120
@@ -71,9 +73,17 @@ data class MenuDish(
     val tags: List<Long>,
     /** Allergen letters; [] for "none", null for "not stated yet" — see [Allergens]. */
     val allergens: List<String>? = null,
+    /** A drink's size in millilitres, null when it has none. */
+    val volumeMl: Int? = null,
+    /** The Pfand inside [price]; read only, for the price per litre. */
+    val deposit: Double = 0.0,
 ) {
     val edit: DishEdit
-        get() = DishEdit(name, description, price, prepMinutes, sortOrder, imageUrl)
+        get() = DishEdit(name, description, price, prepMinutes, sortOrder, imageUrl, volumeMl)
+
+    /** "0,33 l · 6,52 €/l", or null for anything without a size. */
+    val unitPrice: String?
+        get() = DrinkVolume.line(volumeMl, price, deposit)
 }
 
 /** One choice inside a group, with its own sold-out switch. */
@@ -221,6 +231,8 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
                         available = it.available,
                         tags = tagged[it.id].orEmpty(),
                         allergens = it.allergens,
+                        volumeMl = it.volumeMl,
+                        deposit = it.deposit,
                     )
                 }
         }
@@ -246,6 +258,8 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
                 put("prep_minutes", edit.prepMinutes)
                 put("sort_order", edit.sortOrder)
                 put("image_url", edit.imageUrl.trim())
+                // Sent as JSON null when blank: clearing the field clears the size.
+                put("volume_ml", edit.volumeMl)
             },
         )
 
@@ -500,9 +514,11 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
         val available: Boolean = true,
         @SerialName("image_url") val imageUrl: String? = null,
         val allergens: List<String>? = null,
+        @SerialName("volume_ml") val volumeMl: Int? = null,
+        val deposit: Double = 0.0,
     ) {
         companion object {
-            const val COLUMNS = "id,category_id,name,description,price,prep_minutes,sort_order,available,image_url,allergens"
+            const val COLUMNS = "id,category_id,name,description,price,prep_minutes,sort_order,available,image_url,allergens,volume_ml,deposit"
         }
     }
 

@@ -68,6 +68,7 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.Allergen
 import de.hamzabistro.printstation.core.Allergens
 import de.hamzabistro.printstation.core.DishEdit
+import de.hamzabistro.printstation.core.DrinkVolume
 import de.hamzabistro.printstation.core.Ingredient
 import de.hamzabistro.printstation.core.MenuDish
 import de.hamzabistro.printstation.core.MenuOption
@@ -99,6 +100,8 @@ data class DishForm(
     val prepMinutes: String,
     val sortOrder: String,
     val imageUrl: String,
+    /** Millilitres as typed; blank for food. */
+    val volumeMl: String,
     val tags: Set<Long>,
     /** The ticks, in the three states of [Allergens]: null until somebody says. */
     val allergens: List<String>?,
@@ -109,7 +112,8 @@ data class DishForm(
             val price = price.trim().replace(',', '.').toDoubleOrNull() ?: return null
             val prep = prepMinutes.trim().toIntOrNull() ?: return null
             val sort = sortOrder.trim().toIntOrNull() ?: return null
-            return DishEdit(name, description, price, prep, sort, imageUrl).takeIf { it.valid }
+            val volume = DrinkVolume.parse(volumeMl) ?: return null
+            return DishEdit(name, description, price, prep, sort, imageUrl, volume.ml).takeIf { it.valid }
         }
 
     companion object {
@@ -121,6 +125,7 @@ data class DishForm(
                 prepMinutes = dish.prepMinutes.toString(),
                 sortOrder = dish.sortOrder.toString(),
                 imageUrl = dish.imageUrl,
+                volumeMl = dish.volumeMl?.toString() ?: "",
                 tags = dish.tags.toSet(),
                 allergens = dish.allergens,
             )
@@ -649,6 +654,7 @@ private fun LazyListScope.dishes(state: MenuState, menu: MenuViewModel) {
                             }
                         },
                     )
+                    dish.unitPrice?.let { Hint(it) }
                     AllergenLine(dish.allergens)
                     val form = state.form
                     if (editing && form != null) DishFormView(dish, form, state, menu)
@@ -685,6 +691,10 @@ private fun DishFormView(dish: MenuDish, form: DishForm, state: MenuState, menu:
         NumberField(form.sortOrder, R.string.menu_position, KeyboardType.Number, Modifier.weight(1f)) { v -> menu.updateForm { it.copy(sortOrder = v) } }
     }
     Hint(stringResource(R.string.menu_prep_hint))
+
+    // A drink's size, for the "0,33 l · 6,52 €/l" under it on the menu. Blank for food.
+    NumberField(form.volumeMl, R.string.menu_volume, KeyboardType.Number, Modifier.fillMaxWidth()) { v -> menu.updateForm { it.copy(volumeMl = v) } }
+    Hint(stringResource(R.string.menu_volume_hint))
 
     // Labels, not categories: a tick leaves the dish where it is printed and adds a way to find it.
     if (state.tags.isNotEmpty()) {
