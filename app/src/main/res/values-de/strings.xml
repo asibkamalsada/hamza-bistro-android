@@ -347,6 +347,16 @@
     <string name="menu_ingredient_delete_confirm">Zutat löschen? Alles, was sie blockiert, ist danach wieder bestellbar.</string>
     <string name="menu_ingredient_new">Neue Zutat</string>
     <string name="menu_ingredient_add">Hinzufügen</string>
+    <string name="menu_allergens">Allergene</string>
+    <string name="menu_allergens_list">Allergene: %1$s</string>
+    <string name="menu_allergens_none">Allergene: keine</string>
+    <string name="menu_allergens_not_stated">Allergene noch nicht angegeben</string>
+    <string name="menu_allergens_hint">Aus Rezept und Lieferantenblatt. Nichts angekreuzt heißt „noch nicht angegeben“ – die Karte zeigt dann „Angaben folgen“.</string>
+    <string name="menu_allergens_none_box">Keines der 14</string>
+    <string name="menu_allergens_missing_count">Ohne Allergenangaben: %1$d</string>
+    <string name="menu_allergens_missing_only">Nur diese zeigen</string>
+    <string name="menu_allergens_option_shared">Gilt für diese Auswahl in jedem Gericht, das sie anbietet.</string>
+    <string name="menu_allergen_unknown">Die Datenbank kennt einen dieser Allergen-Buchstaben nicht. Neu laden und noch einmal ankreuzen.</string>
 
     <!-- Einstellungen: Wer erfährt, Druckstationen, Adressprüfung (HealthSections.kt) -->
     <string name="who_hears">Wer von Bestellungen erfährt</string>

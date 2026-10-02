@@ -5,6 +5,7 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.InvalidHoursException
 import de.hamzabistro.printstation.core.NotAllowedException
 import de.hamzabistro.printstation.core.SignedOutException
+import de.hamzabistro.printstation.core.UnknownAllergenException
 import kotlinx.coroutines.CancellationException
 
 /** What went wrong, said for the person holding the device. */
@@ -13,6 +14,7 @@ fun failureText(context: Context, e: Exception): String =
         is SignedOutException -> context.getString(R.string.stopped_signed_out)
         is NotAllowedException -> context.getString(R.string.problem_not_staff)
         is InvalidHoursException -> context.getString(R.string.hours_invalid)
+        is UnknownAllergenException -> context.getString(R.string.menu_allergen_unknown)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 

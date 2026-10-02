@@ -112,8 +112,13 @@ queue's top bar (**Mehr** on a phone):
   **Bearbeiten**; a photo picked there is cropped square, shrunk to 256 px
   WebP on the device and uploaded to the `menu` bucket, and lands on the
   menu when the form is saved. What an ingredient is used in is set behind
-  the count beside it. Deposits, new dishes and new option groups stay in
-  the Supabase dashboard, as before.
+  the count beside it. **Allergens** (LMIV, the 14 lettered a–n) are ticked
+  in the same form, and per choice behind **Allergene** on the choices tab;
+  nothing ticked stays "not stated" (the menu says "Angaben folgen"), and
+  only the separate **Keines der 14** saves "none". Each row shows its
+  letters or a red "noch nicht angegeben", and both tabs count what is
+  still missing with a filter to work through it. Deposits, new dishes and
+  new option groups stay in the Supabase dashboard, as before.
 - **Lieferzeiten** — the open/closed switch, closures planned ahead (a
   holiday, a day off; also open-ended), and the week's delivery hours, saved
   all at once, on the quarter hour.
@@ -249,7 +254,7 @@ kept in a small file and reported later, never printed twice.
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
   and takings (`History`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
-  ingredients (`Menu`, `PhotoCrop`), who hears about orders, the print
+  ingredients (`Menu`, `Allergens`, `PhotoCrop`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer

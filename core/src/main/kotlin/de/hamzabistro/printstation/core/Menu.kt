@@ -7,9 +7,13 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -65,6 +69,8 @@ data class MenuDish(
     val available: Boolean,
     /** The tags it carries, by id. */
     val tags: List<Long>,
+    /** Allergen letters; [] for "none", null for "not stated yet" — see [Allergens]. */
+    val allergens: List<String>? = null,
 ) {
     val edit: DishEdit
         get() = DishEdit(name, description, price, prepMinutes, sortOrder, imageUrl)
@@ -77,6 +83,8 @@ data class MenuOption(
     val price: Double,
     val available: Boolean,
     val tags: List<Long>,
+    /** What the choice brings onto the dish — extra cheese brings g. Null until stated. */
+    val allergens: List<String>? = null,
 )
 
 /**
@@ -136,6 +144,18 @@ interface MenuBackend {
 
     /** Makes the dish carry exactly these tags. */
     suspend fun setDishTags(id: Long, tags: List<Long>)
+
+    /** The 14 allergens, in the menu's order. */
+    suspend fun allergens(): List<Allergen>
+
+    /**
+     * States a dish's allergens: the letters, [] for "none", or null to put
+     * it back to "not stated". What the database stored, sorted.
+     */
+    suspend fun setDishAllergens(id: Long, codes: List<String>?): List<String>?
+
+    /** The same for a choice, on every dish that offers it. */
+    suspend fun setOptionAllergens(id: Long, codes: List<String>?): List<String>?
 
     /** Puts a shrunk photo in the bucket; the public URL to save onto the dish. */
     suspend fun uploadPhoto(dishId: Long, photo: Photo, now: Long): String
@@ -200,6 +220,7 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
                         imageUrl = it.imageUrl ?: "",
                         available = it.available,
                         tags = tagged[it.id].orEmpty(),
+                        allergens = it.allergens,
                     )
                 }
         }
@@ -253,6 +274,38 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
         )
     }
 
+    override suspend fun allergens(): List<Allergen> =
+        select("allergens", Allergen.serializer()) {
+            addQueryParameter("select", "code,name_de,name_en")
+            addQueryParameter("order", "sort_order")
+        }
+
+    override suspend fun setDishAllergens(id: Long, codes: List<String>?): List<String>? =
+        setAllergens("set_item_allergens", "p_item_id", id, codes)
+
+    override suspend fun setOptionAllergens(id: Long, codes: List<String>?): List<String>? =
+        setAllergens("set_option_allergens", "p_option_id", id, codes)
+
+    /**
+     * Through the staff functions rather than a PATCH: one call with one
+     * answer for the site and the app, and a plain refusal for anyone else.
+     * A null is sent as JSON null — that is the "not stated" — never left out.
+     */
+    private suspend fun setAllergens(function: String, idName: String, id: Long, codes: List<String>?): List<String>? {
+        val args = buildJsonObject {
+            put(idName, id)
+            put("p_codes", codes?.let { list -> buildJsonArray { list.forEach { add(JsonPrimitive(it)) } } } ?: JsonNull)
+        }
+        val answer =
+            try {
+                rest.rpc(function, args)
+            } catch (e: BackendException) {
+                if (e.code == UNKNOWN_ALLERGEN) throw UnknownAllergenException(e.message ?: function)
+                throw e
+            }
+        return json.decodeFromString(STORED, answer.ifBlank { "null" })
+    }
+
     /**
      * Named after the dish and the moment, never reused: a new photo is a new
      * URL, so the object can be cached for a year and the bucket needs no
@@ -277,7 +330,7 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
         }
         val options = async {
             select("menu_options", OptionRow.serializer()) {
-                addQueryParameter("select", "id,group_id,name,price,available")
+                addQueryParameter("select", "id,group_id,name,price,available,allergens")
                 addQueryParameter("order", "sort_order")
             }
         }
@@ -296,7 +349,7 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
                     name = group.name,
                     options =
                         rows.filter { it.groupId == group.id }
-                            .map { MenuOption(it.id, it.name, it.price, it.available, tagged[it.id].orEmpty()) },
+                            .map { MenuOption(it.id, it.name, it.price, it.available, tagged[it.id].orEmpty(), it.allergens) },
                     dishes = dishesBy[group.id].orEmpty().sorted(),
                 )
             }
@@ -446,9 +499,10 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
         @SerialName("sort_order") val sortOrder: Int = 0,
         val available: Boolean = true,
         @SerialName("image_url") val imageUrl: String? = null,
+        val allergens: List<String>? = null,
     ) {
         companion object {
-            const val COLUMNS = "id,category_id,name,description,price,prep_minutes,sort_order,available,image_url"
+            const val COLUMNS = "id,category_id,name,description,price,prep_minutes,sort_order,available,image_url,allergens"
         }
     }
 
@@ -462,6 +516,7 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
         val name: String,
         val price: Double = 0.0,
         val available: Boolean = true,
+        val allergens: List<String>? = null,
     )
 
     @Serializable
@@ -491,6 +546,12 @@ class SupabaseMenuBackend internal constructor(private val rest: SupabaseRest) :
     private class IngredientOptionRow(@SerialName("ingredient_id") val ingredientId: Long, @SerialName("option_id") val optionId: Long)
 
     private companion object {
+        /** What set_*_allergens raises for a letter public.allergens does not have. */
+        const val UNKNOWN_ALLERGEN = "HB433"
+
+        /** Their answer: the stored array, or null. */
+        val STORED = ListSerializer(String.serializer()).nullable
+
         /** Public, and world-readable by URL: the customer menu loads it unsigned. */
         const val PHOTO_BUCKET = "menu"
 
