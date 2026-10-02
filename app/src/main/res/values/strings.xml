@@ -234,4 +234,31 @@
     <string name="section_website">On the website</string>
     <string name="website_hint">Sold-out switches, the menu and \"Letzte Bestellungen\" stay on the website.</string>
     <string name="website_open">Open the website</string>
+
+    <!-- Whether the shop takes orders: the line above the queue (ShopSwitch.kt). -->
+    <string name="shop_open">Taking orders.</string>
+    <string name="shop_open_until">Taking orders — until %1$s.</string>
+    <string name="shop_closed_until">Closed — orders again %1$s.</string>
+    <string name="shop_closed_for_good">Closed until further notice — no orders are coming in.</string>
+    <string name="shop_outside_hours">Outside delivery hours — orders again %1$s. Pre-orders are open.</string>
+    <string name="shop_no_hours">No delivery hours set — no orders are coming in.</string>
+    <string name="shop_closed_by">Closed by %1$s.</string>
+    <string name="shop_pause">Pause…</string>
+    <string name="shop_close">Close…</string>
+    <string name="shop_for_30">30 min</string>
+    <string name="shop_for_60">1 hour</string>
+    <string name="shop_for_today">Rest of today</string>
+    <string name="shop_for_good">Until further notice</string>
+    <string name="shop_keep_open">Never mind</string>
+    <string name="shop_open_now">Open again</string>
+    <string name="shop_hours_link">Delivery hours</string>
+    <string name="shop_failed">That did not work: %1$s</string>
+    <string name="shop_when_today">today from %1$s</string>
+    <string name="shop_when_tomorrow">tomorrow from %1$s</string>
+    <string name="shop_when_day">%1$s from %2$s</string>
+    <string name="shop_when_date">on %1$s from %2$s</string>
+    <plurals name="shop_preorders_inside">
+        <item quantity="one">%1$d order already booked falls in this time and stays in the queue — accept or decline it.</item>
+        <item quantity="other">%1$d orders already booked fall in this time and stay in the queue — accept or decline them.</item>
+    </plurals>
 </resources>

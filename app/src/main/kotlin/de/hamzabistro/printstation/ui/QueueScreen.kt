@@ -103,6 +103,9 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
                     }
                 is StaffEvent.Printed -> resources.getString(R.string.printed_by_hand, shown.order)
                 is StaffEvent.PrintFailed -> resources.getString(R.string.printer_failed, shown.reason)
+                is StaffEvent.ShopFailed -> resources.getString(R.string.shop_failed, shown.reason)
+                is StaffEvent.PreordersInside ->
+                    resources.getQuantityString(R.plurals.shop_preorders_inside, shown.count, shown.count)
             }
         )
         viewModel.eventShown()
@@ -242,6 +245,7 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.setOnShift(true) }
 
     Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) })
         if (!state.prefs.onShift) {
             Banner(stringResource(R.string.shift_off_banner), warning = true) {
                 Button(onClick = {
@@ -304,6 +308,17 @@ fun missingForAlarm(context: Context): List<Int> {
 fun needsNotificationPermission(context: Context): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+
+/** The shop line's buttons, wired to the view model. */
+private class ShopButtons(private val viewModel: StaffViewModel) : ShopActions {
+    override fun pause(minutes: Long) = viewModel.pauseShop(minutes)
+
+    override fun closeForToday() = viewModel.closeShopForToday()
+
+    override fun closeForGood() = viewModel.closeShopForGood()
+
+    override fun open() = viewModel.openShop()
+}
 
 /** The card's buttons, wired to the view model and to the phone's dialler and map. */
 private class Actions(private val context: Context, private val viewModel: StaffViewModel) : OrderActions {
