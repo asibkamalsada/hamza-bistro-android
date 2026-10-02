@@ -66,5 +66,19 @@ class InvalidSettingException(message: String) : Exception(message)
  */
 class UnknownAllergenException(message: String) : Exception(message)
 
+/**
+ * The database took no delivery because delivery is paused, all of it or to
+ * the order's ring (HB436, 20261002180000_scoped_pause.sql in
+ * hamza-bistro-web). Collection goes through.
+ */
+class DeliveryPausedException(message: String) : Exception(message)
+
+/**
+ * The database took no delivery for that time because of a weekly delivery
+ * break — inside it, or for right now within its lead (HB437). Collection
+ * goes through.
+ */
+class DeliveryBreakException(message: String) : Exception(message)
+
 /** The ticket did not come out: printer off, out of range, or not answering. */
 class PrinterException(message: String, cause: Throwable? = null) : IOException(message, cause)

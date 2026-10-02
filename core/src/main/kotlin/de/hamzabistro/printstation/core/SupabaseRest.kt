@@ -60,6 +60,18 @@ internal class SupabaseRest(
         // How the staff-only and printing functions refuse an account that
         // may not do what it asked.
         if (message == "staff only") return NotAllowedException()
-        return BackendException(status, "$what: $message", errorField(body, "code"))
+        return when (val code = errorField(body, "code")) {
+            // An order for a delivery the shop is not making right now:
+            // whoever asked can still make it a collection.
+            DELIVERY_PAUSED -> DeliveryPausedException("$what: $message")
+            DELIVERY_BREAK -> DeliveryBreakException("$what: $message")
+            else -> BackendException(status, "$what: $message", code)
+        }
+    }
+
+    private companion object {
+        /** See 20261002180000_scoped_pause.sql in hamza-bistro-web. */
+        const val DELIVERY_PAUSED = "HB436"
+        const val DELIVERY_BREAK = "HB437"
     }
 }

@@ -5,13 +5,18 @@ import java.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
-/** A stretch of time in which the shop takes no orders. */
+/**
+ * A stretch of time in which the shop takes no orders — or, with a [scope]
+ * other than all (hamza-bistro-web#72), no deliveries, or none to some rings.
+ */
 @Serializable
 data class ShopClosure(
     val id: Long,
@@ -20,7 +25,17 @@ data class ShopClosure(
     @SerialName("ends_at") @Serializable(with = InstantSerializer::class) val endsAt: Instant? = null,
     /** Who closed — told to staff only. */
     val by: String? = null,
-)
+    /** A [ClosureScope]; absent from a database without scopes, where every closure stops everything. */
+    val scope: String = ClosureScope.ALL,
+    /** For [ClosureScope.RINGS]: the rings not delivered to. */
+    val rings: List<String>? = null,
+) {
+    /** Whether it stops everything, rather than only delivery. */
+    val stopsAll: Boolean
+        get() = scope != ClosureScope.DELIVERY && scope != ClosureScope.RINGS
+
+    fun covers(at: Instant): Boolean = !startsAt.isAfter(at) && (endsAt == null || endsAt.isAfter(at))
+}
 
 /**
  * One weekday's delivery hours, as delivery_hours keeps them: minutes since
@@ -85,6 +100,10 @@ data class ShopHours(
     @SerialName("busy_until") @Serializable(with = InstantSerializer::class) val busyUntil: Instant? = null,
     /** Who switched busy mode on — told to staff only. */
     @SerialName("busy_by") val busyBy: String? = null,
+    /** The weekly delivery breaks: the active ones, and for staff the switched-off ones too. */
+    @SerialName("delivery_breaks") val deliveryBreaks: List<DeliveryBreak> = emptyList(),
+    /** From this many minutes before a break, delivery for right now is refused. */
+    @SerialName("delivery_break_lead_minutes") val breakLeadMinutes: Int = DeliveryBreak.DEFAULT_LEAD,
 ) {
     /**
      * Busy mode at [now], or null while it is off — or over since this was
@@ -99,11 +118,56 @@ data class ShopHours(
     /** The minutes busy mode adds at [now]: 0 while it is off. */
     fun busyMinutes(now: Instant): Int = busyAt(now)?.minutes ?: 0
 
-    /** The closure running at [now], the one lasting longest where several overlap. */
+    /**
+     * The closure of everything running at [now], the one lasting longest
+     * where several overlap. A pause of delivery alone is not one — the shop
+     * takes collection orders through it: see [deliveryPauseAt].
+     */
     fun closureAt(now: Instant): ShopClosure? =
-        closures
-            .filter { !it.startsAt.isAfter(now) && (it.endsAt == null || it.endsAt.isAfter(now)) }
-            .maxWithOrNull(compareBy(nullsLast()) { it.endsAt })
+        closures.filter { it.stopsAll && it.covers(now) }.maxWithOrNull(compareBy(nullsLast()) { it.endsAt })
+
+    /**
+     * The pause of delivery running at [now], or null: delivery_pause_at()
+     * in 20261002180000_scoped_pause.sql, worked out from [closures] so it
+     * ends by itself between two reads. A pause of all delivery outranks any
+     * of rings; where several of the same kind overlap, the rings add up and
+     * it lasts until the end of the longest.
+     */
+    fun deliveryPauseAt(now: Instant): DeliveryPause? {
+        val running = closures.filter { !it.stopsAll && it.covers(now) }
+        if (running.isEmpty()) return null
+        val scope = if (running.any { it.scope == ClosureScope.DELIVERY }) ClosureScope.DELIVERY else ClosureScope.RINGS
+        val picked = running.filter { it.scope == scope }
+        val until = if (picked.any { it.endsAt == null }) null else picked.maxOf { it.endsAt!! }
+        val rings = if (scope == ClosureScope.RINGS) picked.flatMap { it.rings.orEmpty() }.distinct().sorted() else emptyList()
+        return DeliveryPause(scope, rings, until, picked.firstNotNullOfOrNull { it.by })
+    }
+
+    /**
+     * The active delivery break covering [now] or starting within [lead]
+     * minutes of it, the same Leipzig day; the earliest where several match.
+     * delivery_break_at() in 20261002180000_scoped_pause.sql.
+     */
+    fun breakAt(now: Instant, lead: Int = breakLeadMinutes): DeliveryBreak? {
+        val local = now.atZone(AlarmPolicy.LEIPZIG)
+        val day = local.dayOfWeek.value % 7
+        val minutes = local.hour * 60 + local.minute
+        return deliveryBreaks
+            .filter { it.active && it.day == day && it.starts <= minutes + maxOf(lead, 0) && it.ends > minutes }
+            .minWithOrNull(compareBy({ it.starts }, { it.id ?: Long.MAX_VALUE }))
+    }
+
+    /**
+     * The delivery break to say above the queue at [now]: running, or
+     * starting within the lead — while the shop is open, since closed says
+     * enough.
+     */
+    fun breakNotice(now: Instant): BreakNotice? {
+        if (state(now) != ShopState.OPEN) return null
+        val brk = breakAt(now) ?: return null
+        val local = now.atZone(AlarmPolicy.LEIPZIG)
+        return BreakNotice(brk, running = brk.starts <= local.hour * 60 + local.minute)
+    }
 
     /**
      * Where the shop stands at [now], which may be up to a poll later than
@@ -162,13 +226,29 @@ interface ShopBackend {
 
     /**
      * Closes from [from] (now, when null) until [until] (until somebody opens
-     * again, when null). Throws [InvalidHoursException] for one that ends
-     * before it starts.
+     * again, when null) — everything, or with [what] only delivery, or
+     * delivery to the outer rings. Throws [InvalidHoursException] for one
+     * that ends before it starts.
      */
-    suspend fun close(until: Instant?, from: Instant? = null): ShopHours
+    suspend fun close(until: Instant?, from: Instant? = null, what: PauseWhat = PauseWhat.ALL): ShopHours
 
-    /** Ends every closure running now. One planned for later stays planned. */
+    /** Ends every closure running now, a pause of delivery included. One planned for later stays planned. */
     suspend fun open(): ShopHours
+
+    /**
+     * Adds a weekly delivery break ([DeliveryBreak.id] null) or changes one.
+     * Throws [InvalidHoursException] for one the database refuses: off the
+     * quarter hour, starting after it ends, or gone meanwhile.
+     */
+    suspend fun saveBreak(brk: DeliveryBreak): ShopHours
+
+    suspend fun deleteBreak(id: Long): ShopHours
+
+    /**
+     * From [minutes] before a break, no delivery for right now. Throws
+     * [InvalidHoursException] outside 0–120 on the five.
+     */
+    suspend fun setBreakLead(minutes: Int): ShopHours
 
     /** Takes a closure off the list altogether: the holiday is not happening after all. */
     suspend fun removeClosure(id: Long): ShopHours
@@ -212,16 +292,40 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
             if (e.missingFunction) null else throw e
         }
 
-    override suspend fun close(until: Instant?, from: Instant?): ShopHours =
+    override suspend fun close(until: Instant?, from: Instant?, what: PauseWhat): ShopHours =
         call(
             "shop_close",
             buildJsonObject {
                 if (until == null) put("p_until", JsonNull) else put("p_until", until.toString())
                 if (from != null) put("p_from", from.toString())
+                // Everything is the call as it was before scopes, which a
+                // database without them still takes.
+                if (what != PauseWhat.ALL) {
+                    put("p_scope", what.scope)
+                    what.rings?.let { rings -> put("p_rings", JsonArray(rings.map(::JsonPrimitive))) }
+                }
             },
         )
 
     override suspend fun open(): ShopHours = call("shop_open", buildJsonObject {})
+
+    override suspend fun saveBreak(brk: DeliveryBreak): ShopHours =
+        call(
+            "delivery_break_save",
+            buildJsonObject {
+                if (brk.id == null) put("p_id", JsonNull) else put("p_id", brk.id)
+                put("p_day", brk.day)
+                put("p_starts", brk.starts)
+                put("p_ends", brk.ends)
+                put("p_label", brk.label.trim())
+                put("p_active", brk.active)
+            },
+        )
+
+    override suspend fun deleteBreak(id: Long): ShopHours = call("delivery_break_delete", buildJsonObject { put("p_id", id) })
+
+    override suspend fun setBreakLead(minutes: Int): ShopHours =
+        call("set_delivery_break_lead", buildJsonObject { put("p_minutes", minutes) })
 
     override suspend fun removeClosure(id: Long): ShopHours = call("shop_closure_delete", buildJsonObject { put("p_id", id) })
 
