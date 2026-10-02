@@ -56,10 +56,10 @@ class PrintStationTest {
 
         override suspend fun off(station: String) = Unit
 
-        override suspend fun ticket(order: String, lang: String): ByteArray? {
+        override suspend fun ticket(order: String, lang: String, bagSlip: Boolean): ByteArray? {
             assertEquals("de", lang)
-            calls += "ticket $order"
-            return if (order in gone) null else "ticket $order".toByteArray()
+            calls += if (bagSlip) "ticket+slip $order" else "ticket $order"
+            return if (order in gone) null else (if (bagSlip) "ticket+slip $order" else "ticket $order").toByteArray()
         }
 
         override suspend fun testTicket(lang: String) = ByteArray(0)
@@ -81,6 +81,8 @@ class PrintStationTest {
     private val printer = FakePrinter()
     private val log = MemoryPrintLog()
 
+    private var bagSlip = false
+
     private fun TestScope.station() =
         PrintStation(
             backend = backend,
@@ -89,6 +91,7 @@ class PrintStationTest {
             station = "station-id-1",
             label = "Android-App",
             lang = "de",
+            bagSlip = { bagSlip },
             logger = Logger.NONE,
             now = { testScheduler.currentTime },
             wallClock = { 1_000_000 + testScheduler.currentTime },
@@ -268,5 +271,23 @@ class PrintStationTest {
         backgroundScope.launch { station.run(emptyFlow()) }
         runCurrent()
         assertEquals(listOf("ticket order-3"), printer.printed)
+    }
+
+    @Test
+    fun `with the bag slip on, each order is still one claim, one ticket and one finish`() = runTest {
+        backend.queue += listOf(order(1))
+        val station = station()
+        bagSlip = true
+        backgroundScope.launch { station.run(emptyFlow()) }
+        runCurrent()
+
+        assertEquals(listOf("ticket+slip order-1"), printer.printed)
+        assertEquals(listOf("claim order-1", "ticket+slip order-1", "finish order-1 true"), backend.calls)
+
+        // Switched off while running: the next ticket comes alone.
+        bagSlip = false
+        backend.queue += listOf(order(2))
+        advanceTimeBy(26.seconds)
+        assertEquals(listOf("ticket+slip order-1", "ticket order-2"), printer.printed)
     }
 }

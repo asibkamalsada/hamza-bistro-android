@@ -58,6 +58,8 @@ class PrintStation(
     private val station: String,
     private val label: String,
     private val lang: String,
+    /** Whether a "Tütenzettel" follows each ticket — read at every ticket, so the switch counts at once. */
+    private val bagSlip: () -> Boolean = { false },
     private val logger: Logger,
     /** A monotonic clock in milliseconds, for intervals. */
     private val now: () -> Long,
@@ -162,7 +164,7 @@ class PrintStation(
 
             val ticket =
                 try {
-                    backend.ticket(order.id, lang)
+                    backend.ticket(order.id, lang, bagSlip())
                 } catch (e: Exception) {
                     giveBack(order)
                     throw e

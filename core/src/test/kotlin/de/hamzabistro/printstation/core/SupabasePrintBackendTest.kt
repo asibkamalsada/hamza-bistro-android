@@ -13,7 +13,16 @@ class SupabasePrintBackendTest {
     private val test = TestServer()
     private val store = MemorySessionStore(StoredSession("refresh-0", Account("user-1", null)))
     private val sessions = SessionManager(SupabaseAuth(test.config, test.client) { 0L }, store) { 0L }
-    private val backend = SupabasePrintBackend(test.config, test.client, sessions)
+    private val warnings = mutableListOf<String>()
+    private val logger =
+        object : Logger {
+            override fun info(message: String) = Unit
+
+            override fun warn(message: String, error: Throwable?) {
+                warnings += message
+            }
+        }
+    private val backend = SupabasePrintBackend(test.config, test.client, sessions, logger)
 
     @AfterTest fun close() = test.close()
 
@@ -113,5 +122,54 @@ class SupabasePrintBackendTest {
         assertFailsWith<BackendException> { backend.ticket("a", "de") }
         val tooLarge = assertFailsWith<BackendException> { backend.ticket("a", "de") }
         assertTrue(tooLarge.message!!.contains("too large"))
+    }
+
+    @Test
+    fun `asks for the bag slip with the ticket, in one request`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(200, "\u001b@ticket+slip", contentType = "application/octet-stream")
+
+        assertContentEquals("\u001b@ticket+slip".toByteArray(), backend.ticket("a", "de", bagSlip = true))
+        test.server.takeRequest()
+        val request = test.server.takeRequest()
+        assertEquals("/functions/v1/print-ticket", request.url.encodedPath)
+        assertEquals("""{"order":"a","lang":"de","bagSlip":true}""", request.body!!.utf8())
+        assertEquals(2, test.server.requestCount)
+        assertTrue(warnings.isEmpty())
+    }
+
+    @Test
+    fun `a print-ticket that refuses the bag slip still gives the ticket, and says so`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"error":"bagSlip is true or false"}""")
+        test.reply(200, "\u001b@ticket", contentType = "application/octet-stream")
+
+        assertContentEquals("\u001b@ticket".toByteArray(), backend.ticket("a", "de", bagSlip = true))
+        test.server.takeRequest()
+        assertEquals("""{"order":"a","lang":"de","bagSlip":true}""", test.server.takeRequest().body!!.utf8())
+        assertEquals("""{"order":"a","lang":"de"}""", test.server.takeRequest().body!!.utf8())
+        assertEquals(1, warnings.size)
+    }
+
+    @Test
+    fun `only a refused request is asked again without the slip`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(500, """{"error":"could not build the ticket"}""")
+        test.reply(404, """{"error":"no such order to print"}""")
+
+        assertFailsWith<BackendException> { backend.ticket("a", "de", bagSlip = true) }
+        assertNull(backend.ticket("a", "de", bagSlip = true))
+        // The refresh, then one request each: nothing asked twice.
+        assertEquals(3, test.server.requestCount)
+        assertTrue(warnings.isEmpty())
+    }
+
+    @Test
+    fun `a plain ticket refused is not asked for again`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"error":"order is an order id"}""")
+
+        assertFailsWith<BackendException> { backend.ticket("a", "de") }
+        assertEquals(2, test.server.requestCount)
     }
 }
