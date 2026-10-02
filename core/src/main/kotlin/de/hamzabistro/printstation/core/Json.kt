@@ -1,6 +1,7 @@
 package de.hamzabistro.printstation.core
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -12,7 +13,7 @@ internal val json = Json { ignoreUnknownKeys = true }
 
 private val JSON_MEDIA = "application/json".toMediaType()
 
-internal fun JsonObject.toRequestBody(): RequestBody = toString().toRequestBody(JSON_MEDIA)
+internal fun JsonElement.toRequestBody(): RequestBody = toString().toRequestBody(JSON_MEDIA)
 
 /** A JSON object's string field, or null when it is missing or not a string. */
 internal fun JsonObject.string(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull

@@ -12,7 +12,9 @@ import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.StationNotifications
 import de.hamzabistro.printstation.station.StationState
 import java.time.Instant
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -53,7 +55,8 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
                 Inputs(q, (station as? StationState.Running)?.status?.problem, prefs, busy + pending.keys)
             }
         try {
-            combine(inputs, graph.alarmPoke, ticks) { now, _, _ -> now }.collect(::act)
+            combine(inputs, graph.alarmPoke, ticks, printingSince()) { now, _, _, since -> now to since }
+                .collect { (now, since) -> act(now, since) }
         } finally {
             graph.alarmPlayer.stopLoop()
             StationNotifications.cancelAlarm(context)
@@ -62,12 +65,37 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         }
     }
 
-    private fun act(inputs: Inputs) {
+    /**
+     * Since when some device has been meant to print every accepted order —
+     * the earliest print station's registration — read now and every couple
+     * of minutes; null until known, and when there is none. A failed read
+     * keeps what was known.
+     */
+    private fun printingSince(): Flow<Instant?> = flow {
+        var known: Instant? = null
+        emit(known)
+        while (true) {
+            try {
+                known = graph.devices.printStations(graph.settings.stationId).mapNotNull { it.registeredAt }.minOrNull()
+                emit(known)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                graph.logger.warn("Reading the print stations failed: ${e.javaClass.simpleName}")
+            }
+            delay(STATIONS_POLL)
+        }
+    }
+
+    private fun act(inputs: Inputs, printingSince: Instant?) {
         val queue = inputs.queue
         val prefs = inputs.prefs
         val orders = if (queue.loaded && !queue.notAllowed) queue.orders.filterNot { it.id in inputs.handled } else null
+        // A device that prints by itself hears about its own printer, more
+        // precisely and sooner; it does not also chime about the same ticket.
+        val elsewhere = printingSince.takeUnless { graph.settings.enabled }
         val decision =
-            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarm, Instant.now()) {
+            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarm, Instant.now(), elsewhere) {
                 Eta.estimate(it, queue.prep)
             }
         graph.alarm.value = decision
@@ -104,5 +132,8 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
 
     private companion object {
         val TICK = 5.seconds
+
+        /** Print stations come and go rarely; the "unprinted" chime waits two minutes anyway. */
+        val STATIONS_POLL = 2.minutes
     }
 }

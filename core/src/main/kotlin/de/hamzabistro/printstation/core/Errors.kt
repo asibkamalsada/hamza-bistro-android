@@ -38,5 +38,12 @@ class BackendException(val status: Int, message: String, val code: String? = nul
  */
 class OrderMovedException : Exception("the order had already moved on")
 
+/**
+ * The database refused what was sent as delivery hours or as a closure: a
+ * day that closes before it opens, a time off the quarter hour, a closure
+ * that ends before it starts (HB432).
+ */
+class InvalidHoursException(message: String) : Exception(message)
+
 /** The ticket did not come out: printer off, out of range, or not answering. */
 class PrinterException(message: String, cause: Throwable? = null) : IOException(message, cause)

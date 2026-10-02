@@ -57,6 +57,8 @@
     <string name="chime_cook_now_text">Fällig %1$s · %2$s</string>
     <string name="chime_printer">Bon #%1$d nicht gedruckt</string>
     <string name="chime_printer_text">%1$s. Drucker an, Papier drin?</string>
+    <string name="chime_unprinted">Bon #%1$d nicht gedruckt</string>
+    <string name="chime_unprinted_text">Um %1$s angenommen, und kein Drucker hat den Bon ausgegeben. Drucker an, Papier drin?</string>
     <string name="chime_offline">Keine Verbindung zum Shop</string>
     <string name="chime_offline_text">Seit %1$s – neue Bestellungen kommen hier gerade nicht an. WLAN oder mobile Daten prüfen.</string>
 
@@ -64,7 +66,7 @@
     <string name="slot_tomorrow">morgen</string>
 
     <string name="section_account">Konto</string>
-    <string name="sign_in_hint">Mit deinem Konto von der Website anmelden – das, mit dem du /orders öffnest. Ein Tablet, das nur druckt, meldet sich mit seinem Druckkonto an. Das Passwort wird nicht auf dem Gerät gespeichert.</string>
+    <string name="sign_in_hint">Mit deinem Konto von der Website anmelden – dem, das auf der Personalliste steht. Ein Tablet, das nur druckt, meldet sich mit seinem Druckkonto an. Das Passwort wird nicht auf dem Gerät gespeichert.</string>
     <string name="email">E-Mail</string>
     <string name="password">Passwort</string>
     <string name="sign_in">Anmelden</string>
@@ -92,7 +94,7 @@
     <string name="station_switch">Jede angenommene Bestellung drucken</string>
     <string name="station_one_printer">Der Drucker nimmt nur eine Verbindung an: auf diesem Tablet auf der Website „Jede angenommene Bestellung drucken“ ausschalten.</string>
     <string name="station_stopped">Aus.</string>
-    <string name="station_off_failed">Hier wird nicht mehr gedruckt, aber die Station konnte nicht aus der Liste genommen werden (%1$s). Auf der Website unter „Druckstationen“ entfernen.</string>
+    <string name="station_off_failed">Hier wird nicht mehr gedruckt, aber die Station konnte nicht aus der Liste genommen werden (%1$s). In den Einstellungen unter „Druckstationen“ entfernen.</string>
 
     <string name="section_background">Im Hintergrund weiterdrucken</string>
     <string name="battery_hint">Android beendet die App sonst womöglich, um Akku zu sparen – dann druckt nichts. Den Hintergrundbetrieb erlauben. Bei Samsung und Xiaomi zusätzlich die Schritte für das eigene Modell auf dontkillmyapp.com befolgen.</string>
@@ -178,7 +180,7 @@
     <!-- Settings -->
     <string name="section_shift">Schicht</string>
     <string name="shift_switch">Im Dienst – dieses Gerät klingelt</string>
-    <string name="shift_hint">Während der Schicht läuft die App im Hintergrund, hält die Verbindung zum Shop und steht auf der Website unter „Wer von Bestellungen erfährt“. Auf dem Tablet im Laden einfach immer an lassen; auf dem Handy eines Fahrers nach Feierabend ausschalten.</string>
+    <string name="shift_hint">Während der Schicht läuft die App im Hintergrund, hält die Verbindung zum Shop und steht unter „Wer von Bestellungen erfährt“, hier in den Einstellungen und auf jedem anderen Gerät. Auf dem Tablet im Laden einfach immer an lassen; auf dem Handy eines Fahrers nach Feierabend ausschalten.</string>
     <string name="device_name">Name dieses Geräts</string>
     <string name="device_name_hint">z. B. Tablet, Fahrer 1</string>
 
@@ -200,6 +202,7 @@
     <string name="alarm_quiet_hint">In der Nachtruhe klingelt nichts; eine Bestellung kommt als stille Benachrichtigung an – etwa eine Vorbestellung um ein Uhr nachts. Eine Vorbestellung, die dann noch wartet, klingelt in der Stunde vor ihrer Zeit.</string>
     <string name="alarm_cook_now">Vorbestellung: Bescheid, wenn sie auf den Herd muss</string>
     <string name="alarm_printer">Drucker: Bescheid, wenn ein Bon nicht rauskam</string>
+    <string name="alarm_unprinted">Melden, wenn eine angenommene Bestellung nach zwei Minuten nirgends gedruckt ist</string>
     <string name="alarm_connection">Bescheid, wenn die Verbindung zum Shop weg ist</string>
     <string name="minutes_n">%1$d Min.</string>
     <string name="seconds_n">%1$d Sek.</string>
@@ -231,9 +234,6 @@
 
     <string name="section_printer_staff">Bondrucker (am Tablet im Laden)</string>
 
-    <string name="section_website">Auf der Website</string>
-    <string name="website_hint">Ausverkauft-Schalter, Speisekarte und „Letzte Bestellungen“ bleiben auf der Website.</string>
-    <string name="website_open">Website öffnen</string>
 
     <!-- Ob der Laden Bestellungen annimmt: die Zeile über der Liste (ShopSwitch.kt). -->
     <string name="shop_open">Bestellungen werden angenommen.</string>
@@ -261,4 +261,130 @@
         <item quantity="one">%1$d schon gebuchte Bestellung fällt in diese Zeit und bleibt in der Liste – bitte annehmen oder ablehnen.</item>
         <item quantity="other">%1$d schon gebuchte Bestellungen fallen in diese Zeit und bleiben in der Liste – bitte annehmen oder ablehnen.</item>
     </plurals>
+
+    <!-- Von den Bildschirmen unten geteilt. -->
+    <string name="cancel">Abbrechen</string>
+    <string name="save">Speichern</string>
+    <string name="reload">Neu laden</string>
+    <string name="please_wait">Bitte warten …</string>
+    <string name="remove">Entfernen</string>
+    <string name="settings_reset">Einstellungen dieses Geräts zurücksetzen</string>
+    <string name="more_menu">Mehr</string>
+    <string name="problem_not_staff">Dieses Konto darf das nicht: Es steht nicht (mehr) auf der Personalliste.</string>
+    <string name="address_failing_banner">Die Adressprüfung funktioniert gerade nicht richtig – Details in den Einstellungen.</string>
+
+    <!-- Letzte Bestellungen (HistoryScreen.kt) -->
+    <string name="history_title">Letzte Bestellungen</string>
+    <string name="history_empty">In den letzten Tagen keine Bestellungen.</string>
+    <plurals name="history_takings">
+        <item quantity="one">Heute geliefert: %1$d Bestellung · %2$s</item>
+        <item quantity="other">Heute geliefert: %1$d Bestellungen · %2$s</item>
+    </plurals>
+
+    <!-- Lieferzeiten (HoursScreen.kt) -->
+    <string name="hours_title">Lieferzeiten</string>
+    <string name="hours_now">Jetzt</string>
+    <string name="hours_unknown">Noch nicht gelesen – oder die Datenbank des Ladens kennt die Lieferzeiten noch nicht.</string>
+    <string name="hours_planned">Schließungen</string>
+    <string name="hours_planned_note">Urlaub, ein Ruhetag, ein Abend ohne Fahrer: In dieser Zeit kommen keine Bestellungen, auch keine Vorbestellungen.</string>
+    <string name="hours_planned_none">Keine geplant.</string>
+    <string name="hours_plan_running">läuft gerade</string>
+    <string name="hours_plan_from">Geschlossen ab</string>
+    <string name="hours_plan_until">bis</string>
+    <string name="hours_plan_open_ended">Ohne Ende – bis jemand wieder öffnet</string>
+    <string name="hours_plan_add">Schließung eintragen</string>
+    <string name="hours_plan_range">%1$s bis %2$s</string>
+    <string name="hours_plan_from_only">ab %1$s, ohne Ende</string>
+    <string name="hours_plan_invalid">Bitte einen Anfang angeben, und ein Ende danach.</string>
+    <string name="hours_week">Jede Woche</string>
+    <string name="hours_week_note">In diesen Zeiten werden Bestellungen angenommen, auch zum Abholen; außerhalb nur für eine feste Zeit in den nächsten. Zeiten in Viertelstunden.</string>
+    <string name="hours_day_off">keine Lieferung</string>
+    <string name="hours_week_save">Zeiten speichern</string>
+    <string name="hours_week_reset">Doch nicht</string>
+    <string name="hours_week_invalid">Am %1$s endet die Lieferung, bevor sie anfängt.</string>
+    <string name="hours_saved">Gespeichert.</string>
+    <string name="hours_invalid">Die Datenbank nimmt das nicht an: ein Tag, der schließt, bevor er öffnet, oder eine Schließung, die endet, bevor sie anfängt.</string>
+
+    <!-- Speisekarte (MenuScreen.kt) -->
+    <string name="menu_title">Speisekarte</string>
+    <string name="menu_tab_dishes">Gerichte</string>
+    <string name="menu_tab_options">Optionen</string>
+    <string name="menu_tab_ingredients">Zutaten</string>
+    <string name="menu_intro">Schalte ein Gericht aus und Kunden sehen es sofort nicht mehr.</string>
+    <string name="menu_dashboard_note">Pfand, neue Gerichte und neue Optionsgruppen liegen weiterhin im Supabase-Dashboard.</string>
+    <string name="menu_sold_out_count">Ausverkauft: %1$d</string>
+    <string name="menu_available">Auf der Karte</string>
+    <string name="menu_sold_out">Ausverkauft</string>
+    <string name="menu_edit">Bearbeiten</string>
+    <string name="menu_name">Name</string>
+    <string name="menu_description">Beschreibung</string>
+    <string name="menu_price">Preis (€)</string>
+    <string name="menu_prep">Zubereitung (Min.)</string>
+    <string name="menu_position">Position</string>
+    <string name="menu_prep_hint">Wie lange die Küche für eins davon braucht. Daraus schlägt die Bestellliste die Lieferzeit vor – 0 für alles, was nicht gekocht wird, etwa Getränke.</string>
+    <string name="menu_tags">Merkmale auf der Karte</string>
+    <string name="menu_photo_pick">Foto wählen</string>
+    <string name="menu_photo_hint">Mit dem Gerät fotografieren und hier auswählen – zugeschnitten und verkleinert wird automatisch. Danach speichern, damit es auf der Karte steht.</string>
+    <string name="menu_photo_uploading">Foto wird hochgeladen …</string>
+    <string name="menu_photo_ready">Foto ist bereit. Zum Übernehmen speichern.</string>
+    <string name="menu_photo_url">Foto-URL</string>
+    <string name="menu_photo_preview">Das Foto dieses Gerichts</string>
+    <string name="photo_unreadable">Dieses Gerät kann das Foto nicht lesen. Versuch es mit JPEG oder PNG.</string>
+    <string name="menu_form_invalid">Bitte die Felder prüfen: ein Name aus mindestens zwei Buchstaben, ein Preis, eine Zubereitung von 0–120 Minuten und eine Position.</string>
+    <string name="menu_saved">Gespeichert: %1$s</string>
+    <string name="menu_options_intro">Einzelne Auswahl ausschalten – das Chicken, eine Sauce – ohne das ganze Gericht zu verlieren.</string>
+    <string name="menu_options_shared">Eine Optionsgruppe gehört zu jedem Gericht, das sie anbietet. Wer hier etwas ausschaltet, schaltet es überall aus.</string>
+    <string name="menu_option_used_in">Gehört zu: %1$s</string>
+    <string name="menu_ingredients_intro">Wenn etwas alle ist, hier ausschalten – jedes Gericht und jede Auswahl daraus verschwindet sofort von der Karte. Wieder einschalten und alles ist wie vorher: Was einzeln ausverkauft war, bleibt ausverkauft.</string>
+    <string name="menu_ingredients_out_count">Alle: %1$d</string>
+    <string name="menu_ingredients_empty">Noch keine Zutaten.</string>
+    <string name="menu_ingredient_in">Da</string>
+    <string name="menu_ingredient_out">Alle</string>
+    <string name="menu_ingredient_links_count">Gerichte: %1$d · Auswahlen: %2$d</string>
+    <string name="menu_ingredient_unused">Noch nirgends eingetragen – Ausschalten ändert also nichts.</string>
+    <string name="menu_ingredient_links">Wo sie drin ist</string>
+    <string name="menu_ingredient_delete">Löschen</string>
+    <string name="menu_ingredient_delete_confirm">Zutat löschen? Alles, was sie blockiert, ist danach wieder bestellbar.</string>
+    <string name="menu_ingredient_new">Neue Zutat</string>
+    <string name="menu_ingredient_add">Hinzufügen</string>
+
+    <!-- Einstellungen: Wer erfährt, Druckstationen, Adressprüfung (HealthSections.kt) -->
+    <string name="who_hears">Wer von Bestellungen erfährt</string>
+    <string name="who_hears_nobody">Gerade erfährt niemand von der nächsten Bestellung: kein Gerät im Dienst, das klingelt, und kein Handy mit Benachrichtigungen.</string>
+    <string name="who_hears_app_hint">Geräte mit dieser App klingeln von selbst, bis jemand die Bestellung annimmt.</string>
+    <string name="who_hears_push_hint">Handys und Browser mit den Benachrichtigungen der Website, dort selbst ein- und ausgeschaltet.</string>
+    <string name="device_unnamed">Unbenanntes Gerät</string>
+    <string name="device_this">dieses Gerät</string>
+    <string name="device_mine">deins</string>
+    <string name="device_app">Hamza-Team-App</string>
+    <string name="device_alarm_loop">klingelt, bis jemand annimmt</string>
+    <string name="device_alarm_once">sagt einmal Bescheid</string>
+    <string name="device_alarm_off">klingelt nicht</string>
+    <string name="device_seen">im Dienst seit %1$s · zuletzt gemeldet %2$s</string>
+    <string name="device_silent">seit %1$s nicht gemeldet – dort die App öffnen oder entfernen</string>
+    <string name="device_push_failed">Fehler %1$s: %2$s</string>
+    <string name="device_push_sent">zuletzt benachrichtigt %1$s</string>
+    <string name="device_push_never">noch nichts gesendet</string>
+    <string name="kind_new">neue Bestellungen</string>
+    <string name="kind_reminders">Erinnerungen</string>
+    <string name="kind_preorders">Vorbestellungen</string>
+    <string name="kind_unprinted">nicht gedruckte Bons</string>
+    <string name="kind_loud">laut</string>
+    <string name="kind_quiet">Nachtruhe %1$s–%2$s</string>
+    <string name="print_stations">Druckstationen</string>
+    <string name="print_stations_hint">Geräte, die jede angenommene Bestellung selbst drucken. Solange eines hier steht, bekommen die Handys Bescheid, wenn ein Bon zwei Minuten nach dem Annehmen nicht gedruckt ist. Eines, das nicht mehr druckt, hier entfernen.</string>
+    <string name="print_station_unnamed">Druckstation</string>
+    <string name="print_station_seen">zuletzt aktiv %1$s</string>
+    <string name="address_check">Adressprüfung</string>
+    <string name="address_ok">Funktioniert – zuletzt Adresse gefunden %1$s</string>
+    <string name="address_failing">Fehler seit %1$s: %2$s</string>
+    <string name="address_fallback">Läuft über den Ersatzdienst (zuletzt %1$s) – der Hauptdienst meldete: %2$s</string>
+    <string name="address_unconfigured">Nicht eingerichtet – kein Geocoder hinterlegt, keine Adresse wird geprüft</string>
+    <string name="address_no_data">Noch keine Abfragen aufgezeichnet</string>
+    <string name="address_require_off">Achtung: Bestellungen werden gerade ohne Adressprüfung angenommen</string>
+    <string name="address_unverified">Ungeprüfte Lieferungen der letzten 7 Tage: %1$d von %2$d</string>
+    <string name="address_test">Jetzt testen</string>
+    <string name="address_test_ok">Test bestanden – Ladenadresse in %1$s gefunden (%2$d ms)</string>
+    <string name="address_test_fallback">Test nur über den Ersatzdienst %1$s bestanden – der Hauptdienst meldete: %2$s</string>
+    <string name="address_test_failed">Test fehlgeschlagen: %1$s</string>
 </resources>

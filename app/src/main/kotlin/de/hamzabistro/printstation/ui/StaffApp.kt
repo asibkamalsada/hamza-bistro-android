@@ -1,5 +1,6 @@
 package de.hamzabistro.printstation.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7,13 +8,37 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.StateFlow
 
-/** A staff account's app: the queue, and its settings behind one button. */
+/** Where a staff account is in the app. Everything but the queue goes back to the queue. */
+enum class StaffScreen {
+    QUEUE,
+
+    /** "Letzte Bestellungen" and today's takings. */
+    HISTORY,
+
+    /** What is sold out, and what a dish is and costs: the site's /menu-admin. */
+    MENU,
+
+    /** Open or closed, closures planned ahead, the week: the site's /orders/hours. */
+    HOURS,
+
+    /** This device, who hears about orders, the printers, the address check. */
+    SETTINGS,
+}
+
+/**
+ * A staff account's app: the queue, and from it everything the website's
+ * staff pages had — the history, the menu, the delivery hours, the settings.
+ */
 @Composable
 fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String?>, onFocused: () -> Unit) {
-    var settings by rememberSaveable { mutableStateOf(false) }
-    if (settings) {
-        SettingsScreen(staff, main, onBack = { settings = false })
-    } else {
-        QueueScreen(staff, focus, onFocused, onSettings = { settings = true })
+    var screen by rememberSaveable { mutableStateOf(StaffScreen.QUEUE) }
+    val back = { screen = StaffScreen.QUEUE }
+    if (screen != StaffScreen.QUEUE) BackHandler(onBack = back)
+    when (screen) {
+        StaffScreen.QUEUE -> QueueScreen(staff, focus, onFocused, onOpen = { screen = it })
+        StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
+        StaffScreen.MENU -> MenuScreen(onBack = back)
+        StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
+        StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
     }
 }

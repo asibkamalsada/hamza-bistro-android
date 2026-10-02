@@ -150,7 +150,8 @@ fun stepLabel(context: Context, order: StaffOrder, step: OrderStep): String =
  * One order, as /orders draws it: number and badges, the time line, what to
  * cook, the note, what to collect, who and where — and the one or two
  * buttons that move it on. [compact] leaves out who and where, for the
- * alarm screen over the lock screen.
+ * alarm screen over the lock screen; [readOnly] leaves out the buttons, for
+ * the history, which is for reading.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -166,6 +167,7 @@ fun OrderCard(
     modifier: Modifier = Modifier,
     focused: Boolean = false,
     compact: Boolean = false,
+    readOnly: Boolean = false,
 ) {
     val context = LocalContext.current
     val estimate = Eta.estimate(order, prep)
@@ -248,7 +250,7 @@ fun OrderCard(
 
             if (order.status == OrderStatus.CONFIRMED) PrintLine(order, now)
 
-            if (order.status.open) Actions(order, estimate, prefs, pending, busy, canPrint && !compact, actions)
+            if (order.status.open && !readOnly) Actions(order, estimate, prefs, pending, busy, canPrint && !compact, actions)
         }
     }
 }

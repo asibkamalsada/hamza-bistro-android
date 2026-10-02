@@ -1,9 +1,6 @@
 package de.hamzabistro.printstation.ui
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -60,11 +57,11 @@ interface ShopActions {
  * same line as above the queue on /orders. Closing takes two taps, the
  * second saying for how long; opening again is one.
  *
- * The week's hours and closures planned ahead are set on the website, which
- * the link opens.
+ * [onHours] opens the week's hours and the closures planned ahead; without
+ * it — on that screen itself — there is no link.
  */
 @Composable
-fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions) {
+fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() -> Unit)? = null) {
     val hours = shop.hours ?: return
     val context = LocalContext.current
     val state = hours.state(now)
@@ -123,7 +120,7 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions) {
                             Text(stringResource(if (state == ShopState.OPEN) R.string.shop_pause else R.string.shop_close))
                         }
                 }
-                TextButton(onClick = { context.openShopHours() }) { Text(stringResource(R.string.shop_hours_link)) }
+                if (onHours != null) TextButton(onClick = onHours) { Text(stringResource(R.string.shop_hours_link)) }
             }
         }
     }
@@ -165,15 +162,4 @@ internal fun whenOpen(context: Context, at: Instant, now: Instant): String {
     }
 }
 
-/** The week and the closures planned ahead are set on the website. */
-private fun Context.openShopHours() {
-    try {
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(WEBSITE_HOURS)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    } catch (e: ActivityNotFoundException) {
-        // No browser on this tablet: nothing to open.
-    }
-}
-
 private val DAY_MONTH = DateTimeFormatter.ofPattern("d.M.")
-
-private const val WEBSITE_HOURS = "https://www.hamzabistro.de/orders/hours"

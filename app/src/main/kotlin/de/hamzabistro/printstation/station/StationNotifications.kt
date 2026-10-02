@@ -34,6 +34,9 @@ object StationNotifications {
     private const val ALARM_ID = 3
     private const val PRINTER_ID = 4
     private const val OFFLINE_ID = 5
+
+    /** Below [ORDER_IDS]: clearOrders() would take it off with the accepted order's own. */
+    private const val UNPRINTED_ID = 6
     private const val ORDER_IDS = 1_000
 
     private const val CHANNEL_RUNNING = "station"
@@ -217,6 +220,13 @@ object StationNotifications {
                         context.getString(R.string.chime_printer, chime.order),
                         context.getString(R.string.chime_printer_text, chime.reason),
                         null,
+                    )
+                is Chime.Unprinted ->
+                    Shown(
+                        UNPRINTED_ID,
+                        context.getString(R.string.chime_unprinted, chime.order.orderNumber),
+                        context.getString(R.string.chime_unprinted_text, Format.clock(chime.order.confirmedAt ?: chime.order.createdAt)),
+                        chime.order.id,
                     )
                 is Chime.Offline ->
                     Shown(

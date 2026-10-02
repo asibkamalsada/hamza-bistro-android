@@ -28,6 +28,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,14 +44,17 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,12 +78,10 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused: () -> Unit, onSettings: () -> Unit) {
+fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused: () -> Unit, onOpen: (StaffScreen) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val event by viewModel.events.collectAsStateWithLifecycle()
     val asked by focus.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
 
     // Coming back to the screen shows the queue as it is now; going away
@@ -92,6 +95,44 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
         onDispose { view.keepScreenOn = false }
     }
 
+    StaffEvents(viewModel, snackbar)
+
+    val actions = remember(viewModel) { Actions(context, viewModel) }
+    val waiting = state.queue.orders.count { it.status == OrderStatus.NEW }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
+                },
+                actions = { QueueMenu(onOpen) },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Banners(state, viewModel, onOpen)
+            when {
+                !state.queue.loaded && state.queue.failingSince == null ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.queue.orders.isEmpty() ->
+                    Text(
+                        stringResource(R.string.queue_empty),
+                        modifier = Modifier.padding(24.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                else -> Groups(state, actions, asked, onFocused)
+            }
+        }
+    }
+}
+
+/** What happened that the screen says once, in a snackbar: a step, a ticket, the shop switch. */
+@Composable
+fun StaffEvents(viewModel: StaffViewModel, snackbar: SnackbarHostState) {
+    val event by viewModel.events.collectAsStateWithLifecycle()
+    val resources = LocalResources.current
     LaunchedEffect(event) {
         val shown = event ?: return@LaunchedEffect
         snackbar.showSnackbar(
@@ -109,36 +150,6 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
             }
         )
         viewModel.eventShown()
-    }
-
-    val actions = remember(viewModel) { Actions(context, viewModel) }
-    val waiting = state.queue.orders.count { it.status == OrderStatus.NEW }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
-                },
-                actions = { TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) } },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Banners(state, viewModel)
-            when {
-                !state.queue.loaded && state.queue.failingSince == null ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.queue.orders.isEmpty() ->
-                    Text(
-                        stringResource(R.string.queue_empty),
-                        modifier = Modifier.padding(24.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                else -> Groups(state, actions, asked, onFocused)
-            }
-        }
     }
 }
 
@@ -236,7 +247,7 @@ private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, act
  * with the fix a tap away — the shift switched off above all.
  */
 @Composable
-private fun Banners(state: StaffState, viewModel: StaffViewModel) {
+private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (StaffScreen) -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
     var checks by remember { mutableIntStateOf(0) }
@@ -245,7 +256,7 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.setOnShift(true) }
 
     Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) })
+        ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) }, onHours = { onOpen(StaffScreen.HOURS) })
         if (!state.prefs.onShift) {
             Banner(stringResource(R.string.shift_off_banner), warning = true) {
                 Button(onClick = {
@@ -263,6 +274,12 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel) {
             Banner(stringResource(R.string.silenced_until, Format.clock(it)), warning = false) {}
         }
         if (state.queue.notAllowed) Banner(stringResource(R.string.queue_not_staff), warning = true) {}
+        // Orders priced on whatever postcode was typed: the detail, and the test, are in the settings.
+        if (state.addressFailing) {
+            Banner(stringResource(R.string.address_failing_banner), warning = true) {
+                OutlinedButton(onClick = { onOpen(StaffScreen.SETTINGS) }) { Text(stringResource(R.string.settings)) }
+            }
+        }
         state.queue.failingSince?.let {
             Banner(stringResource(R.string.queue_offline_since, Format.clock(it)), warning = true) {
                 OutlinedButton(onClick = viewModel::refresh) { Text(stringResource(R.string.retry)) }
@@ -309,8 +326,43 @@ fun needsNotificationPermission(context: Context): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
+/**
+ * Where the queue leads: on a tablet, each a button; on a phone, behind one,
+ * so the title keeps its room.
+ */
+@Composable
+private fun QueueMenu(onOpen: (StaffScreen) -> Unit) {
+    val entries =
+        listOf(
+            StaffScreen.HISTORY to R.string.history_title,
+            StaffScreen.MENU to R.string.menu_title,
+            StaffScreen.HOURS to R.string.hours_title,
+            StaffScreen.SETTINGS to R.string.settings,
+        )
+    val width = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    if (width >= WIDE) {
+        for ((screen, label) in entries) TextButton(onClick = { onOpen(screen) }) { Text(stringResource(label)) }
+        return
+    }
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(stringResource(R.string.more_menu)) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for ((screen, label) in entries) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(label)) },
+                    onClick = {
+                        open = false
+                        onOpen(screen)
+                    },
+                )
+            }
+        }
+    }
+}
+
 /** The shop line's buttons, wired to the view model. */
-private class ShopButtons(private val viewModel: StaffViewModel) : ShopActions {
+internal class ShopButtons(private val viewModel: StaffViewModel) : ShopActions {
     override fun pause(minutes: Long) = viewModel.pauseShop(minutes)
 
     override fun closeForToday() = viewModel.closeShopForToday()
@@ -321,7 +373,7 @@ private class ShopButtons(private val viewModel: StaffViewModel) : ShopActions {
 }
 
 /** The card's buttons, wired to the view model and to the phone's dialler and map. */
-private class Actions(private val context: Context, private val viewModel: StaffViewModel) : OrderActions {
+internal class Actions(private val context: Context, private val viewModel: StaffViewModel) : OrderActions {
     override fun accept(order: StaffOrder, minutes: Int) = viewModel.accept(order, minutes)
 
     override fun acceptScheduled(order: StaffOrder) = viewModel.acceptScheduled(order)
@@ -354,3 +406,6 @@ private class Actions(private val context: Context, private val viewModel: Staff
 }
 
 private const val FOCUS_MS = 4_000L
+
+/** From here on the queue's top bar has room for every button. */
+private val WIDE = 720.dp

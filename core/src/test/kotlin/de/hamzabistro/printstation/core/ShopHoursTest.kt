@@ -5,7 +5,9 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 class ShopHoursTest {
@@ -127,6 +129,66 @@ class ShopHoursTest {
         val forGood = test.server.takeRequest()
         assertEquals("""{"p_until":null}""", forGood.body!!.utf8())
         assertEquals("/rest/v1/rpc/shop_open", test.server.takeRequest().url.encodedPath)
+    }
+
+    @Test
+    fun `reads the week the shop delivers in`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, answer(openNow = true))
+        assertEquals(listOf(DeliveryDay(0, delivers = true, opens = 720, closes = 1200)), backend.hours()!!.delivery)
+    }
+
+    @Test
+    fun `plans a closure ahead, and takes one off the list`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, answer(openNow = true, extra = ""","preorders_inside":0"""))
+        test.reply(200, answer(openNow = true))
+
+        backend.close(until = Instant.parse("2026-12-26T23:00:00Z"), from = Instant.parse("2026-12-24T13:00:00Z"))
+        backend.removeClosure(5)
+
+        test.server.takeRequest()
+        val plan = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/shop_close", plan.url.encodedPath)
+        assertEquals("""{"p_until":"2026-12-26T23:00:00Z","p_from":"2026-12-24T13:00:00Z"}""", plan.body!!.utf8())
+        val remove = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/shop_closure_delete", remove.url.encodedPath)
+        assertEquals("""{"p_id":5}""", remove.body!!.utf8())
+    }
+
+    @Test
+    fun `saves the whole week at once`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, answer(openNow = true))
+
+        backend.saveWeek(listOf(DeliveryDay(1, true, 660, 1200), DeliveryDay(2, false, 660, 1440)))
+
+        test.server.takeRequest()
+        val save = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/set_delivery_hours", save.url.encodedPath)
+        assertEquals(
+            """{"p_hours":[{"day":1,"delivers":true,"opens":660,"closes":1200},{"day":2,"delivers":false,"opens":660,"closes":1440}]}""",
+            save.body!!.utf8(),
+        )
+    }
+
+    @Test
+    fun `hours the database refuses say so`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(400, """{"code":"HB432","message":"a closure has to end after it starts"}""")
+        assertFailsWith<InvalidHoursException> { backend.close(Instant.parse("2026-12-24T12:00:00Z"), Instant.parse("2026-12-24T13:00:00Z")) }
+    }
+
+    @Test
+    fun `a day is what the table allows`() {
+        assertTrue(DeliveryDay(1, true, 660, 1200).valid)
+        // Until midnight at the end of the day.
+        assertTrue(DeliveryDay(1, true, 1080, 1440).valid)
+        assertFalse(DeliveryDay(1, true, 1200, 660).valid)
+        assertFalse(DeliveryDay(1, true, 665, 1200).valid)
+        assertFalse(DeliveryDay(1, true, 660, 1455).valid)
+        // A day off keeps its times, and the table checks them all the same.
+        assertFalse(DeliveryDay(1, false, 1200, 1200).valid)
     }
 
     @Test

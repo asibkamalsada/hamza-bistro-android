@@ -24,8 +24,9 @@ class AlarmPolicyTest {
         settings: AlarmSettings = loud,
         failing: Boolean = false,
         printer: Problem? = null,
+        printingSince: Instant? = null,
         lead: Int = 25,
-    ) = policy.decide(orders, failing, printer, settings, now) { lead }
+    ) = policy.decide(orders, failing, printer, settings, now, printingSince) { lead }
 
     @Test
     fun `rings for every new order until it leaves the queue, wherever it was answered`() {
@@ -145,5 +146,42 @@ class AlarmPolicyTest {
         assertTrue(decision.ringing.isEmpty())
         assertTrue(decision.chimes.isEmpty())
         assertEquals(1, decision.waiting.size)
+    }
+
+    /** A print station has been meant to print every accepted order since noon. */
+    private val printing = at("2026-09-26T12:00:00Z")
+
+    @Test
+    fun `chimes once about an accepted order with no ticket two minutes on`() {
+        val accepted = order("a", confirmedAt = "2026-09-26T16:00:00Z")
+        assertTrue(decide(listOf(accepted), printingSince = printing).chimes.isEmpty())
+        assertTrue(decide(listOf(accepted), now = evening.plusSeconds(110), printingSince = printing).chimes.isEmpty())
+        assertEquals(
+            listOf<Chime>(Chime.Unprinted(accepted)),
+            decide(listOf(accepted), now = evening.plusSeconds(121), printingSince = printing).chimes,
+        )
+        assertTrue(decide(listOf(accepted), now = evening.plusSeconds(300), printingSince = printing).chimes.isEmpty())
+    }
+
+    @Test
+    fun `says nothing about a ticket that printed, or that nothing was meant to print`() {
+        val accepted = order("a", confirmedAt = "2026-09-26T16:00:00Z")
+        decide(listOf(accepted), printingSince = printing)
+        val later = evening.plusSeconds(130)
+        assertTrue(decide(listOf(accepted.copy(printedAt = at("2026-09-26T16:00:40Z"))), now = later, printingSince = printing).chimes.isEmpty())
+        // No print station, or none that was there when the order was accepted.
+        assertTrue(decide(listOf(accepted), now = later).chimes.isEmpty())
+        assertTrue(decide(listOf(accepted), now = later, printingSince = at("2026-09-26T16:01:00Z")).chimes.isEmpty())
+        // On its way: cooked, ticket or not.
+        assertTrue(decide(listOf(accepted.copy(status = OrderStatus.ON_THE_WAY)), now = later, printingSince = printing).chimes.isEmpty())
+    }
+
+    @Test
+    fun `an order already overdue when this device started does not chime, nor one switched off`() {
+        assertTrue(decide(listOf(order("a", confirmedAt = "2026-09-26T15:50:00Z")), printingSince = printing).chimes.isEmpty())
+        val accepted = order("b", confirmedAt = "2026-09-26T16:00:00Z")
+        decide(listOf(accepted), printingSince = printing)
+        val off = loud.copy(unprinted = false)
+        assertTrue(decide(listOf(accepted), now = evening.plusSeconds(130), settings = off, printingSince = printing).chimes.isEmpty())
     }
 }
