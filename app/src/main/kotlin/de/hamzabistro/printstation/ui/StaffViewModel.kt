@@ -51,7 +51,11 @@ data class StaffState(
     val shop: ShopView = ShopView(),
     /** The delivery address check is failing: orders are priced on what the customer typed. */
     val addressFailing: Boolean = false,
-)
+) {
+    /** Busy mode's minutes on every promise, now: 0 while it is off, or once it ran out. */
+    val busyMinutes: Int
+        get() = shop.hours?.busyMinutes(now) ?: 0
+}
 
 /** What happened that the screen should say once. */
 sealed interface StaffEvent {
@@ -124,7 +128,7 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
         _events.value = null
     }
 
-    fun suggestedEta(order: StaffOrder): Int = graph.suggestedEta(order, state.value.queue.prep)
+    fun suggestedEta(order: StaffOrder): Int = graph.suggestedEta(order, state.value.queue.prep, Instant.now())
 
     fun accept(order: StaffOrder, minutes: Int) = graph.steps.take(order, OrderStep.Accept(minutes))
 
@@ -222,6 +226,11 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     fun closeShopForGood() = closeShop(null)
 
     fun openShop() = switchShop { graph.shop.open() }
+
+    /** Busy mode, here and on every device and the website: the database ends it by itself. */
+    fun busyShop(minutes: Int, duration: Duration?) = switchShop { graph.shop.busy(minutes, duration) }
+
+    fun notBusyShop() = switchShop { graph.shop.notBusy() }
 
     private fun closeShop(until: Instant?) = switchShop { graph.shop.close(until) }
 

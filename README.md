@@ -122,7 +122,9 @@ queue's top bar (**Mehr** on a phone):
   allows), and its row shows "0,33 l · 6,52 €/l", the price per litre
   without the Pfand, as the menu prints it. Deposits, new dishes and
   new option groups stay in the Supabase dashboard, as before.
-- **Lieferzeiten** — the open/closed switch, closures planned ahead (a
+- **Lieferzeiten** — the open/closed switch, **Unbeantwortete Bestellungen
+  ablehnen** (off, 5, 10 — recommended —, 15, 20 or 30 minutes; saved on
+  tap, for every device and the website), closures planned ahead (a
   holiday, a day off; also open-ended), and the week's delivery hours, saved
   all at once, on the quarter hour.
 - **Einstellungen**, besides this device's own settings: **Wer von
@@ -141,7 +143,15 @@ right now, and the switch for it
 
 - **Open**: "Bestellungen werden angenommen – bis 20:00 Uhr", and
   **Pausieren …** — 30 minutes, an hour, the rest of the day, or until
-  further notice. Two taps, the second saying for how long.
+  further notice. Two taps, the second saying for how long. Beside it,
+  **Viel los …** — busy mode: +15, +30 or +45 minutes on every promise,
+  for 30 minutes, an hour or the rest of the day; the line then reads
+  "· +30 Min. bis 20:15 Uhr", and **Wieder normal** ends it. The
+  pre-selected accept button adds the minutes (`Eta.estimate(...,
+  busyMinutes)`, after the rounding, as the site's `estimateEtaMinutes`);
+  when a pre-order has to go on does not. Busy mode ends by itself at its
+  time, here on the device's clock too (`shop_busy` in
+  [`20261002160000_busy_mode.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261002160000_busy_mode.sql)).
 - **Closed**: in red, until when, and who closed it, with **Wieder öffnen**
   one tap away.
 - **Outside the hours**: when orders come in again; pre-orders still do.
@@ -181,6 +191,18 @@ decides, every few seconds and on every change of the queue:
   minute, again every three while it lasts — the server's push about it
   comes after two); the queue unreadable for two minutes, which is a
   device that would not hear about the next order.
+- **Auto-decline**: with it switched on under **Lieferzeiten**, the
+  database declines an order nobody answers in time
+  ([`20261002150000_auto_decline.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261002150000_auto_decline.sql)).
+  A waiting card counts down to that moment ("wird in 6 Min. automatisch
+  abgelehnt", red for the last two; a pre-order more than an hour off says
+  when instead), read from the server's own `auto_decline_at`. Two minutes
+  before, the alarm **escalates once**: a warble none of the alarm sounds
+  is, over the loop and through "Stumm", and a harder vibration while it
+  keeps ringing ([`AutoDecline`](core/src/main/kotlin/de/hamzabistro/printstation/core/AutoDecline.kt)).
+  Not on a device set to stay silent about new orders. **Letzte
+  Bestellungen** shows such an order as "keine Antwort — automatisch
+  abgelehnt", for a call back.
 - **A ticket that printed nowhere**: on every device that does not print
   itself, an accepted order with no ticket two minutes on chimes once,
   while a print station registered before it was accepted is meant to

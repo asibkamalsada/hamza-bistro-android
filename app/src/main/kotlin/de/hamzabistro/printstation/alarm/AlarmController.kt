@@ -114,9 +114,12 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         for (chime in decision.chimes) {
             StationNotifications.chime(context, chime, decision.quiet)
             // A message makes its channel's sound; the kitchen's chimes are
-            // the alarm's own, on the alarm stream.
-            if (!decision.quiet && chime !is Chime.NewOrder) {
-                graph.alarmPlayer.chime(prefs.sound, prefs.fullVolume, prefs.vibrate)
+            // the alarm's own, on the alarm stream. Two minutes before an
+            // order is declined unanswered, a sound of its own, over the loop.
+            when {
+                decision.quiet || chime is Chime.NewOrder -> Unit
+                chime is Chime.DecliningSoon -> graph.alarmPlayer.escalate(prefs.fullVolume, prefs.vibrate)
+                else -> graph.alarmPlayer.chime(prefs.sound, prefs.fullVolume, prefs.vibrate)
             }
         }
 

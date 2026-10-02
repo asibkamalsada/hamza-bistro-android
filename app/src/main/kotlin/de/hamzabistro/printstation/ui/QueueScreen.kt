@@ -68,6 +68,7 @@ import de.hamzabistro.printstation.core.QueueGroup
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.queue.StepFailure
+import java.time.Duration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
@@ -237,6 +238,7 @@ private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, act
             busy = order.id in state.busy,
             canPrint = state.canPrint,
             actions = actions,
+            busyMinutes = state.busyMinutes,
             focused = order.id == focus,
         )
     }
@@ -377,6 +379,10 @@ internal class ShopButtons(private val viewModel: StaffViewModel) : ShopActions 
     override fun closeForGood() = viewModel.closeShopForGood()
 
     override fun open() = viewModel.openShop()
+
+    override fun busy(minutes: Int, duration: Duration?) = viewModel.busyShop(minutes, duration)
+
+    override fun notBusy() = viewModel.notBusyShop()
 }
 
 /** The card's buttons, wired to the view model and to the phone's dialler and map. */

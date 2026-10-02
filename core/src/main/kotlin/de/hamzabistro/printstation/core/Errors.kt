@@ -46,6 +46,13 @@ class OrderMovedException : Exception("the order had already moved on")
 class InvalidHoursException(message: String) : Exception(message)
 
 /**
+ * The database refused a shop setting: auto-decline minutes outside 3–60
+ * (HB433 from set_auto_decline_minutes), or busy mode's minutes or length
+ * (HB434).
+ */
+class InvalidSettingException(message: String) : Exception(message)
+
+/**
  * The database does not know an allergen letter that was sent (HB433):
  * public.allergens was changed in the dashboard while a form was open.
  */

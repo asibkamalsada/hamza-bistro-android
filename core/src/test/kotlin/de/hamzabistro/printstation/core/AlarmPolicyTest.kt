@@ -184,4 +184,37 @@ class AlarmPolicyTest {
         val off = loud.copy(unprinted = false)
         assertTrue(decide(listOf(accepted), now = evening.plusSeconds(130), settings = off, printingSince = printing).chimes.isEmpty())
     }
+
+    @Test
+    fun `escalates once two minutes before the database declines an order`() {
+        val a = waiting("a").copy(autoDeclineAt = at("2026-09-26T16:09:00Z"))
+        assertTrue(decide(listOf(a)).chimes.none { it is Chime.DecliningSoon })
+        val due = decide(listOf(a), now = at("2026-09-26T16:07:00Z"))
+        assertEquals(listOf<Chime>(Chime.DecliningSoon(a)), due.chimes)
+        // Still ringing, as before: the escalation is on top of the loop.
+        assertEquals(listOf("a"), due.ringing.map { it.id })
+        assertTrue(decide(listOf(a), now = at("2026-09-26T16:08:00Z")).chimes.isEmpty())
+    }
+
+    @Test
+    fun `escalates through Stumm, and not on a device silent about new orders`() {
+        val a = waiting("a").copy(autoDeclineAt = at("2026-09-26T16:09:00Z"))
+        decide(listOf(a))
+        policy.silence(evening, 600)
+        val silenced = decide(listOf(a), now = at("2026-09-26T16:07:30Z"))
+        assertTrue(silenced.ringing.isEmpty())
+        assertEquals(1, silenced.chimes.count { it is Chime.DecliningSoon })
+
+        val off = AlarmPolicy()
+        val decision = off.decide(listOf(a), false, null, loud.copy(newOrders = NewOrderAlarm.OFF), at("2026-09-26T16:07:30Z")) { 25 }
+        assertTrue(decision.chimes.isEmpty())
+    }
+
+    @Test
+    fun `no escalation with auto-decline off, or for an order already answered`() {
+        val off = waiting("a")
+        assertTrue(decide(listOf(off), now = at("2026-09-26T16:08:00Z")).chimes.none { it is Chime.DecliningSoon })
+        val answered = waiting("b").copy(status = OrderStatus.CONFIRMED, autoDeclineAt = null)
+        assertTrue(decide(listOf(answered), now = at("2026-09-26T16:08:00Z")).chimes.none { it is Chime.DecliningSoon })
+    }
 }

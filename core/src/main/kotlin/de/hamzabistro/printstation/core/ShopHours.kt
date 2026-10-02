@@ -1,5 +1,6 @@
 package de.hamzabistro.printstation.core
 
+import java.time.Duration
 import java.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -78,7 +79,26 @@ data class ShopHours(
     val closures: List<ShopClosure> = emptyList(),
     /** Only in the answer to closing: open orders already booked for a time inside it. */
     @SerialName("preorders_inside") val preordersInside: Int = 0,
+    /** Busy mode's minutes on every promise: 0 while off or over, and from a database without it. */
+    @SerialName("busy_extra_minutes") val busyExtraMinutes: Int = 0,
+    /** When busy mode ends by itself; null while off. */
+    @SerialName("busy_until") @Serializable(with = InstantSerializer::class) val busyUntil: Instant? = null,
+    /** Who switched busy mode on — told to staff only. */
+    @SerialName("busy_by") val busyBy: String? = null,
 ) {
+    /**
+     * Busy mode at [now], or null while it is off — or over since this was
+     * read: it ends by itself at [busyUntil], and the app stops adding the
+     * minutes then, as the site does (busyAt() in opening-hours.ts).
+     */
+    fun busyAt(now: Instant): Busy? {
+        val until = busyUntil ?: return null
+        return if (busyExtraMinutes > 0 && until.isAfter(now)) Busy(busyExtraMinutes, until, busyBy) else null
+    }
+
+    /** The minutes busy mode adds at [now]: 0 while it is off. */
+    fun busyMinutes(now: Instant): Int = busyAt(now)?.minutes ?: 0
+
     /** The closure running at [now], the one lasting longest where several overlap. */
     fun closureAt(now: Instant): ShopClosure? =
         closures
@@ -101,6 +121,35 @@ data class ShopHours(
     /** While closed: when orders come in again, as far as is known at [now]. */
     fun reopensAt(now: Instant): Instant? = nextOpen?.takeIf { it.isAfter(now) } ?: closureAt(now)?.endsAt
 }
+
+/** Busy mode while it is on: every promise [minutes] longer, until [until]. */
+data class Busy(val minutes: Int, val until: Instant, val by: String?) {
+    companion object {
+        /** The extra minutes the switch offers. */
+        val MINUTES: List<Int> = listOf(15, 30, 45)
+
+        /** For how long: 30 Min., 1 Std.; null is the rest of the day. */
+        val FOR: List<Duration?> = listOf(Duration.ofMinutes(30), Duration.ofHours(1), null)
+    }
+}
+
+/**
+ * The shop's settings, as shop_settings() answers staff
+ * (20261002150000_auto_decline.sql and 20261002160000_busy_mode.sql).
+ */
+@Serializable
+data class ShopSettings(
+    /** Minutes an order may wait unanswered before the database declines it; null is off. */
+    @SerialName("auto_decline_minutes") val autoDeclineMinutes: Int? = null,
+    /** How long before its time an unanswered pre-order is declined. */
+    @SerialName("auto_decline_preorder_lead_minutes") val autoDeclinePreorderLeadMinutes: Int = 30,
+    @SerialName("updated_at") @Serializable(with = InstantSerializer::class) val updatedAt: Instant? = null,
+    @SerialName("updated_by") val updatedBy: String? = null,
+    @SerialName("busy_extra_minutes") val busyExtraMinutes: Int = 0,
+    @SerialName("busy_until") @Serializable(with = InstantSerializer::class) val busyUntil: Instant? = null,
+    @SerialName("busy_set_at") @Serializable(with = InstantSerializer::class) val busySetAt: Instant? = null,
+    @SerialName("busy_set_by") val busySetBy: String? = null,
+)
 
 /**
  * Opening and closing the shop, and its delivery hours, as staff. The
@@ -129,6 +178,26 @@ interface ShopBackend {
      * [InvalidHoursException] for a day that closes before it opens.
      */
     suspend fun saveWeek(week: List<DeliveryDay>): ShopHours
+
+    /**
+     * Busy mode: every promise [minutes] longer, for [duration] from now, or
+     * to midnight in Leipzig when null. Replaces busy mode already on.
+     * Throws [InvalidSettingException] for minutes or a length the database
+     * does not take.
+     */
+    suspend fun busy(minutes: Int, duration: Duration?): ShopHours
+
+    /** Back to normal, now. */
+    suspend fun notBusy(): ShopHours
+
+    /** The shop's settings; null on a database that has none yet. */
+    suspend fun settings(): ShopSettings?
+
+    /**
+     * Declines orders left unanswered for [minutes]; null switches it off.
+     * Throws [InvalidSettingException] outside [AutoDecline.ALLOWED].
+     */
+    suspend fun setAutoDecline(minutes: Int?): ShopSettings
 }
 
 /** [ShopBackend] over PostgREST, as the signed-in account. */
@@ -162,12 +231,45 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
             buildJsonObject { put("p_hours", json.encodeToJsonElement(ListSerializer(DeliveryDay.serializer()), week)) },
         )
 
+    override suspend fun busy(minutes: Int, duration: Duration?): ShopHours =
+        call(
+            "shop_busy",
+            buildJsonObject {
+                put("p_minutes", minutes)
+                // An ISO interval, "PT30M", which Postgres reads as one.
+                if (duration == null) put("p_for", JsonNull) else put("p_for", duration.toString())
+            },
+        )
+
+    override suspend fun notBusy(): ShopHours = call("shop_not_busy", buildJsonObject {})
+
+    override suspend fun settings(): ShopSettings? =
+        try {
+            json.decodeFromString(ShopSettings.serializer(), rest.rpc("shop_settings", buildJsonObject {}))
+        } catch (e: BackendException) {
+            if (e.missingFunction) null else throw e
+        }
+
+    override suspend fun setAutoDecline(minutes: Int?): ShopSettings =
+        try {
+            val body =
+                rest.rpc(
+                    "set_auto_decline_minutes",
+                    buildJsonObject { if (minutes == null) put("p_minutes", JsonNull) else put("p_minutes", minutes) },
+                )
+            json.decodeFromString(ShopSettings.serializer(), body)
+        } catch (e: BackendException) {
+            if (e.code == INVALID_AUTO_DECLINE) throw InvalidSettingException(e.message ?: "auto decline")
+            throw e
+        }
+
     private suspend fun call(name: String, args: JsonObject): ShopHours =
         try {
             parse(rest.rpc(name, args))
         } catch (e: BackendException) {
             // The database refusing what was sent as hours or as a closure.
             if (e.code == INVALID_HOURS) throw InvalidHoursException(e.message ?: name)
+            if (e.code == INVALID_BUSY) throw InvalidSettingException(e.message ?: name)
             throw e
         }
 
@@ -176,5 +278,11 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
     private companion object {
         /** See 20261001150000_shop_hours.sql. */
         const val INVALID_HOURS = "HB432"
+
+        /** See 20261002150000_auto_decline.sql. */
+        const val INVALID_AUTO_DECLINE = "HB433"
+
+        /** See 20261002160000_busy_mode.sql. */
+        const val INVALID_BUSY = "HB434"
     }
 }

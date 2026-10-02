@@ -3,6 +3,7 @@ package de.hamzabistro.printstation.ui
 import android.content.Context
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.InvalidHoursException
+import de.hamzabistro.printstation.core.InvalidSettingException
 import de.hamzabistro.printstation.core.NotAllowedException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.UnknownAllergenException
@@ -14,6 +15,7 @@ fun failureText(context: Context, e: Exception): String =
         is SignedOutException -> context.getString(R.string.stopped_signed_out)
         is NotAllowedException -> context.getString(R.string.problem_not_staff)
         is InvalidHoursException -> context.getString(R.string.hours_invalid)
+        is InvalidSettingException -> context.getString(R.string.setting_invalid)
         is UnknownAllergenException -> context.getString(R.string.menu_allergen_unknown)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }

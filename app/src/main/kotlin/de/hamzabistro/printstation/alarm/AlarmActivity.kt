@@ -146,6 +146,7 @@ private fun AlarmScreen(staff: StaffViewModel, onDone: () -> Unit, onOpenApp: (S
                     busy = card.id in state.busy,
                     canPrint = false,
                     actions = actions,
+                    busyMinutes = state.busyMinutes,
                     compact = true,
                 )
             }

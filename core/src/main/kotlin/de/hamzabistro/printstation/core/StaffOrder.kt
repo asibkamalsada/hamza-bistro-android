@@ -41,8 +41,9 @@ enum class OrderStatus {
 }
 
 /**
- * Why the shop called an order off — the four buttons /orders offers, and
- * all that orders_cancel_reason_check allows. The customer's email says it.
+ * Why an order was called off — the four buttons /orders offers, and the
+ * database's own [TIMEOUT]: all that orders_cancel_reason_check allows. The
+ * customer's email says it.
  */
 @Serializable
 enum class CancelReason {
@@ -50,6 +51,18 @@ enum class CancelReason {
     @SerialName("sold_out") SOLD_OUT,
     @SerialName("unreachable") UNREACHABLE,
     @SerialName("address") ADDRESS,
+
+    /**
+     * Nobody answered in time, and the database declined it
+     * (20261002150000_auto_decline.sql). Read, never sent: the database
+     * refuses it from anybody but its own job.
+     */
+    @SerialName("timeout") TIMEOUT;
+
+    companion object {
+        /** What a person may give as the reason: the buttons, never [TIMEOUT]. */
+        val CHOSEN: List<CancelReason> = listOf(BUSY, SOLD_OUT, UNREACHABLE, ADDRESS)
+    }
 }
 
 /** One line of an order as it was placed: what, how many, with what, at what price. */
@@ -111,6 +124,12 @@ data class StaffOrder(
     @SerialName("delivery_zone_source") val deliveryZoneSource: String? = null,
     /** When its ticket came out, wherever. Null: not printed anywhere that said so. */
     @SerialName("printed_at") @Serializable(with = InstantSerializer::class) val printedAt: Instant? = null,
+    /**
+     * When the database declines it unanswered — the computed column
+     * auto_decline_at(orders). Null once it is not new, or with auto-decline
+     * off.
+     */
+    @SerialName("auto_decline_at") @Serializable(with = InstantSerializer::class) val autoDeclineAt: Instant? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -133,7 +152,7 @@ data class StaffOrder(
             "id,order_number,created_at,confirmed_at,scheduled_for,customer_name,phone,address,street," +
                 "postal_code,city,address_note,notes,items,total,status,eta_minutes,cancel_reason," +
                 "returning_customer,delivery_fee,small_order_fee,discount,discount_code,pickup," +
-                "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at"
+                "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at,auto_decline_at"
     }
 }
 

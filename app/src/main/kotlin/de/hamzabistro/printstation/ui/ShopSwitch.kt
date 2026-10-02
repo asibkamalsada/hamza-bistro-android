@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.Busy
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.ShopState
 import java.time.Duration
@@ -50,6 +51,12 @@ interface ShopActions {
     fun closeForGood()
 
     fun open()
+
+    /** Busy mode: every promise [minutes] longer, for [duration], or the rest of the day when null. */
+    fun busy(minutes: Int, duration: Duration?)
+
+    /** Busy mode off: "Wieder normal". */
+    fun notBusy()
 }
 
 /**
@@ -66,6 +73,9 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
     val context = LocalContext.current
     val state = hours.state(now)
     var choosing by remember { mutableStateOf(false) }
+    // Busy mode in two taps, as on /orders: how much longer, then for how long.
+    var busyStep by remember { mutableStateOf<BusyStep?>(null) }
+    val busy = hours.busyAt(now)
 
     val colors =
         when (state) {
@@ -88,6 +98,9 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
                     color = textColor,
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+            busy?.by?.takeIf { state == ShopState.OPEN }?.let {
+                Text(stringResource(R.string.shop_busy_by, it), style = MaterialTheme.typography.bodySmall)
             }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -115,10 +128,36 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
                         }
                         TextButton(onClick = done) { Text(stringResource(R.string.shop_keep_open)) }
                     }
-                    else ->
+                    busyStep == BusyStep.HowMuch -> {
+                        Text(stringResource(R.string.shop_busy_how_much))
+                        for (extra in Busy.MINUTES) {
+                            OutlinedButton(onClick = { busyStep = BusyStep.HowLong(extra) }) {
+                                Text(stringResource(R.string.shop_busy_extra, extra))
+                            }
+                        }
+                        TextButton(onClick = { busyStep = null }) { Text(stringResource(R.string.shop_keep_open)) }
+                    }
+                    busyStep is BusyStep.HowLong -> {
+                        val extra = (busyStep as BusyStep.HowLong).minutes
+                        Text(stringResource(R.string.shop_busy_how_long, extra))
+                        for (duration in Busy.FOR) {
+                            OutlinedButton(onClick = { actions.busy(extra, duration); busyStep = null }, enabled = !shop.busy) {
+                                Text(stringResource(durationLabel(duration)))
+                            }
+                        }
+                        TextButton(onClick = { busyStep = null }) { Text(stringResource(R.string.shop_keep_open)) }
+                    }
+                    else -> {
                         OutlinedButton(onClick = { choosing = true }) {
                             Text(stringResource(if (state == ShopState.OPEN) R.string.shop_pause else R.string.shop_close))
                         }
+                        if (state == ShopState.OPEN) {
+                            OutlinedButton(onClick = { busyStep = BusyStep.HowMuch }) { Text(stringResource(R.string.shop_busy)) }
+                        }
+                        if (busy != null) {
+                            Button(onClick = actions::notBusy, enabled = !shop.busy) { Text(stringResource(R.string.shop_busy_off)) }
+                        }
+                    }
                 }
                 if (onHours != null) TextButton(onClick = onHours) { Text(stringResource(R.string.shop_hours_link)) }
             }
@@ -126,12 +165,34 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
     }
 }
 
-/** "Bestellungen werden angenommen — bis 20:00 Uhr." and the like. */
+/** Where busy mode's switch is: how much longer, then for how long. */
+private sealed interface BusyStep {
+    data object HowMuch : BusyStep
+
+    data class HowLong(val minutes: Int) : BusyStep
+}
+
+private fun durationLabel(duration: Duration?): Int =
+    when (duration) {
+        null -> R.string.shop_for_today
+        Duration.ofMinutes(30) -> R.string.shop_for_30
+        else -> R.string.shop_for_60
+    }
+
+/**
+ * "Bestellungen werden angenommen — bis 20:00 Uhr." and the like; with busy
+ * mode on, "… — bis 20:00 Uhr · +30 Min. bis 20:15 Uhr."
+ */
 private fun shopLine(context: Context, hours: ShopHours, state: ShopState, now: Instant): String =
     when (state) {
-        ShopState.OPEN ->
-            hours.openUntil?.takeIf { it.isAfter(now) }?.let { context.getString(R.string.shop_open_until, Format.clock(it)) }
-                ?: context.getString(R.string.shop_open)
+        ShopState.OPEN -> {
+            val open =
+                hours.openUntil?.takeIf { it.isAfter(now) }?.let { context.getString(R.string.shop_open_until, Format.clock(it)) }
+                    ?: context.getString(R.string.shop_open)
+            hours.busyAt(now)?.let {
+                context.getString(R.string.shop_busy_suffix, open.removeSuffix("."), it.minutes, Format.clock(it.until))
+            } ?: open
+        }
         ShopState.CLOSED ->
             hours.reopensAt(now)?.let { context.getString(R.string.shop_closed_until, whenOpen(context, it, now)) }
                 ?: context.getString(R.string.shop_closed_for_good)

@@ -75,10 +75,16 @@ object Eta {
     /**
      * Cooking plus riding, rounded up to five — or cooking alone for an
      * order the customer is collecting.
+     *
+     * [busyMinutes] is busy mode's (20261002160000_busy_mode.sql), added
+     * after the rounding as estimateEtaMinutes() does: it is on the five
+     * already, and a swamped kitchen's "+30" reads as exactly that on the
+     * button. When a pre-order has to go on is timed without it: the extra
+     * minutes are a promise to the customer, not extra cooking.
      */
-    fun estimate(order: StaffOrder, prep: Map<Long, Int>): Int {
+    fun estimate(order: StaffOrder, prep: Map<Long, Int>, busyMinutes: Int = 0): Int {
         val travel = if (order.pickup) 0 else travelMinutes(order.address, order.deliveryZone)
-        return roundToFive(prepMinutes(order.items, prep) + travel)
+        return roundToFive(prepMinutes(order.items, prep) + travel) + maxOf(0, busyMinutes)
     }
 
     /** The estimate among the round numbers, so the buttons always include it. */

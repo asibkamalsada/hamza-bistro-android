@@ -41,7 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.AutoDecline
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.DeclineUrgency
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
@@ -84,10 +86,13 @@ data class Timing(val text: String, val tone: Tone)
 /** The time line of a card — timing() of the site's orders-page.ts. */
 fun timing(context: Context, order: StaffOrder, lead: Int, now: Instant): Timing? {
     if (order.status == OrderStatus.NEW) {
-        if (order.scheduledFor != null) return null
+        val declining = declineTiming(context, order, now)
+        if (order.scheduledFor != null) return declining
         val waited = maxOf(0, -StaffQueue.minutesUntil(order.createdAt, now))
         val tone = if (waited >= 6) Tone.LATE else if (waited >= 3) Tone.SOON else Tone.OK
-        return Timing(context.getString(R.string.waiting_for, waited), tone)
+        val waiting = Timing(context.getString(R.string.waiting_for, waited), tone)
+        if (declining == null) return waiting
+        return Timing("${waiting.text} · ${declining.text}", if (declining.tone == Tone.LATE) Tone.LATE else tone)
     }
     val due = StaffQueue.promisedAt(order) ?: return null
     val left = StaffQueue.minutesUntil(due, now)
@@ -101,6 +106,27 @@ fun timing(context: Context, order: StaffOrder, lead: Int, now: Instant): Timing
     }
     if (left < 0) return Timing("$dueText · ${context.getString(R.string.due_late, -left)}", Tone.LATE)
     return Timing("$dueText · ${context.getString(R.string.due_in, left)}", if (left <= 5) Tone.SOON else Tone.OK)
+}
+
+/**
+ * "wird in 3 Min. automatisch abgelehnt" — declineTiming() of the site: red
+ * for the last two minutes; a pre-order more than an hour off says when.
+ */
+private fun declineTiming(context: Context, order: StaffOrder, now: Instant): Timing? {
+    val countdown = AutoDecline.countdown(order, now) ?: return null
+    val text =
+        when {
+            countdown.showTime -> context.getString(R.string.auto_decline_at, Format.slot(context, countdown.deadline, now))
+            countdown.minutesLeft <= 0 -> context.getString(R.string.auto_decline_now)
+            else -> context.getString(R.string.auto_decline_in, countdown.minutesLeft)
+        }
+    val tone =
+        when (countdown.urgency) {
+            DeclineUrgency.URGENT -> Tone.LATE
+            DeclineUrgency.SOON -> Tone.SOON
+            DeclineUrgency.CALM -> Tone.OK
+        }
+    return Timing(text, tone)
 }
 
 @Composable
@@ -130,6 +156,7 @@ fun reasonLabel(context: Context, reason: CancelReason?): String =
             CancelReason.SOLD_OUT -> R.string.reason_sold_out
             CancelReason.UNREACHABLE -> R.string.reason_unreachable
             CancelReason.ADDRESS -> R.string.reason_address
+            CancelReason.TIMEOUT -> R.string.reason_timeout
             null -> R.string.reason_none
         }
     )
@@ -165,6 +192,8 @@ fun OrderCard(
     canPrint: Boolean,
     actions: OrderActions,
     modifier: Modifier = Modifier,
+    /** Busy mode's minutes, added to the pre-selected accept button only. */
+    busyMinutes: Int = 0,
     focused: Boolean = false,
     compact: Boolean = false,
     readOnly: Boolean = false,
@@ -250,7 +279,9 @@ fun OrderCard(
 
             if (order.status == OrderStatus.CONFIRMED) PrintLine(order, now)
 
-            if (order.status.open && !readOnly) Actions(order, estimate, prefs, pending, busy, canPrint && !compact, actions)
+            if (order.status.open && !readOnly) {
+                Actions(order, Eta.estimate(order, prep, busyMinutes), prefs, pending, busy, canPrint && !compact, actions)
+            }
         }
     }
 }
@@ -361,7 +392,7 @@ private fun Actions(
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.cancel_why), color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (reason in CancelReason.entries + listOf(null)) {
+                for (reason in CancelReason.CHOSEN + listOf(null)) {
                     OutlinedButton(
                         onClick = {
                             declining = false
