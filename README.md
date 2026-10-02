@@ -86,6 +86,13 @@ rules, ported to Kotlin with the site's own test cases
   pre-order;
 - every step waits out the undo window (5 s by default) and only lands if
   the order is still where this device saw it;
+- **+10 Min.** and **+20 Min.** on every accepted card, for a kitchen or a
+  driver running behind: through the same undo window, then `delay_order`,
+  which adds the minutes in the database, so two phones tapping at once
+  both count. The card then reads "fällig 18:45 · verschoben +10 Min.", a
+  pre-order's "kochen ab" moves with it, and a customer who asked for
+  updates gets an email
+  ([`20261002170000_order_delay.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261002170000_order_delay.sql));
 - the phone number opens the dialler, the address opens the route in the
   chosen map app, the note for the door has a box of its own;
 - "Bon gedruckt 18:05" on an accepted order, "Bon drucken" on a device with
@@ -103,7 +110,8 @@ queue's top bar (**Mehr** on a phone):
 - **Letzte Bestellungen** — the last 50 orders whatever became of them,
   and what today's delivered orders came to, for the call about yesterday's
   order and for cashing up. Read when opened, not polled; the cards are for
-  reading (the phone number and the route still open).
+  reading (the phone number and the route still open). A delivered order
+  that was delayed says so: "fällig 18:45 · verschoben +10 Min.".
 - **Speisekarte** — what is sold out, in three tabs, as on `/menu-admin`:
   a dish; a single choice, which goes off in every dish that offers it; an
   ingredient, which takes everything made of it off at once and, switched
@@ -152,6 +160,11 @@ right now, and the switch for it
   when a pre-order has to go on does not. Busy mode ends by itself at its
   time, here on the device's clock too (`shop_busy` in
   [`20261002160000_busy_mode.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261002160000_busy_mode.sql)).
+  Below it, **Alle +15 Min.**, while there is an accepted order for right
+  away to move: busy mode lengthens the promises still to be made, this
+  one the promises already made (`delay_open_orders`). It asks first, with
+  how many orders, because every one of those customers who asked for
+  updates gets an email.
 - **Closed**: in red, until when, and who closed it, with **Wieder öffnen**
   one tap away.
 - **Outside the hours**: when orders come in again; pre-orders still do.

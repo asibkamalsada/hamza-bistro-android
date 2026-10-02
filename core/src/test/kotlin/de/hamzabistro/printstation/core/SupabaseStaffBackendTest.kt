@@ -4,6 +4,8 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 class SupabaseStaffBackendTest {
@@ -83,6 +85,68 @@ class SupabaseStaffBackendTest {
         val seen = order("a")
         assertFailsWith<OrderMovedException> { backend.move(seen, OrderStep.Out) }
         assertFailsWith<OrderMovedException> { backend.move(seen, OrderStep.Out) }
+    }
+
+    @Test
+    fun `reads the delay, and an order from before it existed as never delayed`() = runBlocking<Unit> {
+        signedIn()
+        val delayed = row.replace(""""printed_at":null,""", """"printed_at":null,"delay_minutes":10,"delayed_at":"2026-09-26T16:40:00+00:00",""")
+        test.reply(200, "[$delayed,$row]")
+        val (first, second) = backend.openOrders()
+        assertEquals(10, first.delayMinutes)
+        assertEquals(at("2026-09-26T16:40:00Z"), first.delayedAt)
+        assertEquals(0, second.delayMinutes)
+        assertNull(second.delayedAt)
+        assertTrue("delay_minutes" in StaffOrder.COLUMNS.split(","))
+    }
+
+    @Test
+    fun `delays by the minutes tapped, for the database to add to what is there`() = runBlocking<Unit> {
+        signedIn()
+        val answer = """{"id":"a","order_number":57,"delay_minutes":20,"delayed_at":"2026-09-26T16:40:00+00:00"}"""
+        test.reply(200, answer)
+        test.reply(200, answer)
+
+        // Already +10 here: still only the 10 tapped goes, never the 20 this device would make it.
+        val seen = order("a", delayMinutes = 10)
+        backend.move(seen, OrderStep.Delay(10))
+        backend.move(seen.copy(status = OrderStatus.ON_THE_WAY), OrderStep.Delay(20))
+
+        test.server.takeRequest()
+        val first = test.server.takeRequest()
+        assertEquals("POST", first.method)
+        assertEquals("/rest/v1/rpc/delay_order", first.url.encodedPath)
+        assertEquals("""{"p_order_id":"a","p_minutes":10}""", first.body!!.utf8())
+        assertEquals("""{"p_order_id":"a","p_minutes":20}""", test.server.takeRequest().body!!.utf8())
+    }
+
+    @Test
+    fun `says so when the order can no longer be delayed`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"code":"HB435","message":"order 57 is delivered: only accepted orders can be delayed"}""")
+        test.reply(400, """{"code":"P0002","message":"no such order"}""")
+        test.reply(500, """{"code":"XX000","message":"boom"}""")
+
+        assertFailsWith<NotDelayableException> { backend.move(order("a"), OrderStep.Delay(10)) }
+        assertFailsWith<NotDelayableException> { backend.move(order("a"), OrderStep.Delay(10)) }
+        assertFailsWith<BackendException> { backend.move(order("a"), OrderStep.Delay(10)) }
+    }
+
+    @Test
+    fun `delays every open order at once and says how many`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(200, """{"delayed":3,"order_ids":["a","b","c"]}""")
+        test.reply(400, """{"code":"HB435","message":"orders can be delayed by 5 to 30 minutes, on the five"}""")
+        test.reply(400, """{"code":"P0001","message":"staff only"}""")
+
+        assertEquals(3, backend.delayOpen(15))
+        assertFailsWith<InvalidSettingException> { backend.delayOpen(7) }
+        assertFailsWith<NotAllowedException> { backend.delayOpen(15) }
+
+        test.server.takeRequest()
+        val all = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/delay_open_orders", all.url.encodedPath)
+        assertEquals("""{"p_minutes":15}""", all.body!!.utf8())
     }
 
     @Test

@@ -1,6 +1,7 @@
 package de.hamzabistro.printstation.queue
 
 import de.hamzabistro.printstation.core.Logger
+import de.hamzabistro.printstation.core.NotDelayableException
 import de.hamzabistro.printstation.core.OrderMovedException
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrderStep
@@ -28,6 +29,9 @@ sealed interface StepFailure {
     /** It had moved on elsewhere; the queue now shows where it stands. */
     data object Moved : StepFailure
 
+    /** A delay the database refused: no longer accepted, or at its three hours. */
+    data object NotDelayable : StepFailure
+
     data class Failed(val reason: String) : StepFailure
 }
 
@@ -38,7 +42,8 @@ sealed interface StepFailure {
  * rule as /orders, and the same for the queue and the alarm screen, which is
  * why it lives with the process rather than with a screen.
  *
- * A step only lands if the order is still where this device saw it.
+ * A step only lands if the order is still where this device saw it. A
+ * delay ("+10 Min.") waits the same way: it emails the customer too.
  */
 class PendingSteps(
     private val scope: CoroutineScope,
@@ -104,6 +109,8 @@ class PendingSteps(
                 throw e
             } catch (e: OrderMovedException) {
                 _failures.tryEmit(StepFailure.Moved)
+            } catch (e: NotDelayableException) {
+                _failures.tryEmit(StepFailure.NotDelayable)
             } catch (e: SignedOutException) {
                 _failures.tryEmit(StepFailure.Failed(e.message ?: "signed out"))
             } catch (e: Exception) {

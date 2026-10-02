@@ -12,6 +12,7 @@ fun order(
     etaMinutes: Int? = 30,
     pickup: Boolean = false,
     number: Long = 57,
+    delayMinutes: Int = 0,
 ) =
     StaffOrder(
         id = id,
@@ -22,6 +23,7 @@ fun order(
         status = status,
         etaMinutes = etaMinutes,
         pickup = pickup,
+        delayMinutes = delayMinutes,
     )
 
 fun at(text: String): Instant = Instant.parse(text)

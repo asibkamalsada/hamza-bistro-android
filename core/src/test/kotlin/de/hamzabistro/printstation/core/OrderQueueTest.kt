@@ -35,6 +35,8 @@ class OrderQueueTest {
 
         override suspend fun move(order: StaffOrder, step: OrderStep) = Unit
 
+        override suspend fun delayOpen(minutes: Int) = 0
+
         override suspend fun prepMinutes() = mapOf(1L to 5)
 
         override suspend fun seen(device: DeviceReport) {

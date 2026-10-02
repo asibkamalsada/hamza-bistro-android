@@ -13,6 +13,7 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.StaffOrder
+import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.core.UpdateState
 import de.hamzabistro.printstation.queue.Pending
@@ -55,6 +56,10 @@ data class StaffState(
     /** Busy mode's minutes on every promise, now: 0 while it is off, or once it ran out. */
     val busyMinutes: Int
         get() = shop.hours?.busyMinutes(now) ?: 0
+
+    /** What "Alle +15 Min." would move now: shown only while this is not empty. */
+    val delayableAll: List<StaffOrder>
+        get() = StaffQueue.delayableAll(queue.orders, StaffQueue.DELAY_ALL_MINUTES, now)
 }
 
 /** What happened that the screen should say once. */
@@ -70,6 +75,11 @@ sealed interface StaffEvent {
 
     /** Orders already booked for a time inside a closure just made: they stand. */
     data class PreordersInside(val count: Int) : StaffEvent
+
+    /** "Alle +15 Min." went through: [count] orders, 0 when there was none left to move. */
+    data class DelayedAll(val count: Int, val minutes: Int) : StaffEvent
+
+    data class DelayAllFailed(val reason: String) : StaffEvent
 }
 
 /**
@@ -139,6 +149,41 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
         graph.steps.take(order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done)
 
     fun cancel(order: StaffOrder, reason: CancelReason?) = graph.steps.take(order, OrderStep.Cancel(reason))
+
+    /**
+     * "+10 Min.": the promise later, on every device, on /my-orders and in
+     * Telegram, and an email to a customer who asked for updates — so it
+     * waits out the undo window like a step.
+     */
+    fun delay(order: StaffOrder, minutes: Int) = graph.steps.take(order, OrderStep.Delay(minutes))
+
+    private val _delayingAll = MutableStateFlow(false)
+
+    /** "Alle +15 Min." is on its way: its button waits. */
+    val delayingAll: StateFlow<Boolean> = _delayingAll.asStateFlow()
+
+    /**
+     * "Alle +15 Min.", asked about first on the screen: it emails every one
+     * of those customers. Sent at once — the question was the pause.
+     */
+    fun delayAll() {
+        if (_delayingAll.value) return
+        _delayingAll.value = true
+        viewModelScope.launch {
+            val minutes = StaffQueue.DELAY_ALL_MINUTES
+            try {
+                _events.value = StaffEvent.DelayedAll(graph.staff.delayOpen(minutes), minutes)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                graph.logger.warn("Delaying every order failed", e)
+                _events.value = StaffEvent.DelayAllFailed(e.message ?: e.javaClass.simpleName)
+            } finally {
+                _delayingAll.value = false
+                graph.queue.refresh()
+            }
+        }
+    }
 
     fun undo(order: StaffOrder) = graph.steps.undo(order.id)
 

@@ -122,6 +122,7 @@
     <string name="need_full_screen">full screen over the lock screen</string>
     <string name="need_background">background running</string>
     <string name="order_moved">That order had already been changed — this is where it stands now.</string>
+    <string name="order_not_delayable">This order can no longer be delayed — this is where it stands now.</string>
     <string name="step_failed">Not sent: %1$s</string>
     <string name="printed_by_hand">Ticket #%1$d printed.</string>
 
@@ -132,6 +133,7 @@
     <string name="due_at">due %1$s</string>
     <string name="due_in">%1$d min left</string>
     <string name="due_late">%1$d min late</string>
+    <string name="due_delayed">delayed +%1$d min</string>
     <string name="cook_from">start cooking %1$s</string>
     <string name="cook_now">Start cooking now</string>
 
@@ -182,6 +184,20 @@
     <string name="pending_accepted">Accepted, %1$d min</string>
     <string name="pending_declined">Declined</string>
     <string name="pending_cancelled">Cancelled</string>
+    <string name="pending_delayed">Delayed +%1$d min</string>
+    <string name="delay_button">+%1$d min</string>
+    <string name="delay_all">All +%1$d min</string>
+    <plurals name="delay_all_confirm">
+        <item quantity="one">Delay %1$d accepted order by %2$d minutes? Customers who asked for updates get an email.</item>
+        <item quantity="other">Delay %1$d accepted orders by %2$d minutes? Customers who asked for updates get an email.</item>
+    </plurals>
+    <string name="delay_all_yes">Yes, delay</string>
+    <plurals name="delay_all_done">
+        <item quantity="one">%1$d order delayed by %2$d minutes.</item>
+        <item quantity="other">%1$d orders delayed by %2$d minutes.</item>
+    </plurals>
+    <string name="delay_all_none">There is no accepted order for right away to delay.</string>
+    <string name="delay_all_failed">Could not delay: %1$s</string>
     <string name="undo">Undo</string>
     <string name="print_ticket">Print ticket</string>
 

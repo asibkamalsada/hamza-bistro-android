@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -141,6 +143,7 @@ fun StaffEvents(viewModel: StaffViewModel, snackbar: SnackbarHostState) {
                 is StaffEvent.Step ->
                     when (val failure = shown.failure) {
                         StepFailure.Moved -> resources.getString(R.string.order_moved)
+                        StepFailure.NotDelayable -> resources.getString(R.string.order_not_delayable)
                         is StepFailure.Failed -> resources.getString(R.string.step_failed, failure.reason)
                     }
                 is StaffEvent.Printed -> resources.getString(R.string.printed_by_hand, shown.order)
@@ -148,6 +151,10 @@ fun StaffEvents(viewModel: StaffViewModel, snackbar: SnackbarHostState) {
                 is StaffEvent.ShopFailed -> resources.getString(R.string.shop_failed, shown.reason)
                 is StaffEvent.PreordersInside ->
                     resources.getQuantityString(R.plurals.shop_preorders_inside, shown.count, shown.count)
+                is StaffEvent.DelayedAll ->
+                    if (shown.count == 0) resources.getString(R.string.delay_all_none)
+                    else resources.getQuantityString(R.plurals.delay_all_done, shown.count, shown.count, shown.minutes)
+                is StaffEvent.DelayAllFailed -> resources.getString(R.string.delay_all_failed, shown.reason)
             }
         )
         viewModel.eventShown()
@@ -260,6 +267,8 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (Staff
 
     Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) }, onHours = { onOpen(StaffScreen.HOURS) })
+        val delayingAll by viewModel.delayingAll.collectAsStateWithLifecycle()
+        DelayAll(state.delayableAll.size, delayingAll, viewModel::delayAll)
         if (!state.prefs.onShift) {
             Banner(stringResource(R.string.shift_off_banner), warning = true) {
                 Button(onClick = {
@@ -294,6 +303,36 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (Staff
                 OutlinedButton(onClick = { context.openDownload(release.downloadUrl) }) { Text(stringResource(R.string.update_install)) }
             }
         }
+    }
+}
+
+/**
+ * "Alle +15 Min.", beside busy mode, for an evening that has gone wrong:
+ * every promise already made moves later at once, where busy mode moves the
+ * ones still to be made. Only while there is something to move, and only
+ * after asking — it emails every one of those customers.
+ */
+@Composable
+private fun DelayAll(count: Int, working: Boolean, onConfirm: () -> Unit) {
+    // Forgotten once there is nothing left to move, so it does not pop up again later.
+    var asking by remember(count == 0) { mutableStateOf(false) }
+    if (count == 0) return
+    val minutes = StaffQueue.DELAY_ALL_MINUTES
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        OutlinedButton(onClick = { asking = true }, enabled = !working) { Text(stringResource(R.string.delay_all, minutes)) }
+    }
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            text = { Text(pluralStringResource(R.plurals.delay_all_confirm, count, count, minutes)) },
+            confirmButton = {
+                Button(onClick = {
+                    asking = false
+                    onConfirm()
+                }) { Text(stringResource(R.string.delay_all_yes)) }
+            },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(R.string.cancel_back)) } },
+        )
     }
 }
 
@@ -394,6 +433,8 @@ internal class Actions(private val context: Context, private val viewModel: Staf
     override fun moveOn(order: StaffOrder) = viewModel.moveOn(order)
 
     override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
+
+    override fun delay(order: StaffOrder, minutes: Int) = viewModel.delay(order, minutes)
 
     override fun undo(order: StaffOrder) = viewModel.undo(order)
 
