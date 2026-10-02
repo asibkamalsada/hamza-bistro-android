@@ -51,6 +51,7 @@ import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.NavApp
 import de.hamzabistro.printstation.core.NewOrderAlarm
 import de.hamzabistro.printstation.core.TravelMode
+import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.station.AlarmSound
 import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.StationSettings
@@ -71,12 +72,14 @@ private val QUIET_WINDOWS: List<Pair<LocalTime, LocalTime>?> =
 fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Unit) {
     val state by staff.state.collectAsStateWithLifecycle()
     val mainState by main.state.collectAsStateWithLifecycle()
+    val update by staff.update.collectAsStateWithLifecycle()
     val prefs = state.prefs
     val context = LocalContext.current
     var checks by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         checks++
         main.refresh()
+        staff.checkForUpdate(UpdateChecker.ON_OPEN)
     }
     val askForNotifications =
         // The shift starts either way: without notifications it still rings,
@@ -235,6 +238,8 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
             }
 
             AccountSection(mainState, main)
+
+            AppSection(update, onCheck = { staff.checkForUpdate() })
         }
     }
 }

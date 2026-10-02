@@ -254,6 +254,7 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (Staff
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { checks++ }
     val askForNotifications =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.setOnShift(true) }
+    val update = viewModel.update.collectAsStateWithLifecycle().value.available
 
     Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) }, onHours = { onOpen(StaffScreen.HOURS) })
@@ -283,6 +284,12 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (Staff
         state.queue.failingSince?.let {
             Banner(stringResource(R.string.queue_offline_since, Format.clock(it)), warning = true) {
                 OutlinedButton(onClick = viewModel::refresh) { Text(stringResource(R.string.retry)) }
+            }
+        }
+        // Last: a newer build can wait until the orders are answered.
+        update?.let { release ->
+            Banner(stringResource(R.string.update_available, release.versionName), warning = false) {
+                OutlinedButton(onClick = { context.openDownload(release.downloadUrl) }) { Text(stringResource(R.string.update_install)) }
             }
         }
     }

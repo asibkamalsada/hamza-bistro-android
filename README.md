@@ -251,8 +251,9 @@ kept in a small file and reported later, never printed twice.
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients (`Menu`, `PhotoCrop`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
-  (`AlarmPolicy`), Realtime (`OrdersRealtime`), and printing
-  (`SupabasePrintBackend`, `PrintStation`).
+  (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
+  (`SupabasePrintBackend`, `PrintStation`), and the check for a newer
+  release (`AppUpdate`).
 - [`app/`](app) — what only Android can do: the service and the boot
   receiver (`station/`), the alarm's sound and screen (`alarm/`), the undo
   window (`queue/`), the BLE printer (`printer/`), the Keystore-sealed
@@ -373,6 +374,19 @@ which takes the phone off the website's list at once.
 After a reboot the service starts by itself once the device has been
 unlocked for the first time — before that, Android keeps the app's
 encrypted data locked.
+
+### Newer versions
+
+The app does not update itself. It reads the latest release from GitHub's
+API (unauthenticated: the repository is public) when the queue or the
+settings are opened, at most once an hour, and once a day while on shift;
+a release whose tag's run number (`v0.2.<run>`) is above the installed
+`versionCode` shows **Update verfügbar: 0.2.… · Installieren** above the
+queue and under **Einstellungen → App**. **Installieren** opens the APK's
+download in the browser; Android's installer puts it over the old version,
+keeping the sign-in and the printer. A GitHub that does not answer changes
+nothing: the check runs beside the queue and the alarm, never in their way,
+and only the settings say that it failed.
 
 ### Updating from the Druckstation
 

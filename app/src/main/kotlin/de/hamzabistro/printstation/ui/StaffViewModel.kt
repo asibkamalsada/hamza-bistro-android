@@ -13,6 +13,8 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.StaffOrder
+import de.hamzabistro.printstation.core.UpdateChecker
+import de.hamzabistro.printstation.core.UpdateState
 import de.hamzabistro.printstation.queue.Pending
 import de.hamzabistro.printstation.queue.StepFailure
 import de.hamzabistro.printstation.station.DevicePrefs
@@ -139,10 +141,22 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     /** The screen went away: what waits on its undo window goes now, as on /orders. */
     fun flush() = graph.steps.flushAll()
 
-    /** The queue now, and whether the address check works — on every return to the screen. */
+    /**
+     * The queue now, and whether the address check works — on every return
+     * to the screen. And whether a newer build is out, at most once an hour.
+     */
     fun refresh() {
         graph.queue.refresh()
         viewModelScope.launch { checkAddress() }
+        checkForUpdate(UpdateChecker.ON_OPEN)
+    }
+
+    /** Whether a newer build is out, for the line above the queue and the settings. */
+    val update: StateFlow<UpdateState> = graph.updates.state
+
+    /** Looks for a newer build unless it was looked for less than [maxAge] ago. Never fails. */
+    fun checkForUpdate(maxAge: kotlin.time.Duration = kotlin.time.Duration.ZERO) {
+        graph.scope.launch { graph.updates.check(maxAge) }
     }
 
     /**

@@ -142,11 +142,24 @@ class ShiftService : LifecycleService() {
             printingOn = parts.printing,
         )
 
-    /** The queue and its alarm, until the shift ends here. */
+    /**
+     * The queue and its alarm, until the shift ends here — and, beside them,
+     * a look once a day for a newer build. That look never throws, and runs
+     * in a job of its own, so GitHub can do nothing to the alarm.
+     */
     private suspend fun shift() {
         coroutineScope {
             val queue = graph.liveQueue.shareIn(this, SharingStarted.Eagerly, replay = 1)
             launch { queue.collect { queueShown.value = it } }
+            launch {
+                try {
+                    graph.updates.daily()
+                } catch (e: Exception) {
+                    // It catches its own failures; should one slip through, the shift goes on.
+                    if (e is CancellationException) throw e
+                    graph.logger.warn("The update check stopped", e)
+                }
+            }
             AlarmController(this@ShiftService, graph).run(queue)
         }
     }
