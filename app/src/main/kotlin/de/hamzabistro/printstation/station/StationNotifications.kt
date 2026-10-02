@@ -235,6 +235,15 @@ object StationNotifications {
                         context.getString(R.string.chime_offline_text, Format.clock(chime.since)),
                         null,
                     )
+                // In the order's own place: it replaces the "new order"
+                // notification, and goes with the order as that does.
+                is Chime.DecliningSoon ->
+                    Shown(
+                        ORDER_IDS + (chime.order.orderNumber % 100_000).toInt(),
+                        context.getString(R.string.chime_declining, chime.order.orderNumber),
+                        context.getString(R.string.chime_declining_text),
+                        chime.order.id,
+                    )
             }
         val channel =
             when {

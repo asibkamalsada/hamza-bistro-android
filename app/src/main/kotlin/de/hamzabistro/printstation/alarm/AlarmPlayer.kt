@@ -98,8 +98,34 @@ class AlarmPlayer(context: Context) {
         )
     }
 
+    /**
+     * Two minutes before an order is declined unanswered: a sound none of
+     * the alarm's own is, once — over the loop when it rings — and a harder
+     * vibration, kept up while the loop goes on.
+     */
+    @Synchronized
+    fun escalate(full: Boolean, vibrate: Boolean) {
+        if (full) raiseVolume()
+        val (tones, round) = URGENT
+        val once = play(synthesise(tones, round, loop = false), loop = false)
+        if (vibrate) vibrate(URGENT_VIBRATION, repeat = if (looping) 0 else -1)
+        main.postDelayed(
+            {
+                synchronized(this) {
+                    once?.release()
+                    if (!looping) restoreVolume()
+                }
+            },
+            URGENT_MS,
+        )
+    }
+
     private fun play(sound: AlarmSound, loop: Boolean): AudioTrack? {
-        val samples = synthesise(sound, loop)
+        val (tones, round) = pattern(sound)
+        return play(synthesise(tones, round, loop), loop)
+    }
+
+    private fun play(samples: ShortArray, loop: Boolean): AudioTrack? {
         return try {
             AudioTrack.Builder()
                 .setAudioAttributes(ALARM)
@@ -178,6 +204,10 @@ class AlarmPlayer(context: Context) {
         private val LOOP_VIBRATION = longArrayOf(0, 600, 300, 600, 300, 1_000, 800)
         private val CHIME_VIBRATION = longArrayOf(0, 300, 150, 300)
 
+        /** Short and hard, many times: not the loop's long buzz, so it is felt as different. */
+        private val URGENT_VIBRATION = longArrayOf(0, 200, 100, 200, 100, 200, 100, 200, 400)
+        private const val URGENT_MS = 3_000L
+
         private enum class Wave { SQUARE, SINE, SAW }
 
         /** One tone: when it starts and how long it sounds, in seconds, and its pitch. */
@@ -204,9 +234,18 @@ class AlarmPlayer(context: Context) {
                     listOf(Tone(0.0, 0.5, Wave.SAW, 600.0, 1300.0), Tone(0.5, 0.5, Wave.SAW, 600.0, 1300.0)) to 1.3
             }
 
+        /**
+         * The escalation: a fast high-low square warble, like a smoke alarm
+         * running out of patience — none of the three sounds a device can
+         * be set to.
+         */
+        private val URGENT: Pair<List<Tone>, Double> =
+            (0 until 16).map { i ->
+                Tone(at = i * 0.14, length = 0.12, wave = Wave.SQUARE, from = if (i % 2 == 0) 1_480.0 else 1_050.0)
+            } to 2.4
+
         /** The sound as 16-bit samples. */
-        private fun synthesise(sound: AlarmSound, loop: Boolean): ShortArray {
-            val (tones, round) = pattern(sound)
+        private fun synthesise(tones: List<Tone>, round: Double, loop: Boolean): ShortArray {
             val seconds = if (loop) round else tones.maxOf { it.at + it.length } + 0.05
             val out = DoubleArray((seconds * RATE).toInt())
             for (tone in tones) {

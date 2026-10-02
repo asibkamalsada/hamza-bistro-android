@@ -43,9 +43,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.AutoDecline
 import de.hamzabistro.printstation.core.DeliveryDay
 import de.hamzabistro.printstation.core.ShopClosure
 import de.hamzabistro.printstation.core.ShopHours
+import de.hamzabistro.printstation.core.ShopSettings
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDateTime
@@ -73,6 +75,10 @@ data class HoursState(
     val planOpenEnded: Boolean = false,
     val planBusy: Boolean = false,
     val planMessage: Message? = null,
+    /** The shop's settings as last read; null until read, and on a database without them. */
+    val settings: ShopSettings? = null,
+    val autoDeclineBusy: Boolean = false,
+    val autoDeclineMessage: Message? = null,
 )
 
 /**
@@ -98,6 +104,28 @@ class HoursViewModel(application: Application) : AndroidViewModel(application) {
             attempt(app, { error -> _state.update { it.copy(weekMessage = Message(error, error = true)) } }) {
                 graph.shop.hours()?.let(::show)
             }
+        }
+        viewModelScope.launch {
+            attempt(app, { error -> _state.update { it.copy(autoDeclineMessage = Message(error, error = true)) } }) {
+                val settings = graph.shop.settings()
+                _state.update { it.copy(settings = settings) }
+            }
+        }
+    }
+
+    /** Auto-decline after [minutes], or off; saved at once, for every device and the website. */
+    fun setAutoDecline(minutes: Int?) {
+        if (_state.value.autoDeclineBusy) return
+        _state.update { it.copy(autoDeclineBusy = true, autoDeclineMessage = null) }
+        viewModelScope.launch {
+            val saved =
+                attempt(app, { error -> _state.update { it.copy(autoDeclineMessage = Message(error, error = true)) } }) {
+                    graph.shop.setAutoDecline(minutes)
+                }
+            if (saved != null) {
+                _state.update { it.copy(settings = saved, autoDeclineMessage = Message(app.getString(R.string.hours_saved), error = false)) }
+            }
+            _state.update { it.copy(autoDeclineBusy = false) }
         }
     }
 
@@ -239,10 +267,48 @@ fun HoursScreen(staff: StaffViewModel, onBack: () -> Unit) {
                     ShopSwitch(staffState.shop, staffState.now, remember(staff) { ShopButtons(staff) })
                 }
             }
+            AutoDeclineSetting(state, hours)
             Closures(shop, state, staffState.now, hours)
             Week(shop, state, hours)
         }
     }
+}
+
+/**
+ * How long an order may wait unanswered before the database declines it —
+ * the picker of the site's /orders/hours. Left out on a database without
+ * the setting.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AutoDeclineSetting(state: HoursState, hours: HoursViewModel) {
+    val settings = state.settings
+    if (settings == null && state.autoDeclineMessage == null) return
+    val context = LocalContext.current
+    Section(stringResource(R.string.auto_decline_heading)) {
+        Text(stringResource(R.string.auto_decline_note), style = MaterialTheme.typography.bodySmall)
+        if (settings != null) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (minutes in AutoDecline.choices(settings.autoDeclineMinutes)) {
+                    val label = autoDeclineLabel(context, minutes)
+                    val enabled = !state.autoDeclineBusy
+                    if (minutes == settings.autoDeclineMinutes) {
+                        Button(onClick = {}, enabled = enabled) { Text(label) }
+                    } else {
+                        OutlinedButton(onClick = { hours.setAutoDecline(minutes) }, enabled = enabled) { Text(label) }
+                    }
+                }
+            }
+        }
+        state.autoDeclineMessage?.let { Said(it) }
+    }
+}
+
+/** "Aus — Bestellungen warten", "nach 10 Minuten (empfohlen)". */
+private fun autoDeclineLabel(context: Context, minutes: Int?): String {
+    if (minutes == null) return context.getString(R.string.auto_decline_off)
+    val label = context.getString(R.string.auto_decline_after, minutes)
+    return if (minutes == AutoDecline.SUGGESTED) context.getString(R.string.auto_decline_suggested, label) else label
 }
 
 /** Closures running now and planned: a holiday, a day off. One ended early by "Open again" drops off. */

@@ -71,4 +71,13 @@ class EtaTest {
         assertEquals(listOf(15, 30, 45, 60), Eta.options(30))
         assertEquals(listOf(20, 25, 40), Eta.options(25, listOf(20, 40)))
     }
+
+    @Test
+    fun `adds busy mode on top of the rounded estimate`() {
+        assertEquals(45, Eta.estimate(delivery("Lützner Str. 1, 04177 Leipzig", line(doner)), prep, busyMinutes = 30))
+        assertEquals(30, Eta.estimate(delivery("", line(pizza), pickup = true), prep, busyMinutes = 15))
+        // Not rounded again: +15 on 13 minutes of cooking and riding is 30, not 28 rounded.
+        assertEquals(15 + 15, Eta.estimate(delivery("Lützner Str. 1, 04177 Leipzig", line(doner)), prep, 15))
+        assertEquals(15, Eta.estimate(delivery("Lützner Str. 1, 04177 Leipzig", line(doner)), prep, -5))
+    }
 }

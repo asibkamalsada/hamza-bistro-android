@@ -61,6 +61,8 @@
     <string name="chime_unprinted_text">Accepted at %1$s, and no printer has put out its ticket. Printer on, paper in?</string>
     <string name="chime_offline">No connection to the shop</string>
     <string name="chime_offline_text">Since %1$s — new orders do not reach this device just now. Check Wi-Fi or mobile data.</string>
+    <string name="chime_declining">Order #%1$d: declined automatically in 2 min</string>
+    <string name="chime_declining_text">Nobody has answered it. Accept or decline now — otherwise the customer is told it could not be taken.</string>
 
     <string name="slot_today">today</string>
     <string name="slot_tomorrow">tomorrow</string>
@@ -124,6 +126,9 @@
     <string name="printed_by_hand">Ticket #%1$d printed.</string>
 
     <string name="waiting_for">waiting %1$d min</string>
+    <string name="auto_decline_in">declined automatically in %1$d min</string>
+    <string name="auto_decline_at">declined automatically %1$s</string>
+    <string name="auto_decline_now">about to be declined automatically</string>
     <string name="due_at">due %1$s</string>
     <string name="due_in">%1$d min left</string>
     <string name="due_late">%1$d min late</string>
@@ -172,6 +177,7 @@
     <string name="reason_unreachable">Can\'t reach them</string>
     <string name="reason_address">Address problem</string>
     <string name="reason_none">No reason</string>
+    <string name="reason_timeout">nobody answered — declined automatically</string>
     <string name="pending_sending">%1$s — sending in a moment</string>
     <string name="pending_accepted">Accepted, %1$d min</string>
     <string name="pending_declined">Declined</string>
@@ -240,6 +246,13 @@
     <!-- Whether the shop takes orders: the line above the queue (ShopSwitch.kt). -->
     <string name="shop_open">Taking orders.</string>
     <string name="shop_open_until">Taking orders — until %1$s.</string>
+    <string name="shop_busy_suffix">%1$s · +%2$d min until %3$s.</string>
+    <string name="shop_busy">Busy…</string>
+    <string name="shop_busy_how_much">Every promise longer by:</string>
+    <string name="shop_busy_how_long">+%1$d min, for:</string>
+    <string name="shop_busy_extra">+%1$d min</string>
+    <string name="shop_busy_off">Back to normal</string>
+    <string name="shop_busy_by">Busy mode set by %1$s.</string>
     <string name="shop_closed_until">Closed — orders again %1$s.</string>
     <string name="shop_closed_for_good">Closed until further notice — no orders are coming in.</string>
     <string name="shop_outside_hours">Outside delivery hours — orders again %1$s. Pre-orders are open.</string>
@@ -306,6 +319,12 @@
     <string name="hours_week_invalid">On %1$s delivery ends before it starts.</string>
     <string name="hours_saved">Saved.</string>
     <string name="hours_invalid">The database refused that: a day that closes before it opens, or a closure that ends before it starts.</string>
+    <string name="auto_decline_heading">Decline unanswered orders</string>
+    <string name="auto_decline_note">An order nobody accepts or declines in that time is declined automatically, and the customer gets an email. A pre-order is declined 30 minutes before its time.</string>
+    <string name="auto_decline_off">Off — orders wait</string>
+    <string name="auto_decline_after">after %1$d minutes</string>
+    <string name="auto_decline_suggested">%1$s (recommended)</string>
+    <string name="setting_invalid">The database refused that value.</string>
 
     <!-- The menu (MenuScreen.kt) -->
     <string name="menu_title">Menu</string>

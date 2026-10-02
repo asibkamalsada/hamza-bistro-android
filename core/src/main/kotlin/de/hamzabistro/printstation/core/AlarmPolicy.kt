@@ -56,6 +56,12 @@ sealed interface Chime {
 
     /** The queue has not been read for a while: this device would not hear of an order. */
     data class Offline(val since: Instant) : Chime
+
+    /**
+     * Two minutes before the database declines it unanswered: the alarm
+     * escalates, once, with a sound and a vibration of its own.
+     */
+    data class DecliningSoon(val order: StaffOrder) : Chime
 }
 
 /** What the alarm should be doing now. */
@@ -89,6 +95,10 @@ data class AlarmDecision(
  *   * An accepted pre-order chimes once when it has to go on; this device's
  *     printer failing chimes after half a minute and every three minutes
  *     while it lasts; a queue that cannot be read chimes once after two.
+ *   * A new order two minutes before the database declines it unanswered
+ *     (auto_decline_at, 20261002150000_auto_decline.sql) escalates once:
+ *     through "Stumm", since it is the last chance; not on a device set to
+ *     stay silent about new orders.
  *   * An accepted order with no ticket two minutes on chimes once, while a
  *     print station registered before it was accepted is meant to print it
  *     — the rule of remind_staff_of_waiting_orders()'s "unprinted" stamp in
@@ -99,6 +109,7 @@ data class AlarmDecision(
  */
 class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     private val chimedNew = mutableSetOf<String>()
+    private val escalated = mutableSetOf<String>()
     private val cookDone = mutableSetOf<String>()
     private var cookPrimed = false
     private val unprintedDone = mutableSetOf<String>()
@@ -157,6 +168,11 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
             chimedNew += waiting.map { it.id }
         }
 
+        for (order in waiting) {
+            if (!AutoDecline.escalationDue(order, now) || !escalated.add(order.id)) continue
+            if (settings.newOrders != NewOrderAlarm.OFF) chimes += Chime.DecliningSoon(order)
+        }
+
         if (orders != null) {
             for (order in orders) {
                 if (order.status != OrderStatus.CONFIRMED || order.scheduledFor == null || order.id in cookDone) continue
@@ -184,6 +200,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
             }
             val ids = orders.map { it.id }.toSet()
             chimedNew.retainAll(ids)
+            escalated.retainAll(ids)
             cookDone.retainAll(ids)
             unprintedDone.retainAll(ids)
         }

@@ -161,8 +161,12 @@ class AppGraph(context: Context) {
         return DeviceReport(settings.stationId, device.label.trim().ifEmpty { Build.MODEL }, device.alarm.newOrders.wire)
     }
 
-    /** The minutes the ETA buttons are built around, from the dishes and the ring. */
-    fun suggestedEta(order: StaffOrder, prep: Map<Long, Int>): Int = Eta.estimate(order, prep)
+    /**
+     * The minutes the ETA buttons are built around, from the dishes and the
+     * ring, plus busy mode's while it is on at [now].
+     */
+    fun suggestedEta(order: StaffOrder, prep: Map<Long, Int>, now: Instant): Int =
+        Eta.estimate(order, prep, shopView.value.hours?.busyMinutes(now) ?: 0)
 
     val steps =
         PendingSteps(

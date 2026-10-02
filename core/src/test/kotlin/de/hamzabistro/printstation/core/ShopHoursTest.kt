@@ -204,4 +204,53 @@ class ShopHoursTest {
         test.reply(400, """{"code":"P0001","message":"staff only"}""")
         assertFailsWith<NotAllowedException> { backend.close(null) }
     }
+
+    @Test
+    fun `reads busy mode with the hours, and stops counting it once it ran out`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(
+            200,
+            answer(openNow = true, extra = ""","busy_extra_minutes":30,"busy_until":"2026-10-02T11:15:00+00:00","busy_by":"koch@example.com""""),
+        )
+
+        val hours = backend.hours()!!
+        assertEquals(Busy(30, Instant.parse("2026-10-02T11:15:00Z"), "koch@example.com"), hours.busyAt(now))
+        assertEquals(30, hours.busyMinutes(now))
+        // Over by itself, without waiting for the next read.
+        assertNull(hours.busyAt(Instant.parse("2026-10-02T11:15:00Z")))
+        assertEquals(0, hours.busyMinutes(Instant.parse("2026-10-02T11:20:00Z")))
+    }
+
+    @Test
+    fun `busy mode off, or from a database without it, is no minutes`() {
+        assertEquals(0, ShopHours(openNow = true).busyMinutes(now))
+        // Off, as the database says it: 0 and no end.
+        assertNull(ShopHours(openNow = true, busyExtraMinutes = 0, busyUntil = null).busyAt(now))
+    }
+
+    @Test
+    fun `switches busy mode on for a while or the rest of the day, and back to normal`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        repeat(4) { test.reply(200, answer(openNow = true)) }
+
+        backend.busy(30, java.time.Duration.ofMinutes(30))
+        backend.busy(15, java.time.Duration.ofHours(1))
+        backend.busy(45, null)
+        backend.notBusy()
+
+        test.server.takeRequest()
+        val half = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/shop_busy", half.url.encodedPath)
+        assertEquals("""{"p_minutes":30,"p_for":"PT30M"}""", half.body!!.utf8())
+        assertEquals("""{"p_minutes":15,"p_for":"PT1H"}""", test.server.takeRequest().body!!.utf8())
+        assertEquals("""{"p_minutes":45,"p_for":null}""", test.server.takeRequest().body!!.utf8())
+        assertEquals("/rest/v1/rpc/shop_not_busy", test.server.takeRequest().url.encodedPath)
+    }
+
+    @Test
+    fun `busy mode the database refuses says so`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(400, """{"code":"HB434","message":"busy minutes must be 5 to 60 in steps of 5"}""")
+        assertFailsWith<InvalidSettingException> { backend.busy(7, null) }
+    }
 }
