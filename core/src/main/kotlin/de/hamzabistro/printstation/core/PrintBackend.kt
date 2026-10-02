@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
@@ -49,8 +50,12 @@ interface PrintBackend {
     /** Takes this station off the list: printing was switched off here. */
     suspend fun off(station: String)
 
-    /** The order's ticket as ESC/POS bytes, or null when it is no longer there to print. */
-    suspend fun ticket(order: String, lang: String): ByteArray?
+    /**
+     * The order's ticket as ESC/POS bytes, or null when it is no longer there
+     * to print. With [bagSlip], the "Tütenzettel" follows the ticket in the
+     * same bytes: one job, so still one claim and one finish per order.
+     */
+    suspend fun ticket(order: String, lang: String, bagSlip: Boolean = false): ByteArray?
 
     /** The test ticket, for choosing a printer. */
     suspend fun testTicket(lang: String): ByteArray
@@ -61,9 +66,12 @@ interface PrintBackend {
  * the print-ticket edge function for the bytes. Every call carries the
  * signed-in account's own token, so the database's policies decide.
  */
-class SupabasePrintBackend internal constructor(private val rest: SupabaseRest) : PrintBackend {
-    constructor(config: SupabaseConfig, http: OkHttpClient, sessions: SessionManager) :
-        this(SupabaseRest(config, http, sessions))
+class SupabasePrintBackend internal constructor(
+    private val rest: SupabaseRest,
+    private val logger: Logger = Logger.NONE,
+) : PrintBackend {
+    constructor(config: SupabaseConfig, http: OkHttpClient, sessions: SessionManager, logger: Logger = Logger.NONE) :
+        this(SupabaseRest(config, http, sessions), logger)
 
     override suspend fun canPrint(): Boolean = rpc("can_print", buildJsonObject {}) == "true"
 
@@ -115,11 +123,26 @@ class SupabasePrintBackend internal constructor(private val rest: SupabaseRest) 
         rpc("print_station_off", buildJsonObject { put("p_station", station) })
     }
 
-    override suspend fun ticket(order: String, lang: String): ByteArray? =
-        printTicket(buildJsonObject {
+    /**
+     * A print-ticket from before the bag slip (hamza-bistro-web#91) ignores
+     * the flag and sends the ticket alone. One that refuses the request (a
+     * 400) has printed nothing yet, so the plain ticket is asked for instead:
+     * the switch never costs a ticket.
+     */
+    override suspend fun ticket(order: String, lang: String, bagSlip: Boolean): ByteArray? {
+        val plain = buildJsonObject {
             put("order", order)
             put("lang", lang)
-        })
+        }
+        if (!bagSlip) return printTicket(plain)
+        return try {
+            printTicket(JsonObject(plain + ("bagSlip" to JsonPrimitive(true))))
+        } catch (e: BackendException) {
+            if (e.status != 400) throw e
+            logger.warn("print-ticket refused the bag slip; printing the ticket without it", e)
+            printTicket(plain)
+        }
+    }
 
     override suspend fun testTicket(lang: String): ByteArray =
         printTicket(buildJsonObject {

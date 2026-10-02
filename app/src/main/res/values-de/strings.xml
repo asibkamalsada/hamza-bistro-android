@@ -92,6 +92,8 @@
 
     <string name="section_station">Drucken</string>
     <string name="station_switch">Jede angenommene Bestellung drucken</string>
+    <string name="station_bag_slip">Tütenzettel nach jedem Bon</string>
+    <string name="station_bag_slip_hint">Ein kurzer Streifen nach dem Bon, für die Tüte: die Bestellnummer groß, die Adresse und was zu kassieren ist. Für automatisch und von Hand gedruckte Bons auf diesem Gerät.</string>
     <string name="station_one_printer">Der Drucker nimmt nur eine Verbindung an: auf diesem Tablet auf der Website „Jede angenommene Bestellung drucken“ ausschalten.</string>
     <string name="station_stopped">Aus.</string>
     <string name="station_off_failed">Hier wird nicht mehr gedruckt, aber die Station konnte nicht aus der Liste genommen werden (%1$s). In den Einstellungen unter „Druckstationen“ entfernen.</string>

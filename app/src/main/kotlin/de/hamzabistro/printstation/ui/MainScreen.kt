@@ -225,6 +225,11 @@ fun StationSection(state: UiState, viewModel: MainViewModel) {
             )
         }
         Text(stringResource(R.string.station_one_printer), style = MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.station_bag_slip), modifier = Modifier.weight(1f))
+            Switch(checked = state.bagSlip, onCheckedChange = viewModel::setBagSlip)
+        }
+        Text(stringResource(R.string.station_bag_slip_hint), style = MaterialTheme.typography.bodySmall)
         val status =
             when (val station = state.station) {
                 StationState.Stopped -> stringResource(R.string.station_stopped)

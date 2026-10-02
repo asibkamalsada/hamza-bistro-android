@@ -250,6 +250,14 @@ ticket is a deploy of the function, not a new APK. Printer off: the ticket
 is given back and tried again at the next look; printed but not recorded:
 kept in a small file and reported later, never printed twice.
 
+**Tütenzettel nach jedem Bon** (Einstellungen → Bondrucker, per device,
+off by default) asks `print-ticket` with `"bagSlip": true`: the answer is
+the ticket and then the bag slip, one job for the printer, so it is still
+one claim and one finish per order — for automatic and by-hand prints. A
+`print-ticket` from before the slip ignores the flag and prints the ticket
+alone; one that refuses it (a 400) is asked again for the plain ticket, and
+the app logs it.
+
 ### The code
 
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
@@ -371,7 +379,8 @@ the printer on, **Drucker suchen**, tap the printer (`CY-BX58D-…`, allow
 "Geräte in der Nähe"), **Testdruck**, and switch on **Jede angenommene
 Bestellung drucken**. In Chrome on the same tablet, switch the website's
 own "Jede angenommene Bestellung drucken" off: the printer takes one
-connection at a time. Leave the alarm on "Laut klingeln" and the shift on
+connection at a time. **Tütenzettel nach jedem Bon** adds a strip for the
+bag after each ticket. Leave the alarm on "Laut klingeln" and the shift on
 for good; keep it plugged in; **Bildschirm anlassen** keeps the queue on
 screen.
 

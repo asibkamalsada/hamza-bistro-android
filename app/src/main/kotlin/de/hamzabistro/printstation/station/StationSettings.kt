@@ -86,6 +86,15 @@ class StationSettings(context: Context) {
         get() = prefs.getBoolean(ENABLED, false)
         set(value) = prefs.edit().putBoolean(ENABLED, value).apply()
 
+    /**
+     * Whether a "Tütenzettel" (hamza-bistro-web#91) follows each ticket
+     * printed here, by itself or by hand. The printer's, not the account's:
+     * kept with the printer, through a sign-out and "reset settings".
+     */
+    var bagSlip: Boolean
+        get() = prefs.getBoolean(BAG_SLIP, false)
+        set(value) = prefs.edit().putBoolean(BAG_SLIP, value).apply()
+
     val printer: ChosenPrinter?
         get() =
             prefs.getString(PRINTER_ADDRESS, null)?.let {
@@ -181,6 +190,7 @@ class StationSettings(context: Context) {
 
         private const val STATION_ID = "station_id"
         private const val ENABLED = "enabled"
+        private const val BAG_SLIP = "bag_slip"
         private const val PRINTER_ADDRESS = "printer_address"
         private const val PRINTER_NAME = "printer_name"
         private const val ROLE = "role"

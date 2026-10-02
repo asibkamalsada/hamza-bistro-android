@@ -37,6 +37,8 @@ data class UiState(
     val role: Role? = null,
     val printer: ChosenPrinter? = null,
     val enabled: Boolean = false,
+    /** A "Tütenzettel" after each ticket printed here. */
+    val bagSlip: Boolean = false,
     val station: StationState = StationState.Stopped,
     val scanning: Boolean = false,
     val found: List<FoundPrinter> = emptyList(),
@@ -67,6 +69,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 role = graph.settings.device.value.role,
                 printer = graph.settings.printer,
                 enabled = graph.settings.enabled,
+                bagSlip = graph.settings.bagSlip,
                 station = graph.stationState.value,
             )
         )
@@ -204,6 +207,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         withTimeoutOrNull(TICKET_TIMEOUT) { graph.printer(printer.address).print(ticket) }
             ?: throw PrinterException("the printer did not answer")
         info(R.string.printer_sent)
+    }
+
+    /** Counts from the next ticket on, the running station's included. */
+    fun setBagSlip(on: Boolean) {
+        graph.settings.bagSlip = on
+        _state.update { it.copy(bagSlip = on) }
     }
 
     fun setEnabled(on: Boolean) = act {

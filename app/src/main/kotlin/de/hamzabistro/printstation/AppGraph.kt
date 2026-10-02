@@ -84,7 +84,7 @@ class AppGraph(context: Context) {
 
     val sessions = SessionManager(SupabaseAuth(config, http, monotonic), KeystoreSessionStore(this.context), monotonic)
 
-    val backend = SupabasePrintBackend(config, http, sessions)
+    val backend = SupabasePrintBackend(config, http, sessions, logger)
 
     val staff = SupabaseStaffBackend(config, http, sessions)
 
@@ -239,6 +239,7 @@ class AppGraph(context: Context) {
             station = settings.stationId,
             label = STATION_LABEL,
             lang = TICKET_LANG,
+            bagSlip = { settings.bagSlip },
             logger = logger,
             now = monotonic,
             wallClock = System::currentTimeMillis,
@@ -251,7 +252,8 @@ class AppGraph(context: Context) {
      */
     suspend fun printByHand(order: StaffOrder) {
         val chosen = settings.printer ?: throw PrinterException("no printer chosen")
-        val ticket = backend.ticket(order.id, TICKET_LANG) ?: throw PrinterException("the order is gone")
+        val ticket =
+            backend.ticket(order.id, TICKET_LANG, settings.bagSlip) ?: throw PrinterException("the order is gone")
         withTimeoutOrNull(TICKET_TIMEOUT) { printer(chosen.address).print(ticket) }
             ?: throw PrinterException("the printer did not answer")
         printLog.markDone(listOf(order.id))
