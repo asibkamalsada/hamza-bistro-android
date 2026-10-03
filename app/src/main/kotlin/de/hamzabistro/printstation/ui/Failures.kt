@@ -6,11 +6,14 @@ import de.hamzabistro.printstation.core.DeliveryBreakException
 import de.hamzabistro.printstation.core.DeliveryPausedException
 import de.hamzabistro.printstation.core.InvalidHoursException
 import de.hamzabistro.printstation.core.InvalidSettingException
+import de.hamzabistro.printstation.core.InvalidSpecialDayException
 import de.hamzabistro.printstation.core.MenuEditError
 import de.hamzabistro.printstation.core.MenuEditException
+import de.hamzabistro.printstation.core.NeedsServerUpdateException
 import de.hamzabistro.printstation.core.NotAllowedException
 import de.hamzabistro.printstation.core.ReportRangeException
 import de.hamzabistro.printstation.core.SignedOutException
+import de.hamzabistro.printstation.core.SpecialDayError
 import de.hamzabistro.printstation.core.UnknownAllergenException
 import kotlinx.coroutines.CancellationException
 
@@ -21,6 +24,9 @@ fun failureText(context: Context, e: Exception): String =
         is NotAllowedException -> context.getString(R.string.problem_not_staff)
         is InvalidHoursException -> context.getString(R.string.hours_invalid)
         is InvalidSettingException -> context.getString(R.string.setting_invalid)
+        is InvalidSpecialDayException ->
+            context.getString(if (e.reason == SpecialDayError.DATE) R.string.special_invalid_date else R.string.special_invalid_hours)
+        is NeedsServerUpdateException -> context.getString(R.string.special_needs_update, e.migration)
         is UnknownAllergenException -> context.getString(R.string.menu_allergen_unknown)
         is DeliveryPausedException -> context.getString(R.string.delivery_paused)
         is DeliveryBreakException -> context.getString(R.string.delivery_break)
