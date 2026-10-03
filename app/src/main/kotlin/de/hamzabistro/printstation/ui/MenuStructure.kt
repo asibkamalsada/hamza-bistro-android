@@ -48,7 +48,7 @@ import de.hamzabistro.printstation.core.MenuEdits
 internal fun LazyListScope.categories(state: MenuState, menu: MenuViewModel) {
     item(key = "categories-intro") {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_categories_intro))
+            MenuHint(stringResource(R.string.menu_categories_intro))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedButton(onClick = { menu.startCategory(null) }, enabled = !state.arranging) { Text(stringResource(R.string.menu_category_new)) }
                 FilterChip(selected = state.arranging, onClick = menu::toggleArranging, label = { Text(stringResource(R.string.menu_arrange)) })
@@ -84,7 +84,7 @@ internal fun LazyListScope.categories(state: MenuState, menu: MenuViewModel) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(category.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         val count = state.dishes.count { it.categoryId == category.id }
-                        Hint(if (count == 0) stringResource(R.string.menu_category_hidden) else pluralStringResource(R.plurals.menu_category_dishes, count, count))
+                        MenuHint(if (count == 0) stringResource(R.string.menu_category_hidden) else pluralStringResource(R.plurals.menu_category_dishes, count, count))
                     }
                     TextButton(onClick = { if (editing) menu.cancelForms() else menu.startCategory(category) }) {
                         Text(stringResource(if (editing) R.string.cancel else R.string.menu_edit))
@@ -112,7 +112,7 @@ private fun CategoryFormView(category: MenuCategory?, form: CategoryForm, state:
         modifier = Modifier.fillMaxWidth(),
     )
     if (category == null) {
-        Hint(stringResource(R.string.menu_category_new_hint))
+        MenuHint(stringResource(R.string.menu_category_new_hint))
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             PhotoPreview(form.imageUrl, menu)
@@ -125,7 +125,7 @@ private fun CategoryFormView(category: MenuCategory?, form: CategoryForm, state:
                         TextButton(onClick = { menu.updateCategoryForm { it.copy(imageUrl = "") } }) { Text(stringResource(R.string.menu_photo_remove)) }
                     }
                 }
-                Hint(
+                MenuHint(
                     stringResource(
                         when {
                             state.uploading -> R.string.menu_photo_uploading
@@ -159,7 +159,7 @@ private fun CategoryFormView(category: MenuCategory?, form: CategoryForm, state:
 
 /** The week as seven rows, Monday first: each day a category or one dish, so much cheaper, or nothing. */
 internal fun LazyListScope.deals(state: MenuState, menu: MenuViewModel) {
-    item(key = "deals-intro") { Hint(stringResource(R.string.menu_deals_intro)) }
+    item(key = "deals-intro") { MenuHint(stringResource(R.string.menu_deals_intro)) }
     items(MenuEdits.WEEK, key = { "day$it" }) { day ->
         val deal = state.deals.find { it.day == day }
         val form = state.dealForm?.takeIf { it.day == day }
@@ -169,7 +169,7 @@ internal fun LazyListScope.deals(state: MenuState, menu: MenuViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(dayName(LocalContext.current, day), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                        if (deal == null) Hint(stringResource(R.string.menu_deal_none)) else Text(dealLine(deal, state))
+                        if (deal == null) MenuHint(stringResource(R.string.menu_deal_none)) else Text(dealLine(deal, state))
                     }
                     TextButton(onClick = { if (form != null) menu.cancelForms() else menu.startDeal(day) }) {
                         Text(stringResource(if (form != null) R.string.cancel else R.string.menu_edit))
@@ -215,7 +215,7 @@ private fun DealFormView(deal: MenuDeal?, form: DealForm, busy: Boolean, state: 
     NumberField(form.discount, R.string.menu_deal_discount, KeyboardType.Decimal, Modifier.fillMaxWidth(), form.discount.isNotBlank() && !form.valid) { v ->
         menu.updateDealForm { it.copy(discount = v) }
     }
-    Hint(stringResource(R.string.menu_deal_discount_hint))
+    MenuHint(stringResource(R.string.menu_deal_discount_hint))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (deal != null) {
             TextButton(onClick = { menu.clearDeal(form.day) }, enabled = !busy) {

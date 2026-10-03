@@ -50,8 +50,8 @@ internal fun LazyListScope.options(state: MenuState, menu: MenuViewModel) {
     val live = state.groups.filterNot { it.archived }
     item(key = "options-intro") {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_options_intro))
-            Hint(stringResource(R.string.menu_options_shared))
+            MenuHint(stringResource(R.string.menu_options_intro))
+            MenuHint(stringResource(R.string.menu_options_shared))
             val out = live.filter { it.offered }.sumOf { group -> group.live.count { !it.available } }
             Text(stringResource(R.string.menu_sold_out_count, out), fontWeight = FontWeight.SemiBold)
             MissingAllergens(
@@ -109,7 +109,7 @@ private fun GroupHeader(group: OptionGroup, state: MenuState, menu: MenuViewMode
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
                 Heading(group.name)
-                Hint(stringResource(if (group.selection == Selection.SINGLE) R.string.menu_group_single else R.string.menu_group_multiple))
+                MenuHint(stringResource(if (group.selection == Selection.SINGLE) R.string.menu_group_single else R.string.menu_group_multiple))
             }
             if (!state.arranging) {
                 TextButton(onClick = { menu.startGroup(group) }, enabled = !editing) {
@@ -122,7 +122,7 @@ private fun GroupHeader(group: OptionGroup, state: MenuState, menu: MenuViewMode
         if (group.dishes.isEmpty()) {
             Text(stringResource(R.string.menu_group_on_no_dish), style = MaterialTheme.typography.bodySmall, color = toneColor(Tone.SOON))
         } else {
-            Hint(stringResource(R.string.menu_option_used_in, group.dishes.joinToString(", ")))
+            MenuHint(stringResource(R.string.menu_option_used_in, group.dishes.joinToString(", ")))
         }
         if (group.live.isEmpty()) {
             Text(stringResource(R.string.menu_group_no_choice), style = MaterialTheme.typography.bodySmall, color = toneColor(Tone.SOON))
@@ -169,14 +169,14 @@ private fun GroupFormView(group: OptionGroup?, form: GroupForm, state: MenuState
         )
     }
     if (group == null) {
-        Hint(stringResource(R.string.menu_group_new_hint))
+        MenuHint(stringResource(R.string.menu_group_new_hint))
     } else {
         HorizontalDivider()
         Text(stringResource(R.string.menu_group_dishes), style = MaterialTheme.typography.labelLarge)
-        Hint(stringResource(R.string.menu_options_shared))
-        if (form.selection == Selection.SINGLE && group.live.isEmpty()) Hint(stringResource(R.string.menu_group_no_choice))
+        MenuHint(stringResource(R.string.menu_options_shared))
+        if (form.selection == Selection.SINGLE && group.live.isEmpty()) MenuHint(stringResource(R.string.menu_group_no_choice))
         for ((category, dishes) in state.dishes.groupBy { it.category }) {
-            Hint(category)
+            MenuHint(category)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (dish in dishes) {
                     FilterChip(selected = dish.id in form.itemIds, onClick = { menu.toggleGroupDish(dish.id) }, label = { Text(dish.name) })
@@ -261,7 +261,7 @@ private fun OptionCard(
             if (editingAllergens) {
                 Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HorizontalDivider()
-                    Hint(stringResource(R.string.menu_allergens_option_shared))
+                    MenuHint(stringResource(R.string.menu_allergens_option_shared))
                     AllergenPicker(
                         state.allergens,
                         state.allergenDraft,
@@ -302,7 +302,7 @@ private fun OptionFormView(option: MenuOption?, form: OptionForm, state: MenuSta
     NumberField(form.price, R.string.menu_option_price, KeyboardType.Decimal, Modifier.fillMaxWidth(), form.edit == null && form.name.isNotBlank()) { v ->
         menu.updateOptionForm { it.copy(price = v) }
     }
-    Hint(stringResource(R.string.menu_option_price_hint))
+    MenuHint(stringResource(R.string.menu_option_price_hint))
     AdditivePicker(form.additives) { number -> menu.updateOptionForm { it.copy(additives = Additives.toggle(it.additives, number)) } }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.menu_available), modifier = Modifier.weight(1f))
@@ -326,7 +326,7 @@ private fun LazyListScope.archivedOptions(state: MenuState, menu: MenuViewModel)
     val groups = state.groups.filter { it.archived }
     val choices = state.groups.filterNot { it.archived }.flatMap { group -> group.options.filter { it.archived }.map { group to it } }
     item(key = "archived-options-intro") {
-        Hint(stringResource(if (groups.isEmpty() && choices.isEmpty() && !state.loading) R.string.menu_archived_none else R.string.menu_archived_options_intro))
+        MenuHint(stringResource(if (groups.isEmpty() && choices.isEmpty() && !state.loading) R.string.menu_archived_none else R.string.menu_archived_options_intro))
     }
     items(groups, key = { "ag${it.id}" }) { group ->
         ArchivedRow(group.name, stringResource(R.string.menu_archived_group), "g${group.id}" in state.busy) { menu.restoreGroup(group) }
@@ -342,7 +342,7 @@ private fun ArchivedRow(name: String, detail: String, busy: Boolean, onRestore: 
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                Hint(detail)
+                MenuHint(detail)
             }
             Button(onClick = onRestore, enabled = !busy) { Text(stringResource(R.string.menu_restore)) }
         }

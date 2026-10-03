@@ -65,7 +65,7 @@ import kotlinx.coroutines.delay
 internal fun LazyListScope.dishes(state: MenuState, menu: MenuViewModel) {
     item(key = "dishes-intro") {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_intro))
+            MenuHint(stringResource(R.string.menu_intro))
             Text(stringResource(R.string.menu_sold_out_count, state.dishes.count { !it.available }), fontWeight = FontWeight.SemiBold)
             MissingAllergens(Allergens.missing(state.dishes.map { it.allergens }), state.onlyMissingAllergens, menu::toggleOnlyMissingAllergens)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -106,7 +106,7 @@ internal fun LazyListScope.dishes(state: MenuState, menu: MenuViewModel) {
                 }
             }
         }
-        if (dishes.isEmpty() && state.creatingIn != categoryId) item(key = "empty-$categoryId") { Hint(stringResource(R.string.menu_category_empty)) }
+        if (dishes.isEmpty() && state.creatingIn != categoryId) item(key = "empty-$categoryId") { MenuHint(stringResource(R.string.menu_category_empty)) }
         items(dishes, key = { "d${it.id}" }) { dish -> DishCard(dish, dishes, state, menu) }
     }
 }
@@ -140,7 +140,7 @@ private fun DishCard(dish: MenuDish, category: List<MenuDish>, state: MenuState,
                     }
                 },
             )
-            dish.unitPrice?.let { Hint(it) }
+            dish.unitPrice?.let { MenuHint(it) }
             AllergenLine(dish.allergens)
             val form = state.form
             if (editing && form != null) DishFormView(dish, form, state, menu)
@@ -160,14 +160,14 @@ internal fun Arrange(name: String, first: Boolean, last: Boolean, busy: Boolean,
 
 private fun LazyListScope.archivedDishes(state: MenuState, menu: MenuViewModel) {
     item(key = "archived-intro") {
-        Hint(stringResource(if (state.archivedDishes.isEmpty() && !state.loading) R.string.menu_archived_none else R.string.menu_archived_intro))
+        MenuHint(stringResource(if (state.archivedDishes.isEmpty() && !state.loading) R.string.menu_archived_none else R.string.menu_archived_intro))
     }
     items(state.archivedDishes, key = { "a${it.id}" }) { dish ->
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(dish.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                    Hint("${dish.category} · ${Format.euro(dish.price)}")
+                    MenuHint("${dish.category} · ${Format.euro(dish.price)}")
                 }
                 Button(onClick = { menu.restoreDish(dish) }, enabled = "d${dish.id}" !in state.busy) { Text(stringResource(R.string.menu_restore)) }
             }
@@ -219,7 +219,7 @@ private fun DishFormView(dish: MenuDish?, form: DishForm, state: MenuState, menu
         { m -> NumberField(form.price, R.string.menu_price, KeyboardType.Decimal, m, DishProblem.PRICE in problems) { v -> menu.updateForm { it.copy(price = v) } } },
         { m -> NumberField(form.deposit, R.string.menu_deposit, KeyboardType.Decimal, m, DishProblem.DEPOSIT in problems) { v -> menu.updateForm { it.copy(deposit = v) } } },
     )
-    Hint(stringResource(R.string.menu_deposit_hint))
+    MenuHint(stringResource(R.string.menu_deposit_hint))
     FieldPair(
         { m ->
             NumberField(form.pickupDiscount, R.string.menu_pickup_discount, KeyboardType.Decimal, m, DishProblem.PICKUP_DISCOUNT in problems) { v ->
@@ -228,13 +228,13 @@ private fun DishFormView(dish: MenuDish?, form: DishForm, state: MenuState, menu
         },
         { m -> NumberField(form.prepMinutes, R.string.menu_prep, KeyboardType.Number, m, DishProblem.PREP in problems) { v -> menu.updateForm { it.copy(prepMinutes = v) } } },
     )
-    Hint(stringResource(R.string.menu_prep_hint))
+    MenuHint(stringResource(R.string.menu_prep_hint))
 
     // A drink's size, for the "0,33 l · 6,52 €/l" under it on the menu. Blank for food.
     NumberField(form.volumeMl, R.string.menu_volume, KeyboardType.Number, Modifier.fillMaxWidth(), DishProblem.VOLUME in problems) { v ->
         menu.updateForm { it.copy(volumeMl = v) }
     }
-    Hint(stringResource(R.string.menu_volume_hint))
+    MenuHint(stringResource(R.string.menu_volume_hint))
 
     AdditivePicker(form.additives, menu::toggleFormAdditive)
 
@@ -265,7 +265,7 @@ private fun DishFormView(dish: MenuDish?, form: DishForm, state: MenuState, menu
     }
 
     if (dish == null) {
-        Hint(stringResource(R.string.menu_photo_after_create))
+        MenuHint(stringResource(R.string.menu_photo_after_create))
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             PhotoPreview(form.imageUrl, menu)
@@ -276,7 +276,7 @@ private fun DishFormView(dish: MenuDish?, form: DishForm, state: MenuState, menu
                 ) {
                     Text(stringResource(R.string.menu_photo_pick))
                 }
-                Hint(
+                MenuHint(
                     stringResource(
                         when {
                             state.uploading -> R.string.menu_photo_uploading
@@ -345,13 +345,13 @@ private fun DishGroups(form: DishForm, state: MenuState, menu: MenuViewModel) {
     val live = state.groups.filterNot { it.archived }
     if (live.isEmpty()) return
     Text(stringResource(R.string.menu_dish_groups), style = MaterialTheme.typography.labelLarge)
-    Hint(stringResource(R.string.menu_dish_groups_hint))
+    MenuHint(stringResource(R.string.menu_dish_groups_hint))
     for ((index, id) in form.groupIds.withIndex()) {
         val group = state.groups.find { it.id == id } ?: continue
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(group.name, fontWeight = FontWeight.Medium)
-                Hint(stringResource(R.string.menu_group_choices, group.live.joinToString(", ") { it.name }.ifEmpty { "–" }))
+                MenuHint(stringResource(R.string.menu_group_choices, group.live.joinToString(", ") { it.name }.ifEmpty { "–" }))
             }
             TextButton(onClick = { menu.moveFormGroup(id, -1) }, enabled = index > 0) { Text(stringResource(R.string.menu_move_up)) }
             TextButton(onClick = { menu.moveFormGroup(id, 1) }, enabled = index < form.groupIds.lastIndex) { Text(stringResource(R.string.menu_move_down)) }

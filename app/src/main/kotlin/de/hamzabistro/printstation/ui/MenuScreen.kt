@@ -872,7 +872,7 @@ fun MenuScreen(onBack: () -> Unit) {
 }
 
 @Composable
-internal fun Hint(text: String) {
+internal fun MenuHint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
@@ -916,8 +916,8 @@ internal fun AllergenLine(allergens: List<String>?) {
     when {
         allergens == null ->
             Text(stringResource(R.string.menu_allergens_not_stated), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        allergens.isEmpty() -> Hint(stringResource(R.string.menu_allergens_none))
-        else -> Hint(stringResource(R.string.menu_allergens_list, allergens.joinToString(", ")))
+        allergens.isEmpty() -> MenuHint(stringResource(R.string.menu_allergens_none))
+        else -> MenuHint(stringResource(R.string.menu_allergens_list, allergens.joinToString(", ")))
     }
 }
 
@@ -952,7 +952,7 @@ internal fun AllergenPicker(
     val german = LocalConfiguration.current.locales[0].language == "de"
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(stringResource(R.string.menu_allergens), style = MaterialTheme.typography.labelLarge)
-        Hint(stringResource(R.string.menu_allergens_hint))
+        MenuHint(stringResource(R.string.menu_allergens_hint))
         FlowRow {
             for (allergen in all) {
                 Tick(checked = value?.contains(allergen.code) == true, enabled = enabled, onToggle = { onToggle(allergen.code) }, modifier = Modifier.width(260.dp)) {
@@ -990,9 +990,9 @@ internal fun Tick(checked: Boolean, enabled: Boolean, onToggle: () -> Unit, modi
 private fun LazyListScope.ingredients(state: MenuState, menu: MenuViewModel) {
     item(key = "ingredients-intro") {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_ingredients_intro))
+            MenuHint(stringResource(R.string.menu_ingredients_intro))
             Text(stringResource(R.string.menu_ingredients_out_count, state.ingredients.count { !it.inStock }), fontWeight = FontWeight.SemiBold)
-            if (state.ingredients.isEmpty() && !state.loading) Hint(stringResource(R.string.menu_ingredients_empty))
+            if (state.ingredients.isEmpty() && !state.loading) MenuHint(stringResource(R.string.menu_ingredients_empty))
         }
     }
     items(state.ingredients, key = { "i${it.id}" }) { ingredient ->
@@ -1051,7 +1051,7 @@ private fun IngredientCard(ingredient: Ingredient, state: MenuState, menu: MenuV
                 // Dishes first and in menu order: "no pizza cheese, no pizza" is a whole category, and reads as one.
                 Text(stringResource(R.string.menu_tab_dishes), style = MaterialTheme.typography.labelLarge)
                 for ((category, dishes) in state.dishes.groupBy { it.category }) {
-                    Hint(category)
+                    MenuHint(category)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (dish in dishes) {
                             FilterChip(selected = dish.id in state.linkDishes, onClick = { menu.toggleLinkDish(dish.id) }, label = { Text(dish.name) })
@@ -1060,7 +1060,7 @@ private fun IngredientCard(ingredient: Ingredient, state: MenuState, menu: MenuV
                 }
                 Text(stringResource(R.string.menu_tab_options), style = MaterialTheme.typography.labelLarge)
                 for (group in state.groups.filterNot { it.archived }) {
-                    Hint(group.name)
+                    MenuHint(group.name)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (option in group.live) {
                             FilterChip(selected = option.id in state.linkOptions, onClick = { menu.toggleLinkOption(option.id) }, label = { Text(option.name) })
