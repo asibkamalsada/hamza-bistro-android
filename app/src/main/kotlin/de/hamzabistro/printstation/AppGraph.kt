@@ -157,9 +157,15 @@ class AppGraph(context: Context) {
     private fun deviceReport(): DeviceReport? {
         val device = settings.device.value
         if (device.role != Role.STAFF || !device.onShift) return null
-        // Unnamed, it goes by its model, which beats "Unbenanntes Gerät" on the list.
-        return DeviceReport(settings.stationId, device.label.trim().ifEmpty { Build.MODEL }, device.alarm.newOrders.wire)
+        return DeviceReport(settings.stationId, deviceLabel(), device.alarm.newOrders.wire)
     }
+
+    /**
+     * What this device is called on the site — on "Wer von Bestellungen
+     * erfährt", and in the Kassensturz beside what it delivered. Unnamed, it
+     * goes by its model, which beats "Unbenanntes Gerät" on the list.
+     */
+    fun deviceLabel(): String = settings.device.value.label.trim().ifEmpty { Build.MODEL }
 
     /**
      * The minutes the ETA buttons are built around, from the dishes and the

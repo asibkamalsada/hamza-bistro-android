@@ -30,8 +30,9 @@ interface StaffBackend {
 
     /**
      * Moves [order] one [step] on — but only from where this device saw it.
-     * Throws [OrderMovedException] when it had moved on meanwhile, and
-     * [NotDelayableException] for an [OrderStep.Delay] the database refused.
+     * Throws [OrderMovedException] when it had moved on meanwhile,
+     * [NotDelayableException] for an [OrderStep.Delay] the database refused,
+     * and [PaymentLockedException] when it refused how it was paid.
      */
     suspend fun move(order: StaffOrder, step: OrderStep)
 
@@ -106,6 +107,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
                     // The database refusing a step that is not one /orders
                     // offers: the order is somewhere else by now.
                     if (error is BackendException && error.code == "HB412") throw OrderMovedException()
+                    if (error is BackendException && error.code == "HB438") throw PaymentLockedException()
                     throw error
                 }
                 json.decodeFromString(ListSerializer(IdRow.serializer()), text)
@@ -179,6 +181,13 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         put("status", checkNotNull(step.to) { "not a status step: $step" }.column)
         when (step) {
             is OrderStep.Accept -> put("eta_minutes", step.etaMinutes)
+            is OrderStep.Done -> {
+                // Left out rather than null: an order paid online keeps
+                // "online", and without a method the Kassensturz says
+                // "unbekannt", as for Telegram's button.
+                step.payment?.let { put("payment_method", it.wire) }
+                step.device?.trim()?.takeIf { it.isNotEmpty() }?.let { put("delivered_device", it) }
+            }
             is OrderStep.Cancel -> {
                 val reason = step.reason
                 if (reason == null) put("cancel_reason", JsonNull)

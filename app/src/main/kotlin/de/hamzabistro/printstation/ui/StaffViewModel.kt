@@ -11,6 +11,8 @@ import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.PauseWhat
+import de.hamzabistro.printstation.core.Payment
+import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.StaffOrder
@@ -145,9 +147,23 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     fun acceptScheduled(order: StaffOrder) = graph.steps.take(order, OrderStep.AcceptScheduled)
 
-    /** Out of the door or onto the counter; then delivered or collected. */
+    /**
+     * Out of the door or onto the counter; then delivered or collected,
+     * with the one button an order paid online keeps.
+     */
     fun moveOn(order: StaffOrder) =
-        graph.steps.take(order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done)
+        graph.steps.take(
+            order,
+            if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else Payment.done(order, null, graph.deviceLabel()),
+        )
+
+    /**
+     * "Bar" or "Karte": delivered or collected, and how the money came in,
+     * for the Kassensturz — with this device's label, so two drivers on one
+     * account stay apart. Held for the undo window like any step, so the
+     * wrong one of the two taken back records nothing.
+     */
+    fun deliver(order: StaffOrder, payment: PaymentMethod) = graph.steps.take(order, Payment.done(order, payment, graph.deviceLabel()))
 
     fun cancel(order: StaffOrder, reason: CancelReason?) = graph.steps.take(order, OrderStep.Cancel(reason))
 

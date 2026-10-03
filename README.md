@@ -48,21 +48,23 @@ anybody else. It is where it happens:
 - **orders are accepted (or declined) on it** — it rings until somebody
   does;
 - **it prints** every accepted order, on the Bluetooth printer beside it;
-- it moves them on, "Unterwegs" / "Abholbereit", "Geliefert" / "Abgeholt".
+- it moves them on, "Unterwegs" / "Abholbereit", then "Geliefert · Bar /
+  Karte" or "Abgeholt · Bar / Karte": delivered and how it was paid, in one
+  tap, for the Kassensturz.
 
 It signs in with a staff account of its own (see Security), stays on
 shift, stays plugged in and keeps its screen on.
 
 **A driver's phone** can have the app as well, with the driver's own staff
 account: for the "Unterwegs" list with the route and the phone number, and
-for "Geliefert" at the door. It is optional — the tablet does not need it —
+for "Bar" / "Karte" at the door. It is optional — the tablet does not need it —
 and a driver will usually want the alarm set to "once" or off, so that the
 tablet stays the place orders are taken.
 
 | Device                          | Signs in as                               | Does                                                                                  |
 | ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
 | The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every accepted order, screen on    |
-| A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Geliefert"; alarm "once" or off; own night window           |
+| A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Bar" / "Karte"; alarm "once" or off; own night window      |
 
 Which one a device is follows from the account: staff get the queue. A
 print account (`public.print_accounts`) gets the printer setup and nothing
@@ -111,7 +113,14 @@ queue's top bar (**Mehr** on a phone):
   and what today's delivered orders came to, for the call about yesterday's
   order and for cashing up. Read when opened, not polled; the cards are for
   reading (the phone number and the route still open). A delivered order
-  that was delayed says so: "fällig 18:45 · verschoben +10 Min.".
+  that was delayed says so: "fällig 18:45 · verschoben +10 Min."; a
+  delivered one says how it was paid: "Bezahlt: Bar / Karte / unbekannt".
+- **Kassensturz** — for today or a day picked: per driver (account and
+  device name), how many orders, cash, card and unknown, with the order
+  numbers behind each sum a tap away, and **Teilen** as plain text through
+  the share sheet. "Bar" or "Karte" taken back within the undo window
+  records nothing; after it, a correction is made in the Supabase
+  dashboard only.
 - **Speisekarte** — what is sold out, in three tabs, as on `/menu-admin`:
   a dish; a single choice, which goes off in every dish that offers it; an
   ingredient, which takes everything made of it off at once and, switched
@@ -298,7 +307,7 @@ the app logs it.
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
-  and takings (`History`), opening and closing the shop, closures and the
+  and takings (`History`), the Kassensturz (`CashUp`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients (`Menu`, `Allergens`, `DrinkVolume`, `PhotoCrop`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules

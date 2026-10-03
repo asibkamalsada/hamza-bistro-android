@@ -67,6 +67,7 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.PauseWhat
+import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.QueueGroup
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
@@ -145,6 +146,7 @@ fun StaffEvents(viewModel: StaffViewModel, snackbar: SnackbarHostState) {
                     when (val failure = shown.failure) {
                         StepFailure.Moved -> resources.getString(R.string.order_moved)
                         StepFailure.NotDelayable -> resources.getString(R.string.order_not_delayable)
+                        StepFailure.PaymentLocked -> resources.getString(R.string.payment_locked)
                         is StepFailure.Failed -> resources.getString(R.string.step_failed, failure.reason)
                     }
                 is StaffEvent.Printed -> resources.getString(R.string.printed_by_hand, shown.order)
@@ -384,6 +386,7 @@ private fun QueueMenu(onOpen: (StaffScreen) -> Unit) {
     val entries =
         listOf(
             StaffScreen.HISTORY to R.string.history_title,
+            StaffScreen.CASH_UP to R.string.cash_up_title,
             StaffScreen.MENU to R.string.menu_title,
             StaffScreen.HOURS to R.string.hours_title,
             StaffScreen.SETTINGS to R.string.settings,
@@ -432,6 +435,8 @@ internal class Actions(private val context: Context, private val viewModel: Staf
     override fun acceptScheduled(order: StaffOrder) = viewModel.acceptScheduled(order)
 
     override fun moveOn(order: StaffOrder) = viewModel.moveOn(order)
+
+    override fun deliver(order: StaffOrder, payment: PaymentMethod) = viewModel.deliver(order, payment)
 
     override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
 
