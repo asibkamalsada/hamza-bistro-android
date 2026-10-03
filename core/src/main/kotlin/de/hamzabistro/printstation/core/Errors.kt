@@ -88,5 +88,12 @@ class DeliveryBreakException(message: String) : Exception(message)
  */
 class PaymentLockedException : Exception("the order's payment method is already recorded")
 
+/**
+ * The database took no report for that range (HB455): it ends before it
+ * starts, or covers more than 366 days. The app clamps the range, so this
+ * means a clock far off or a server with other limits.
+ */
+class ReportRangeException(message: String) : Exception(message)
+
 /** The ticket did not come out: printer off, out of range, or not answering. */
 class PrinterException(message: String, cause: Throwable? = null) : IOException(message, cause)

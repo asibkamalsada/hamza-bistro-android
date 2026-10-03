@@ -355,6 +355,79 @@
     <string name="cash_up_pickup">Abholung</string>
     <string name="cash_up_needs_update">Die Datenbank des Ladens kennt den Kassensturz noch nicht: Dafür braucht es das Server-Update (20261002190000_cash_up).</string>
 
+    <!-- Auswertung (ReportScreen.kt) -->
+    <string name="report_title">Auswertung</string>
+    <!-- Die erste Zeile des geteilten Texts; %1$s ist der Zeitraum. -->
+    <string name="report_share_title">Auswertung %1$s</string>
+    <string name="report_share">Teilen</string>
+    <string name="report_csv">CSV</string>
+    <string name="report_this_week">Diese Woche</string>
+    <string name="report_last_week">Letzte Woche</string>
+    <string name="report_this_month">Dieser Monat</string>
+    <string name="report_last_month">Letzter Monat</string>
+    <string name="report_custom">Zeitraum…</string>
+    <plurals name="report_days">
+        <item quantity="one">%1$d Tag</item>
+        <item quantity="other">%1$d Tage</item>
+    </plurals>
+    <string name="report_revenue">Umsatz</string>
+    <string name="report_orders">Bestellungen</string>
+    <string name="report_basket">Ø Warenkorb</string>
+    <string name="report_late">Verspätet</string>
+    <string name="report_day">Tag</string>
+    <string name="report_delivered">Geliefert</string>
+    <string name="report_cancelled">Storniert</string>
+    <string name="report_delivery">Lieferung</string>
+    <string name="report_pickup">Abholung</string>
+    <string name="report_by_day">Pro Tag</string>
+    <string name="report_rings">Ringe</string>
+    <string name="report_ring">Ring</string>
+    <string name="report_ring_inner">Innen</string>
+    <string name="report_ring_near">Nah</string>
+    <string name="report_ring_far">Weit</string>
+    <string name="report_ring_edge">Rand</string>
+    <string name="report_fees">Gebühren</string>
+    <string name="report_delivery_fees">Liefergebühr</string>
+    <string name="report_small_order_fees">Mindermengenzuschlag</string>
+    <string name="report_best_sellers">Bestseller</string>
+    <string name="report_dish">Gericht</string>
+    <string name="report_qty">Menge</string>
+    <string name="report_show_all">Alle anzeigen (%1$d)</string>
+    <string name="report_show_top">Nur die ersten 10</string>
+    <string name="report_none">Nichts im Zeitraum.</string>
+    <string name="report_busy_hours">Stoßzeiten</string>
+    <string name="report_busy_hours_hint">Bestellungen je Wochentag und Stunde (Vorbestellungen in der Stunde ihres Termins). Je dunkler, desto mehr.</string>
+    <string name="report_times">Zeiten</string>
+    <string name="report_median">Median</string>
+    <string name="report_p90">p90</string>
+    <string name="report_new_to_accepted">Neu → angenommen</string>
+    <string name="report_accepted_to_out">Angenommen → unterwegs</string>
+    <string name="report_out_to_delivered">Unterwegs → geliefert</string>
+    <string name="report_accepted_to_delivered">Angenommen → geliefert</string>
+    <string name="report_accepted_to_collected">Angenommen → abgeholt</string>
+    <string name="report_late_title">Verspätet (nach dem Versprechen, „+10 Min.“ mitgerechnet)</string>
+    <!-- %1$s Lieferung/Abholung, %2$d verspätet, %3$d alle, %4$s Anteil. -->
+    <string name="report_late_line">%1$s: %2$d / %3$d · %4$s</string>
+    <string name="report_times_note">In Klammern: wie viele gemessen. Vorbestellungen zählen ab „angenommen“ nicht mit; „unterwegs“ gibt es erst seit dem Live-Status.</string>
+    <string name="report_minutes">{n} Min.</string>
+    <string name="report_cancellations">Stornos</string>
+    <string name="report_by_customer">Kunde</string>
+    <string name="report_by_staff">Personal</string>
+    <string name="report_by_system">System</string>
+    <string name="report_reason_timeout">automatisch abgelehnt</string>
+    <string name="report_discounts">Rabatte</string>
+    <string name="report_discounts_total">Zusammen</string>
+    <string name="report_codes">Rabattcodes</string>
+    <string name="report_free_delivery">davon Gratis-Lieferung</string>
+    <string name="report_stamps">Stempelkarte · Stempel: %1$d</string>
+    <string name="report_deals">Angebote</string>
+    <string name="report_deals_measured">Angebote erst seit dem Server-Update erfasst. Gemessen: %1$d von %2$d Bestellungen.</string>
+    <string name="report_pickup_discount">Abholrabatt</string>
+    <string name="report_payments">Zahlungen</string>
+    <string name="report_empty">Im Zeitraum wurde nichts geliefert.</string>
+    <string name="report_range_invalid">Diesen Zeitraum nimmt der Server nicht: höchstens 366 Tage, und das Ende nicht vor dem Anfang.</string>
+    <string name="report_needs_update">Die Datenbank des Ladens kennt die Auswertung noch nicht: Dafür braucht es das Server-Update (20261003130000_staff_report).</string>
+
     <!-- Lieferzeiten (HoursScreen.kt) -->
     <string name="hours_title">Lieferzeiten</string>
     <string name="hours_now">Jetzt</string>

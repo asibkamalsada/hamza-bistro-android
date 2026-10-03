@@ -387,6 +387,7 @@ private fun QueueMenu(onOpen: (StaffScreen) -> Unit) {
         listOf(
             StaffScreen.HISTORY to R.string.history_title,
             StaffScreen.CASH_UP to R.string.cash_up_title,
+            StaffScreen.REPORT to R.string.report_title,
             StaffScreen.MENU to R.string.menu_title,
             StaffScreen.HOURS to R.string.hours_title,
             StaffScreen.SETTINGS to R.string.settings,
