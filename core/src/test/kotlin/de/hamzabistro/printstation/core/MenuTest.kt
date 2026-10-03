@@ -28,6 +28,7 @@ class MenuTest {
                     """{"id":3,"category_id":2,"name":"Döner","description":"","price":7.5,"prep_minutes":5,"sort_order":10,"available":true,"image_url":""},""" +
                     """{"id":99,"category_id":null,"name":"Halb fertig","price":1,"available":true}]""",
                 "/rest/v1/menu_item_tags" to """[{"item_id":3,"tag_id":1},{"item_id":3,"tag_id":2}]""",
+                "/rest/v1/menu_item_option_groups" to """[{"item_id":3,"group_id":7},{"item_id":3,"group_id":5}]""",
             )
         )
 
@@ -38,10 +39,16 @@ class MenuTest {
         assertFalse(dishes[0].available)
         assertEquals(listOf(1L, 2L), dishes[1].tags)
         assertEquals("", dishes[2].description)
-        assertEquals(DishEdit("Döner Teller", "mit Salat", 11.9, 8, 20, "https://x/y.webp"), dishes[0].edit)
+        assertEquals(
+            DishEdit("Döner Teller", "mit Salat", 11.9, 8, "https://x/y.webp", available = false, categoryId = 2),
+            dishes[0].edit,
+        )
+        // In the order the dish offers them, as the server sorted them.
+        assertEquals(listOf(7L, 5L), dishes[1].groupIds)
 
         val items = test.requests().single { it.url.encodedPath == "/rest/v1/menu_items" }
         assertEquals("sort_order,name", items.url.queryParameter("order"))
+        assertEquals("is.null", items.url.queryParameter("archived_at"))
         assertEquals("Bearer access-1", items.headers["Authorization"])
     }
 
@@ -65,17 +72,20 @@ class MenuTest {
     }
 
     @Test
-    fun `saves what a dish is and costs, trimmed`() = runBlocking<Unit> {
+    fun `saves what changed about a dish through update_menu_item, trimmed`() = runBlocking<Unit> {
         test.token("access-1", "refresh-1")
-        test.reply(200, """[{"id":4}]""")
+        test.reply(200, """{"id":4}""")
 
-        backend.saveDish(4, DishEdit("  Döner Teller ", " mit Salat ", 12.5, 9, 20, " https://x/y.webp "))
+        val before = DishEdit("Döner Teller", "mit Salat", 11.9, 8, "https://x/y.webp")
+        backend.saveDish(4, before, before.copy(name = "  Döner Teller ", description = " mit Salat und Soße ", price = 12.5))
+        // Nothing changed: nothing sent.
+        backend.saveDish(4, before, before.copy(name = "Döner Teller "))
 
         test.server.takeRequest()
-        assertEquals(
-            """{"name":"Döner Teller","description":"mit Salat","price":12.5,"prep_minutes":9,"sort_order":20,"image_url":"https://x/y.webp","volume_ml":null}""",
-            test.server.takeRequest().body!!.utf8(),
-        )
+        val request = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/update_menu_item", request.url.encodedPath)
+        assertEquals("""{"p_item_id":4,"p_changes":{"description":"mit Salat und Soße","price":12.5}}""", request.body!!.utf8())
+        assertNull(test.server.takeRequest(0, java.util.concurrent.TimeUnit.SECONDS))
     }
 
     @Test
@@ -87,6 +97,7 @@ class MenuTest {
                     """[{"id":10,"category_id":1,"name":"Cola 0,33l","price":2.4,"deposit":0.25,"volume_ml":330},""" +
                     """{"id":11,"category_id":1,"name":"Ayran","price":1.5,"volume_ml":null}]""",
                 "/rest/v1/menu_item_tags" to "[]",
+                "/rest/v1/menu_item_option_groups" to "[]",
             )
         )
         val dishes = backend.dishes()
@@ -101,24 +112,33 @@ class MenuTest {
     }
 
     @Test
-    fun `saves a drink's size in millilitres`() = runBlocking<Unit> {
+    fun `saves a drink's size in millilitres, and clears it with null`() = runBlocking<Unit> {
         test.token("access-1", "refresh-1")
-        test.reply(200, """[{"id":10}]""")
+        test.reply(200, "{}")
+        test.reply(200, "{}")
 
-        backend.saveDish(10, DishEdit("Cola 0,33l", "", 2.4, 0, 10, "", volumeMl = 330))
+        val cola = DishEdit("Cola 0,33l", "", 2.4, 0, "")
+        backend.saveDish(10, cola, cola.copy(volumeMl = 330))
+        backend.saveDish(10, cola.copy(volumeMl = 330), cola)
 
         test.server.takeRequest()
-        assertTrue(test.server.takeRequest().body!!.utf8().endsWith(""","volume_ml":330}"""))
+        assertEquals("""{"p_item_id":10,"p_changes":{"volume_ml":330}}""", test.server.takeRequest().body!!.utf8())
+        assertEquals("""{"p_item_id":10,"p_changes":{"volume_ml":null}}""", test.server.takeRequest().body!!.utf8())
     }
 
     @Test
     fun `a dish edit is refused before it is sent when it cannot be right`() {
-        val edit = DishEdit("Döner", "", 7.5, 5, 10, "")
+        val edit = DishEdit("Döner", "", 7.5, 5, "")
         assertTrue(edit.valid)
-        assertFalse(edit.copy(name = " D ").valid)
-        assertFalse(edit.copy(price = -1.0).valid)
-        assertFalse(edit.copy(prepMinutes = 121).valid)
-        assertFalse(edit.copy(sortOrder = -10).valid)
+        assertEquals(listOf(DishProblem.NAME), edit.copy(name = " D ").problems)
+        assertEquals(listOf(DishProblem.PRICE, DishProblem.DEPOSIT), edit.copy(price = -1.0).problems)
+        assertEquals(listOf(DishProblem.PREP), edit.copy(prepMinutes = 121).problems)
+        // The Pfand is part of the price, never more.
+        assertEquals(listOf(DishProblem.DEPOSIT), edit.copy(price = 0.2, deposit = 0.25).problems)
+        assertTrue(edit.copy(price = 0.25, deposit = 0.25).valid)
+        assertEquals(listOf(DishProblem.PICKUP_DISCOUNT), edit.copy(pickupDiscount = -1.0).problems)
+        assertEquals(listOf(DishProblem.VOLUME), edit.copy(volumeMl = 0).problems)
+        assertEquals(listOf(DishProblem.ADDITIVES), edit.copy(additives = listOf(1, 6)).problems)
     }
 
     @Test
@@ -179,9 +199,11 @@ class MenuTest {
         )
 
         val groups = backend.optionGroups()
-        // Nothing in it, or offered by no dish: a half-finished dashboard edit.
-        assertEquals(listOf("Dein Fleisch"), groups.map { it.name })
+        // All of them, for the editor; only one is something a customer meets.
+        assertEquals(listOf("Dein Fleisch", "Leer", "Niemandes"), groups.map { it.name })
+        assertEquals(listOf("Dein Fleisch"), groups.filter { it.offered }.map { it.name })
         assertEquals(listOf("Döner", "Dürüm"), groups[0].dishes)
+        assertEquals(listOf(5L, 3L), groups[0].itemIds)
         assertEquals(listOf("Kalb", "Hähnchen"), groups[0].options.map { it.name })
         assertEquals(listOf(2L), groups[0].options[0].tags)
         assertFalse(groups[0].options[1].available)

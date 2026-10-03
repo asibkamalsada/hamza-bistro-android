@@ -3,11 +3,8 @@ package de.hamzabistro.printstation.ui
 import android.app.Application
 import android.graphics.BitmapFactory
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,12 +17,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -49,15 +45,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,19 +58,28 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.Additives
 import de.hamzabistro.printstation.core.Allergen
 import de.hamzabistro.printstation.core.Allergens
-import de.hamzabistro.printstation.core.DishEdit
-import de.hamzabistro.printstation.core.DrinkVolume
+import de.hamzabistro.printstation.core.CategoryForm
+import de.hamzabistro.printstation.core.DealForm
+import de.hamzabistro.printstation.core.DishForm
+import de.hamzabistro.printstation.core.GroupForm
 import de.hamzabistro.printstation.core.Ingredient
+import de.hamzabistro.printstation.core.MenuCategory
+import de.hamzabistro.printstation.core.MenuDeal
 import de.hamzabistro.printstation.core.MenuDish
+import de.hamzabistro.printstation.core.MenuEditError
+import de.hamzabistro.printstation.core.MenuEditException
+import de.hamzabistro.printstation.core.MenuEdits
 import de.hamzabistro.printstation.core.MenuOption
 import de.hamzabistro.printstation.core.MenuTag
+import de.hamzabistro.printstation.core.OptionForm
 import de.hamzabistro.printstation.core.OptionGroup
+import de.hamzabistro.printstation.core.Photo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,51 +87,25 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The three things that can be sold out, in the order they are reached for. */
+/**
+ * The three things that can be sold out, in the order they are reached for,
+ * then what the menu is made of: its categories and the deal of the day.
+ */
 enum class MenuTab {
     DISHES,
     OPTIONS,
     INGREDIENTS,
+    CATEGORIES,
+    DEALS,
 }
 
-/** A dish's form as typed: text until it is saved, so "7," on the way to "7,50" is not refused. */
-data class DishForm(
-    val name: String,
-    val description: String,
-    val price: String,
-    val prepMinutes: String,
-    val sortOrder: String,
-    val imageUrl: String,
-    /** Millilitres as typed; blank for food. */
-    val volumeMl: String,
-    val tags: Set<Long>,
-    /** The ticks, in the three states of [Allergens]: null until somebody says. */
-    val allergens: List<String>?,
-) {
-    /** What it says, or null while a number does not read as one or the edit cannot be right. */
-    val edit: DishEdit?
-        get() {
-            val price = price.trim().replace(',', '.').toDoubleOrNull() ?: return null
-            val prep = prepMinutes.trim().toIntOrNull() ?: return null
-            val sort = sortOrder.trim().toIntOrNull() ?: return null
-            val volume = DrinkVolume.parse(volumeMl) ?: return null
-            return DishEdit(name, description, price, prep, sort, imageUrl, volume.ml).takeIf { it.valid }
-        }
+/** Something that takes a dish or choice off the menu, asked about before it is done. */
+sealed interface Confirm {
+    data class ArchiveDish(val dish: MenuDish) : Confirm
 
-    companion object {
-        fun of(dish: MenuDish) =
-            DishForm(
-                name = dish.name,
-                description = dish.description,
-                price = "%.2f".format(java.util.Locale.GERMANY, dish.price),
-                prepMinutes = dish.prepMinutes.toString(),
-                sortOrder = dish.sortOrder.toString(),
-                imageUrl = dish.imageUrl,
-                volumeMl = dish.volumeMl?.toString() ?: "",
-                tags = dish.tags.toSet(),
-                allergens = dish.allergens,
-            )
-    }
+    data class ArchiveGroup(val group: OptionGroup) : Confirm
+
+    data class ArchiveOption(val option: MenuOption) : Confirm
 }
 
 data class MenuState(
@@ -140,15 +116,19 @@ data class MenuState(
     val tags: List<MenuTag> = emptyList(),
     val groups: List<OptionGroup> = emptyList(),
     val ingredients: List<Ingredient> = emptyList(),
-    /** What is being written, as "d4", "o12", "i3": dish, option, ingredient. */
+    val categories: List<MenuCategory> = emptyList(),
+    val deals: List<MenuDeal> = emptyList(),
+    /** What is being written, as "d4", "o12", "i3", "g2", "c1", "w3": dish, option, ingredient, group, category, weekday. */
     val busy: Set<String> = emptySet(),
     /** The dish whose form is open; one at a time. */
     val editing: Long? = null,
+    /** The category a new dish is being made in, while [editing] is null. */
+    val creatingIn: Long? = null,
     val form: DishForm? = null,
     val uploading: Boolean = false,
     /** A photo landed in the bucket and waits for "Save". */
     val photoReady: Boolean = false,
-    /** The dish just saved, to say so. */
+    /** What was just done, to say so. */
     val saved: String? = null,
     /** The ingredient whose links are open; one at a time. */
     val linking: Long? = null,
@@ -161,12 +141,24 @@ data class MenuState(
     /** The choice whose allergens are open; one at a time. */
     val allergenOption: Long? = null,
     val allergenDraft: List<String>? = null,
+    /** The "Archiviert" filter: what was taken off the menu, to bring back. */
+    val showArchived: Boolean = false,
+    val archivedDishes: List<MenuDish> = emptyList(),
+    /** The arrows to put dishes, choices or categories in order. */
+    val arranging: Boolean = false,
+    val confirm: Confirm? = null,
+    /** An archived dish with the name just refused as taken (HB451), to offer back. */
+    val restoreOffer: MenuDish? = null,
+    val groupForm: GroupForm? = null,
+    val optionForm: OptionForm? = null,
+    val categoryForm: CategoryForm? = null,
+    val dealForm: DealForm? = null,
 )
 
 /**
  * What is on the menu today — the site's /menu-admin. The sold-out switches
- * are the everyday job and stay one tap; editing a dish and saying what an
- * ingredient is used in are behind a second. Each tab reads fresh whenever
+ * are the everyday job and stay one tap; editing, adding and archiving are
+ * behind a second, and archiving asks first. Each tab reads fresh whenever
  * it is opened: this screen's whole job is being up to date.
  */
 class MenuViewModel(application: Application) : AndroidViewModel(application) {
@@ -179,13 +171,29 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun fail(error: String) = _state.update { it.copy(error = error) }
 
+    private fun closeForms(s: MenuState) =
+        s.copy(
+            editing = null,
+            creatingIn = null,
+            form = null,
+            linking = null,
+            allergenOption = null,
+            groupForm = null,
+            optionForm = null,
+            categoryForm = null,
+            dealForm = null,
+            restoreOffer = null,
+        )
+
     fun open(tab: MenuTab) {
-        _state.update { it.copy(tab = tab, error = null, saved = null, editing = null, form = null, linking = null, allergenOption = null) }
+        _state.update { closeForms(it).copy(tab = tab, error = null, saved = null, arranging = false) }
         load()
     }
 
-    fun load() {
+    /** Reads the open tab again; with [keepError], what just went wrong stays said. */
+    fun load(keepError: Boolean = false) {
         val tab = _state.value.tab
+        val archived = _state.value.showArchived
         _state.update { it.copy(loading = true) }
         viewModelScope.launch {
             attempt(app, ::fail) {
@@ -194,20 +202,45 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
                         MenuTab.DISHES -> {
                             val tags = async { menu.tags() }
                             val allergens = async { menu.allergens() }
+                            val groups = async { menu.optionGroups() }
+                            val categories = async { menu.categories() }
+                            val gone = async { if (archived) menu.dishes(archived = true) else emptyList() }
                             val dishes = menu.dishes()
-                            _state.update { it.copy(dishes = dishes, tags = tags.await(), allergens = allergens.await(), error = null) }
+                            _state.update {
+                                it.copy(
+                                    dishes = dishes,
+                                    tags = tags.await(),
+                                    allergens = allergens.await(),
+                                    groups = groups.await(),
+                                    categories = categories.await(),
+                                    archivedDishes = gone.await(),
+                                    error = it.error.takeIf { keepError },
+                                )
+                            }
                         }
                         MenuTab.OPTIONS -> {
                             val tags = async { menu.tags() }
                             val allergens = async { menu.allergens() }
+                            val dishes = async { menu.dishes() }
                             val groups = menu.optionGroups()
-                            _state.update { it.copy(groups = groups, tags = tags.await(), allergens = allergens.await(), error = null) }
+                            _state.update { it.copy(groups = groups, dishes = dishes.await(), tags = tags.await(), allergens = allergens.await(), error = it.error.takeIf { keepError }) }
                         }
                         MenuTab.INGREDIENTS -> {
                             val dishes = async { menu.dishes() }
                             val groups = async { menu.optionGroups() }
                             val ingredients = menu.ingredients()
-                            _state.update { it.copy(ingredients = ingredients, dishes = dishes.await(), groups = groups.await(), error = null) }
+                            _state.update { it.copy(ingredients = ingredients, dishes = dishes.await(), groups = groups.await(), error = it.error.takeIf { keepError }) }
+                        }
+                        MenuTab.CATEGORIES -> {
+                            val dishes = async { menu.dishes() }
+                            val categories = menu.categories()
+                            _state.update { it.copy(categories = categories, dishes = dishes.await(), error = it.error.takeIf { keepError }) }
+                        }
+                        MenuTab.DEALS -> {
+                            val dishes = async { menu.dishes() }
+                            val categories = async { menu.categories() }
+                            val deals = menu.deals()
+                            _state.update { it.copy(deals = deals, categories = categories.await(), dishes = dishes.await(), error = it.error.takeIf { keepError }) }
                         }
                     }
                 }
@@ -230,6 +263,52 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * One write under [key], the row's buttons greyed out meanwhile. On a
+     * taken dish name ([dishName], HB451) it looks for an archived dish of
+     * that name, to offer it back rather than leave the owner guessing.
+     */
+    private fun write(
+        key: String,
+        dishName: String? = null,
+        onFailure: () -> Unit = {},
+        block: suspend () -> Unit,
+        done: (MenuState) -> MenuState = { it },
+    ) {
+        if (key in _state.value.busy) return
+        _state.update { it.copy(busy = it.busy + key, error = null, saved = null) }
+        viewModelScope.launch {
+            var refused: Exception? = null
+            val ok = attempt(app, { message -> fail(message) }) {
+                try {
+                    block()
+                } catch (e: MenuEditException) {
+                    refused = e
+                    throw e
+                }
+            } != null
+            if (!ok && dishName != null && (refused as? MenuEditException)?.reason == MenuEditError.NAME_TAKEN) {
+                attempt(app, {}) { menu.archivedDishNamed(dishName) }?.let { found -> _state.update { it.copy(restoreOffer = found) } }
+            }
+            _state.update { s -> (if (ok) done(s) else s).copy(busy = s.busy - key) }
+            if (!ok) onFailure()
+        }
+    }
+
+    /** Every open form closed, nothing saved. */
+    fun cancelForms() = _state.update { closeForms(it) }
+
+    fun dismissConfirm() = _state.update { it.copy(confirm = null) }
+
+    fun dismissRestoreOffer() = _state.update { it.copy(restoreOffer = null) }
+
+    fun toggleArranging() = _state.update { closeForms(it).copy(arranging = !it.arranging) }
+
+    fun toggleArchived() {
+        _state.update { closeForms(it).copy(showArchived = !it.showArchived, arranging = false) }
+        load()
+    }
+
     // -------------------------------------------------------------------
     // Dishes
     // -------------------------------------------------------------------
@@ -242,9 +321,21 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startEdit(dish: MenuDish) =
-        _state.update { it.copy(editing = dish.id, form = DishForm.of(dish), error = null, saved = null, photoReady = false) }
+        _state.update { closeForms(it).copy(editing = dish.id, form = DishForm.of(dish), error = null, saved = null, photoReady = false) }
 
-    fun cancelEdit() = _state.update { it.copy(editing = null, form = null) }
+    /** "+ Gericht" in a category: the same form, empty, with what the category's dishes usually have. */
+    fun startNew(categoryId: Long) =
+        _state.update { s ->
+            closeForms(s).copy(
+                creatingIn = categoryId,
+                form = DishForm.new(categoryId, s.dishes.filter { it.categoryId == categoryId }),
+                error = null,
+                saved = null,
+                photoReady = false,
+            )
+        }
+
+    fun cancelEdit() = _state.update { it.copy(editing = null, creatingIn = null, form = null) }
 
     fun updateForm(change: (DishForm) -> DishForm) = _state.update { it.copy(form = it.form?.let(change)) }
 
@@ -254,40 +345,115 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFormAllergenNone() = updateForm { it.copy(allergens = Allergens.toggleNone(it.allergens)) }
 
+    fun toggleFormAdditive(number: Int) = updateForm { it.copy(additives = Additives.toggle(it.additives, number)) }
+
+    fun addFormGroup(id: Long) = updateForm { if (id in it.groupIds) it else it.copy(groupIds = it.groupIds + id) }
+
+    fun removeFormGroup(id: Long) = updateForm { it.copy(groupIds = it.groupIds - id) }
+
+    fun moveFormGroup(id: Long, by: Int) = updateForm { it.copy(groupIds = MenuEdits.move(it.groupIds, id, by)) }
+
     fun toggleOnlyMissingAllergens() = _state.update { it.copy(onlyMissingAllergens = !it.onlyMissingAllergens) }
 
     /**
-     * The dish first, then its tags, and only if the dish saved: a refused
-     * price is the thing worth saying, and tags on a dish whose edit did not
-     * land would leave the two halves disagreeing. Read again after, since
-     * the database trims and rounds, and a new position moves the dish.
-     * Allergens last, and only when the ticks differ from what was read:
-     * an untouched form sends nothing, so it never claims "none".
+     * The dish first, then its labels, allergens and groups, each only when
+     * it differs from what was read, and only if the dish saved: a refused
+     * price is the thing worth saying. An untouched allergen form sends
+     * nothing, so it never claims "none".
+     *
+     * A new dish is made first and the form then stays open on it, now an
+     * edit: the photo needs the dish's id, and a step that fails after the
+     * dish exists is tried again as an edit rather than as a second dish.
      */
     fun saveDish() {
-        val id = _state.value.editing ?: return
-        val form = _state.value.form ?: return
+        val state = _state.value
+        val form = state.form ?: return
         val edit = form.edit
         if (edit == null) {
             fail(app.getString(R.string.menu_form_invalid))
             return
         }
-        val allergens = Allergens.toSave(_state.value.dishes.find { it.id == id }?.allergens, form.allergens)
-        val key = "d$id"
-        _state.update { it.copy(busy = it.busy + key, error = null) }
-        viewModelScope.launch {
-            val done =
-                attempt(app, ::fail) {
-                    menu.saveDish(id, edit)
-                    menu.setDishTags(id, form.tags.toList())
-                    if (allergens != null) menu.setDishAllergens(id, allergens.codes)
-                    menu.dishes()
-                }
-            _state.update {
-                if (done == null) it.copy(busy = it.busy - key)
-                else it.copy(busy = it.busy - key, dishes = done, editing = null, form = null, saved = edit.name.trim())
-            }
+        val creatingIn = state.creatingIn
+        val editingId = state.editing
+        if (creatingIn == null && editingId == null) return
+        val key = if (creatingIn != null) "new" else "d$editingId"
+        var made: Long? = null
+        write(
+            key,
+            dishName = edit.name.trim(),
+            // A dish made but not finished: read again, so its form shows and the retry is an edit of it.
+            onFailure = { if (made != null) load(keepError = true) },
+            block = {
+                val original = state.dishes.find { it.id == editingId }
+                val id =
+                    if (creatingIn != null) {
+                        menu.createDish(creatingIn, edit).also { id ->
+                            made = id
+                            // From here on a retry is an edit of this dish, not a second one.
+                            _state.update { it.copy(creatingIn = null, editing = id) }
+                        }
+                    } else {
+                        checkNotNull(editingId).also { menu.saveDish(it, original?.edit ?: edit, edit) }
+                    }
+                if (form.tags != original?.tags.orEmpty().toSet()) menu.setDishTags(id, form.tags.toList())
+                Allergens.toSave(original?.allergens, form.allergens)?.let { menu.setDishAllergens(id, it.codes) }
+                if (form.groupIds != original?.groupIds.orEmpty()) menu.setDishGroups(id, form.groupIds)
+                val dishes = menu.dishes()
+                _state.update { it.copy(dishes = dishes) }
+            },
+        ) { s ->
+            val name = edit.name.trim()
+            val dish = made?.let { id -> s.dishes.find { it.id == id } }
+            if (dish != null) s.copy(editing = dish.id, form = DishForm.of(dish), saved = app.getString(R.string.menu_dish_created, name))
+            else s.copy(editing = null, form = null, saved = app.getString(R.string.menu_saved, name))
         }
+    }
+
+    fun askArchiveDish(dish: MenuDish) = _state.update { it.copy(confirm = Confirm.ArchiveDish(dish)) }
+
+    fun archiveDish(dish: MenuDish) {
+        _state.update { it.copy(confirm = null) }
+        write("d${dish.id}", block = { menu.archiveDish(dish.id) }) { s ->
+            closeForms(s).copy(dishes = s.dishes.filterNot { it.id == dish.id }, saved = app.getString(R.string.menu_archived_done, dish.name))
+        }
+    }
+
+    fun restoreDish(dish: MenuDish) =
+        write("d${dish.id}", block = { menu.restoreDish(dish.id); rereadDishes() }) { s ->
+            closeForms(s).copy(saved = app.getString(R.string.menu_restored_done, dish.name))
+        }
+
+    /** HB451's offer taken: the archived dish comes back instead of a second one. */
+    fun restoreOffered() {
+        val dish = _state.value.restoreOffer ?: return
+        _state.update { closeForms(it) }
+        write("d${dish.id}", block = { menu.restoreDish(dish.id); rereadDishes() }) { s ->
+            s.copy(saved = app.getString(R.string.menu_restored_done, dish.name))
+        }
+    }
+
+    /** Both lists, after a dish came back. */
+    private suspend fun rereadDishes() = coroutineScope {
+        val gone = async { if (_state.value.showArchived) menu.dishes(archived = true) else emptyList() }
+        val dishes = menu.dishes()
+        _state.update { it.copy(dishes = dishes, archivedDishes = gone.await()) }
+    }
+
+    /** One place up or down in its category, at once, and read again if the database says no. */
+    fun moveDish(dish: MenuDish, by: Int) {
+        val categoryId = dish.categoryId ?: return
+        val ids = _state.value.dishes.filter { it.categoryId == categoryId }.map { it.id }
+        val order = MenuEdits.move(ids, dish.id, by)
+        if (order == ids) return
+        _state.update { s ->
+            val moved = order.mapNotNull { id -> s.dishes.find { it.id == id } }
+            s.copy(dishes = s.dishes.filterNot { it.categoryId == categoryId }.let { rest ->
+                // Back where the category was, so the list still reads like the menu.
+                val at = s.dishes.indexOfFirst { it.categoryId == categoryId }.coerceAtLeast(0)
+                rest.take(at) + moved + rest.drop(at)
+            })
+        }
+        write("c$categoryId", onFailure = { load(keepError = true) }, block = { menu.reorderDishes(categoryId, order) })
     }
 
     /**
@@ -298,6 +464,20 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun pickPhoto(uri: Uri) {
         val id = _state.value.editing ?: return
+        upload(uri, { photo -> menu.uploadPhoto(id, photo, System.currentTimeMillis()) }) { s, url ->
+            if (s.editing != id) s else s.copy(form = s.form?.copy(imageUrl = url))
+        }
+    }
+
+    /** The same for a category, whose form must be one already made. */
+    fun pickCategoryPhoto(uri: Uri) {
+        val id = _state.value.categoryForm?.id ?: return
+        upload(uri, { photo -> menu.uploadCategoryPhoto(id, photo, System.currentTimeMillis()) }) { s, url ->
+            s.categoryForm?.takeIf { it.id == id }?.let { form -> s.copy(categoryForm = form.copy(imageUrl = url)) } ?: s
+        }
+    }
+
+    private fun upload(uri: Uri, put: suspend (Photo) -> String, done: (MenuState, String) -> MenuState) {
         _state.update { it.copy(uploading = true, photoReady = false, error = null) }
         viewModelScope.launch {
             val url =
@@ -307,13 +487,10 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
                         fail(app.getString(R.string.photo_unreadable))
                         null
                     } else {
-                        menu.uploadPhoto(id, photo, System.currentTimeMillis())
+                        put(photo)
                     }
                 }
-            _state.update {
-                if (url == null || it.editing != id) it.copy(uploading = false)
-                else it.copy(uploading = false, photoReady = true, form = it.form?.copy(imageUrl = url))
-            }
+            _state.update { if (url == null) it.copy(uploading = false) else done(it.copy(uploading = false, photoReady = true), url) }
         }
     }
 
@@ -345,7 +522,7 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startOptionAllergens(option: MenuOption) =
-        _state.update { it.copy(allergenOption = option.id, allergenDraft = option.allergens, error = null) }
+        _state.update { closeForms(it).copy(allergenOption = option.id, allergenDraft = option.allergens, error = null) }
 
     fun cancelOptionAllergens() = _state.update { it.copy(allergenOption = null) }
 
@@ -379,6 +556,112 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
                 else s.copy(busy = s.busy - key, allergenOption = s.allergenOption.takeIf { it != id })
             }
         }
+    }
+
+    /** After a structural change: the groups as the database now has them. */
+    private suspend fun rereadGroups() {
+        val groups = menu.optionGroups()
+        _state.update { it.copy(groups = groups) }
+    }
+
+    fun startGroup(group: OptionGroup?) =
+        _state.update { closeForms(it).copy(groupForm = group?.let(GroupForm::of) ?: GroupForm.new(), error = null, saved = null) }
+
+    fun updateGroupForm(change: (GroupForm) -> GroupForm) = _state.update { it.copy(groupForm = it.groupForm?.let(change)) }
+
+    fun toggleGroupDish(id: Long) = updateGroupForm { f -> f.copy(itemIds = if (id in f.itemIds) f.itemIds - id else f.itemIds + id) }
+
+    /**
+     * The name and kind, then which dishes offer it, each only if it
+     * changed. A new group is made with no dish: a single-choice group needs
+     * a choice before any dish may offer it, so the choice form opens next.
+     */
+    fun saveGroup() {
+        val form = _state.value.groupForm ?: return
+        if (!form.valid) return
+        val before = _state.value.groups.find { it.id == form.id }
+        var made: Long? = null
+        write(
+            "g${form.id ?: "new"}",
+            block = {
+                val id = form.id
+                if (id == null) {
+                    made = menu.createGroup(form.name, form.selection)
+                } else {
+                    val name = form.name.trim().takeIf { it != before?.name }
+                    val selection = form.selection.takeIf { it != before?.selection }
+                    if (name != null || selection != null) menu.updateGroup(id, name, selection)
+                    if (form.itemIds.toSet() != before?.itemIds.orEmpty().toSet()) menu.setGroupDishes(id, form.itemIds)
+                }
+                rereadGroups()
+            },
+        ) { s ->
+            val id = made
+            if (id != null) s.copy(groupForm = null, optionForm = OptionForm.new(id), saved = app.getString(R.string.menu_group_created, form.name.trim()))
+            else s.copy(groupForm = null, saved = app.getString(R.string.menu_saved, form.name.trim()))
+        }
+    }
+
+    fun askArchiveGroup(group: OptionGroup) = _state.update { it.copy(confirm = Confirm.ArchiveGroup(group)) }
+
+    fun archiveGroup(group: OptionGroup) {
+        _state.update { it.copy(confirm = null) }
+        write("g${group.id}", block = { menu.archiveGroup(group.id); rereadGroups() }) { s ->
+            closeForms(s).copy(saved = app.getString(R.string.menu_archived_done, group.name))
+        }
+    }
+
+    fun restoreGroup(group: OptionGroup) =
+        write("g${group.id}", block = { menu.restoreGroup(group.id); rereadGroups() }) { s ->
+            s.copy(saved = app.getString(R.string.menu_restored_done, group.name))
+        }
+
+    fun startOption(groupId: Long, option: MenuOption?) =
+        _state.update {
+            closeForms(it).copy(optionForm = option?.let { o -> OptionForm.of(groupId, o) } ?: OptionForm.new(groupId), error = null, saved = null)
+        }
+
+    fun updateOptionForm(change: (OptionForm) -> OptionForm) = _state.update { it.copy(optionForm = it.optionForm?.let(change)) }
+
+    fun saveOption() {
+        val form = _state.value.optionForm ?: return
+        val edit = form.edit ?: return
+        val before = _state.value.groups.flatMap { it.options }.find { it.id == form.optionId }
+        write(
+            "o${form.optionId ?: "new"}",
+            block = {
+                val id = form.optionId
+                if (id == null) menu.createOption(form.groupId, edit) else menu.saveOption(id, before?.edit ?: edit, edit)
+                rereadGroups()
+            },
+        ) { s -> s.copy(optionForm = null, saved = app.getString(R.string.menu_saved, edit.name.trim())) }
+    }
+
+    fun askArchiveOption(option: MenuOption) = _state.update { it.copy(confirm = Confirm.ArchiveOption(option)) }
+
+    fun archiveOption(option: MenuOption) {
+        _state.update { it.copy(confirm = null) }
+        write("o${option.id}", block = { menu.archiveOption(option.id); rereadGroups() }) { s ->
+            closeForms(s).copy(saved = app.getString(R.string.menu_archived_done, option.name))
+        }
+    }
+
+    fun restoreOption(option: MenuOption) =
+        write("o${option.id}", block = { menu.restoreOption(option.id); rereadGroups() }) { s ->
+            s.copy(saved = app.getString(R.string.menu_restored_done, option.name))
+        }
+
+    fun moveOption(group: OptionGroup, option: MenuOption, by: Int) {
+        val ids = group.live.map { it.id }
+        val order = MenuEdits.move(ids, option.id, by)
+        if (order == ids) return
+        _state.update { s ->
+            s.copy(groups = s.groups.map { g ->
+                if (g.id != group.id) g
+                else g.copy(options = order.mapNotNull { id -> g.options.find { it.id == id } } + g.options.filter { it.archived })
+            })
+        }
+        write("g${group.id}", onFailure = { load(keepError = true) }, block = { menu.reorderOptions(group.id, order) })
     }
 
     // -------------------------------------------------------------------
@@ -453,6 +736,77 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // -------------------------------------------------------------------
+    // Categories
+    // -------------------------------------------------------------------
+
+    fun startCategory(category: MenuCategory?) =
+        _state.update { closeForms(it).copy(categoryForm = category?.let(CategoryForm::of) ?: CategoryForm.new(), error = null, saved = null, photoReady = false) }
+
+    fun updateCategoryForm(change: (CategoryForm) -> CategoryForm) = _state.update { it.copy(categoryForm = it.categoryForm?.let(change)) }
+
+    fun saveCategory() {
+        val form = _state.value.categoryForm ?: return
+        if (!form.valid) return
+        val before = _state.value.categories.find { it.id == form.id }
+        write(
+            "c${form.id ?: "new"}",
+            block = {
+                val id = form.id
+                if (id == null) {
+                    menu.createCategory(form.name)
+                } else {
+                    val name = form.name.trim().takeIf { it != before?.name }
+                    val image = form.imageUrl.trim().takeIf { it != before?.imageUrl }
+                    if (name != null || image != null) menu.updateCategory(id, name, image)
+                }
+                val categories = menu.categories()
+                _state.update { it.copy(categories = categories) }
+            },
+        ) { s -> s.copy(categoryForm = null, saved = app.getString(R.string.menu_saved, form.name.trim())) }
+    }
+
+    fun moveCategory(category: MenuCategory, by: Int) {
+        val ids = _state.value.categories.map { it.id }
+        val order = MenuEdits.move(ids, category.id, by)
+        if (order == ids) return
+        _state.update { s -> s.copy(categories = order.mapNotNull { id -> s.categories.find { it.id == id } }) }
+        write("categories", onFailure = { load(keepError = true) }, block = { menu.reorderCategories(order) })
+    }
+
+    // -------------------------------------------------------------------
+    // Angebote
+    // -------------------------------------------------------------------
+
+    fun startDeal(day: Int) =
+        _state.update { s -> closeForms(s).copy(dealForm = DealForm.of(day, s.deals.find { it.day == day }), error = null, saved = null) }
+
+    fun updateDealForm(change: (DealForm) -> DealForm) = _state.update { it.copy(dealForm = it.dealForm?.let(change)) }
+
+    fun saveDeal() {
+        val form = _state.value.dealForm ?: return
+        val discount = form.discountValue ?: return
+        if (!form.valid) return
+        write(
+            "w${form.day}",
+            block = {
+                menu.setDeal(form.day, discount, form.categoryId, form.itemId)
+                val deals = menu.deals()
+                _state.update { it.copy(deals = deals) }
+            },
+        ) { s -> s.copy(dealForm = null) }
+    }
+
+    fun clearDeal(day: Int) =
+        write(
+            "w$day",
+            block = {
+                menu.clearDeal(day)
+                val deals = menu.deals()
+                _state.update { it.copy(deals = deals) }
+            },
+        ) { s -> s.copy(dealForm = null) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -467,61 +821,69 @@ fun MenuScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(stringResource(R.string.menu_title)) },
                 navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
-                actions = { TextButton(onClick = menu::load, enabled = !state.loading) { Text(stringResource(R.string.reload)) } },
+                actions = { TextButton(onClick = { menu.load() }, enabled = !state.loading) { Text(stringResource(R.string.reload)) } },
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
-            contentPadding = PaddingValues(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item(key = "tabs") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (tab in MenuTab.entries) {
-                        FilterChip(
-                            selected = state.tab == tab,
-                            onClick = { menu.open(tab) },
-                            label = {
-                                Text(
-                                    stringResource(
-                                        when (tab) {
-                                            MenuTab.DISHES -> R.string.menu_tab_dishes
-                                            MenuTab.OPTIONS -> R.string.menu_tab_options
-                                            MenuTab.INGREDIENTS -> R.string.menu_tab_ingredients
-                                        }
+        // On the tablet the forms stay a readable width, in the middle.
+        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                modifier = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "tabs") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (tab in MenuTab.entries) {
+                            FilterChip(
+                                selected = state.tab == tab,
+                                onClick = { menu.open(tab) },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            when (tab) {
+                                                MenuTab.DISHES -> R.string.menu_tab_dishes
+                                                MenuTab.OPTIONS -> R.string.menu_tab_options
+                                                MenuTab.INGREDIENTS -> R.string.menu_tab_ingredients
+                                                MenuTab.CATEGORIES -> R.string.menu_tab_categories
+                                                MenuTab.DEALS -> R.string.menu_tab_deals
+                                            }
+                                        )
                                     )
-                                )
-                            },
-                        )
+                                },
+                            )
+                        }
                     }
                 }
-            }
-            state.error?.let { error -> item(key = "error") { Text(error, color = MaterialTheme.colorScheme.error) } }
-            state.saved?.let { name -> item(key = "saved") { Text(stringResource(R.string.menu_saved, name), fontWeight = FontWeight.SemiBold) } }
-            if (state.loading) item(key = "loading") { Text(stringResource(R.string.please_wait), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            when (state.tab) {
-                MenuTab.DISHES -> dishes(state, menu)
-                MenuTab.OPTIONS -> options(state, menu)
-                MenuTab.INGREDIENTS -> ingredients(state, menu)
+                state.error?.let { error -> item(key = "error") { Text(error, color = MaterialTheme.colorScheme.error) } }
+                state.saved?.let { done -> item(key = "saved") { Text(done, fontWeight = FontWeight.SemiBold) } }
+                if (state.loading) item(key = "loading") { Text(stringResource(R.string.please_wait), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                when (state.tab) {
+                    MenuTab.DISHES -> dishes(state, menu)
+                    MenuTab.OPTIONS -> options(state, menu)
+                    MenuTab.INGREDIENTS -> ingredients(state, menu)
+                    MenuTab.CATEGORIES -> categories(state, menu)
+                    MenuTab.DEALS -> deals(state, menu)
+                }
             }
         }
     }
+    MenuDialogs(state, menu)
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun MenuHint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
-private fun Heading(text: String) {
+internal fun Heading(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
 }
 
 /** One row with a sold-out switch: the name, whether it is on, and anything else beside it. */
 @Composable
-private fun SwitchLine(
+internal fun SwitchLine(
     name: String,
     on: Boolean,
     onText: String,
@@ -550,19 +912,19 @@ private fun SwitchLine(
 
 /** On every row: the letters, "none", or in red that nobody has said yet — what the menu shows as "Angaben folgen". */
 @Composable
-private fun AllergenLine(allergens: List<String>?) {
+internal fun AllergenLine(allergens: List<String>?) {
     when {
         allergens == null ->
             Text(stringResource(R.string.menu_allergens_not_stated), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        allergens.isEmpty() -> Hint(stringResource(R.string.menu_allergens_none))
-        else -> Hint(stringResource(R.string.menu_allergens_list, allergens.joinToString(", ")))
+        allergens.isEmpty() -> MenuHint(stringResource(R.string.menu_allergens_none))
+        else -> MenuHint(stringResource(R.string.menu_allergens_list, allergens.joinToString(", ")))
     }
 }
 
 /** How many rows are still "not stated", and a switch to show only those, to work through them on the tablet. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MissingAllergens(count: Int, only: Boolean, onToggle: () -> Unit) {
+internal fun MissingAllergens(count: Int, only: Boolean, onToggle: () -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             stringResource(R.string.menu_allergens_missing_count, count),
@@ -580,7 +942,7 @@ private fun MissingAllergens(count: Int, only: Boolean, onToggle: () -> Unit) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AllergenPicker(
+internal fun AllergenPicker(
     all: List<Allergen>,
     value: List<String>?,
     enabled: Boolean,
@@ -590,7 +952,7 @@ private fun AllergenPicker(
     val german = LocalConfiguration.current.locales[0].language == "de"
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(stringResource(R.string.menu_allergens), style = MaterialTheme.typography.labelLarge)
-        Hint(stringResource(R.string.menu_allergens_hint))
+        MenuHint(stringResource(R.string.menu_allergens_hint))
         FlowRow {
             for (allergen in all) {
                 Tick(checked = value?.contains(allergen.code) == true, enabled = enabled, onToggle = { onToggle(allergen.code) }, modifier = Modifier.width(260.dp)) {
@@ -610,7 +972,7 @@ private fun AllergenPicker(
 
 /** A checkbox with its label, the whole row a target for a finger. */
 @Composable
-private fun Tick(checked: Boolean, enabled: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, label: @Composable () -> Unit) {
+internal fun Tick(checked: Boolean, enabled: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, label: @Composable () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.heightIn(min = 48.dp).toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() }),
@@ -622,262 +984,15 @@ private fun Tick(checked: Boolean, enabled: Boolean, onToggle: () -> Unit, modif
 }
 
 // -----------------------------------------------------------------------
-// Dishes
-// -----------------------------------------------------------------------
-
-private fun LazyListScope.dishes(state: MenuState, menu: MenuViewModel) {
-    item(key = "dishes-intro") {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_intro))
-            Hint(stringResource(R.string.menu_dashboard_note))
-            Text(stringResource(R.string.menu_sold_out_count, state.dishes.count { !it.available }), fontWeight = FontWeight.SemiBold)
-            MissingAllergens(Allergens.missing(state.dishes.map { it.allergens }), state.onlyMissingAllergens, menu::toggleOnlyMissingAllergens)
-        }
-    }
-    val shown = if (state.onlyMissingAllergens) state.dishes.filter { it.allergens == null } else state.dishes
-    for ((category, dishes) in shown.groupBy { it.category }) {
-        item(key = "category-$category") { Heading(category) }
-        items(dishes, key = { "d${it.id}" }) { dish ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val editing = state.editing == dish.id
-                    SwitchLine(
-                        name = dish.name,
-                        on = dish.available,
-                        onText = "${Format.euro(dish.price)} · ${stringResource(R.string.menu_available)}",
-                        offText = "${Format.euro(dish.price)} · ${stringResource(R.string.menu_sold_out)}",
-                        busy = "d${dish.id}" in state.busy,
-                        onToggle = { menu.toggleDish(dish) },
-                        extra = {
-                            TextButton(onClick = { if (editing) menu.cancelEdit() else menu.startEdit(dish) }) {
-                                Text(stringResource(if (editing) R.string.cancel else R.string.menu_edit))
-                            }
-                        },
-                    )
-                    dish.unitPrice?.let { Hint(it) }
-                    AllergenLine(dish.allergens)
-                    val form = state.form
-                    if (editing && form != null) DishFormView(dish, form, state, menu)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun DishFormView(dish: MenuDish, form: DishForm, state: MenuState, menu: MenuViewModel) {
-    val pick =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(menu::pickPhoto) }
-    HorizontalDivider()
-    OutlinedTextField(
-        value = form.name,
-        onValueChange = { v -> menu.updateForm { it.copy(name = v) } },
-        label = { Text(stringResource(R.string.menu_name)) },
-        isError = form.name.trim().length < 2,
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    OutlinedTextField(
-        value = form.description,
-        onValueChange = { v -> menu.updateForm { it.copy(description = v) } },
-        label = { Text(stringResource(R.string.menu_description)) },
-        maxLines = 3,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberField(form.price, R.string.menu_price, KeyboardType.Decimal, Modifier.weight(1f)) { v -> menu.updateForm { it.copy(price = v) } }
-        NumberField(form.prepMinutes, R.string.menu_prep, KeyboardType.Number, Modifier.weight(1f)) { v -> menu.updateForm { it.copy(prepMinutes = v) } }
-        NumberField(form.sortOrder, R.string.menu_position, KeyboardType.Number, Modifier.weight(1f)) { v -> menu.updateForm { it.copy(sortOrder = v) } }
-    }
-    Hint(stringResource(R.string.menu_prep_hint))
-
-    // A drink's size, for the "0,33 l · 6,52 €/l" under it on the menu. Blank for food.
-    NumberField(form.volumeMl, R.string.menu_volume, KeyboardType.Number, Modifier.fillMaxWidth()) { v -> menu.updateForm { it.copy(volumeMl = v) } }
-    Hint(stringResource(R.string.menu_volume_hint))
-
-    // Labels, not categories: a tick leaves the dish where it is printed and adds a way to find it.
-    if (state.tags.isNotEmpty()) {
-        Text(stringResource(R.string.menu_tags), style = MaterialTheme.typography.labelLarge)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (tag in state.tags) {
-                FilterChip(selected = tag.id in form.tags, onClick = { menu.toggleFormTag(tag) }, label = { Text(tag.name) })
-            }
-        }
-    }
-
-    if (state.allergens.isNotEmpty()) {
-        AllergenPicker(state.allergens, form.allergens, enabled = true, onToggle = menu::toggleFormAllergen, onNone = menu::toggleFormAllergenNone)
-    }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        PhotoPreview(form.imageUrl, menu)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            OutlinedButton(
-                onClick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                enabled = !state.uploading,
-            ) {
-                Text(stringResource(R.string.menu_photo_pick))
-            }
-            Hint(
-                stringResource(
-                    when {
-                        state.uploading -> R.string.menu_photo_uploading
-                        state.photoReady -> R.string.menu_photo_ready
-                        else -> R.string.menu_photo_hint
-                    }
-                )
-            )
-        }
-    }
-    OutlinedTextField(
-        value = form.imageUrl,
-        onValueChange = { v -> menu.updateForm { it.copy(imageUrl = v) } },
-        label = { Text(stringResource(R.string.menu_photo_url)) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = menu::cancelEdit) { Text(stringResource(R.string.cancel)) }
-        val busy = "d${dish.id}" in state.busy
-        Button(onClick = menu::saveDish, enabled = !busy && !state.uploading && form.edit != null) {
-            Text(stringResource(if (busy) R.string.please_wait else R.string.save))
-        }
-    }
-}
-
-@Composable
-private fun NumberField(value: String, label: Int, keyboard: KeyboardType, modifier: Modifier, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(stringResource(label)) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-        modifier = modifier,
-    )
-}
-
-/** The square the menu draws, at the size it draws it, so what is shown here is what customers get. */
-@Composable
-private fun PhotoPreview(url: String, menu: MenuViewModel) {
-    var image by remember(url) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(url) {
-        // Not on every keystroke in the URL field: once it has stood still for a moment.
-        delay(PREVIEW_SETTLE_MS)
-        image = menu.preview(url)
-    }
-    image?.let {
-        Image(
-            bitmap = it,
-            contentDescription = stringResource(R.string.menu_photo_preview),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
-        )
-    }
-}
-
-// -----------------------------------------------------------------------
-// Options
-// -----------------------------------------------------------------------
-
-@OptIn(ExperimentalLayoutApi::class)
-private fun LazyListScope.options(state: MenuState, menu: MenuViewModel) {
-    item(key = "options-intro") {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_options_intro))
-            Hint(stringResource(R.string.menu_options_shared))
-            val out = state.groups.sumOf { group -> group.options.count { !it.available } }
-            Text(stringResource(R.string.menu_sold_out_count, out), fontWeight = FontWeight.SemiBold)
-            MissingAllergens(
-                Allergens.missing(state.groups.flatMap { group -> group.options.map { it.allergens } }),
-                state.onlyMissingAllergens,
-                menu::toggleOnlyMissingAllergens,
-            )
-        }
-    }
-    // The database allows some tags on a choice — the vegan leaf — and refuses others.
-    val tags = state.tags.filter { it.onOptions }
-    val shown =
-        if (!state.onlyMissingAllergens) state.groups
-        else state.groups.map { g -> g.copy(options = g.options.filter { it.allergens == null }) }.filter { it.options.isNotEmpty() }
-    for (group in shown) {
-        item(key = "group-${group.id}") {
-            Column {
-                Heading(group.name)
-                // Said first: it is the difference between chicken off one Döner and off all four.
-                Hint(stringResource(R.string.menu_option_used_in, group.dishes.joinToString(", ")))
-            }
-        }
-        items(group.options, key = { "g${group.id}-o${it.id}" }) { option ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    val busy = "o${option.id}" in state.busy
-                    val editingAllergens = state.allergenOption == option.id
-                    SwitchLine(
-                        name = option.name,
-                        on = option.available,
-                        onText = stringResource(R.string.menu_available),
-                        offText = stringResource(R.string.menu_sold_out),
-                        busy = busy,
-                        onToggle = { menu.toggleOption(option) },
-                        extra = {
-                            if (state.allergens.isNotEmpty()) {
-                                TextButton(onClick = { if (editingAllergens) menu.cancelOptionAllergens() else menu.startOptionAllergens(option) }) {
-                                    Text(stringResource(if (editingAllergens) R.string.cancel else R.string.menu_allergens))
-                                }
-                            }
-                        },
-                    )
-                    AllergenLine(option.allergens)
-                    if (tags.isNotEmpty()) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            for (tag in tags) {
-                                FilterChip(
-                                    selected = tag.id in option.tags,
-                                    enabled = !busy,
-                                    onClick = { menu.toggleOptionTag(option, tag) },
-                                    label = { Text(tag.name) },
-                                )
-                            }
-                        }
-                    }
-                    if (editingAllergens) {
-                        Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            HorizontalDivider()
-                            Hint(stringResource(R.string.menu_allergens_option_shared))
-                            AllergenPicker(
-                                state.allergens,
-                                state.allergenDraft,
-                                enabled = !busy,
-                                onToggle = menu::toggleOptionAllergen,
-                                onNone = menu::toggleOptionAllergenNone,
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = menu::cancelOptionAllergens) { Text(stringResource(R.string.cancel)) }
-                                Button(onClick = menu::saveOptionAllergens, enabled = !busy) {
-                                    Text(stringResource(if (busy) R.string.please_wait else R.string.save))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// -----------------------------------------------------------------------
 // Ingredients
 // -----------------------------------------------------------------------
 
 private fun LazyListScope.ingredients(state: MenuState, menu: MenuViewModel) {
     item(key = "ingredients-intro") {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Hint(stringResource(R.string.menu_ingredients_intro))
+            MenuHint(stringResource(R.string.menu_ingredients_intro))
             Text(stringResource(R.string.menu_ingredients_out_count, state.ingredients.count { !it.inStock }), fontWeight = FontWeight.SemiBold)
-            if (state.ingredients.isEmpty() && !state.loading) Hint(stringResource(R.string.menu_ingredients_empty))
+            if (state.ingredients.isEmpty() && !state.loading) MenuHint(stringResource(R.string.menu_ingredients_empty))
         }
     }
     items(state.ingredients, key = { "i${it.id}" }) { ingredient ->
@@ -936,7 +1051,7 @@ private fun IngredientCard(ingredient: Ingredient, state: MenuState, menu: MenuV
                 // Dishes first and in menu order: "no pizza cheese, no pizza" is a whole category, and reads as one.
                 Text(stringResource(R.string.menu_tab_dishes), style = MaterialTheme.typography.labelLarge)
                 for ((category, dishes) in state.dishes.groupBy { it.category }) {
-                    Hint(category)
+                    MenuHint(category)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (dish in dishes) {
                             FilterChip(selected = dish.id in state.linkDishes, onClick = { menu.toggleLinkDish(dish.id) }, label = { Text(dish.name) })
@@ -944,10 +1059,10 @@ private fun IngredientCard(ingredient: Ingredient, state: MenuState, menu: MenuV
                     }
                 }
                 Text(stringResource(R.string.menu_tab_options), style = MaterialTheme.typography.labelLarge)
-                for (group in state.groups) {
-                    Hint(group.name)
+                for (group in state.groups.filterNot { it.archived }) {
+                    MenuHint(group.name)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (option in group.options) {
+                        for (option in group.live) {
                             FilterChip(selected = option.id in state.linkOptions, onClick = { menu.toggleLinkOption(option.id) }, label = { Text(option.name) })
                         }
                     }
@@ -983,4 +1098,7 @@ private fun IngredientCard(ingredient: Ingredient, state: MenuState, menu: MenuV
     }
 }
 
-private const val PREVIEW_SETTLE_MS = 400L
+internal const val PREVIEW_SETTLE_MS = 400L
+
+/** Wide enough for two fields side by side, narrow enough to read on the tablet. */
+private val MAX_CONTENT_WIDTH = 960.dp

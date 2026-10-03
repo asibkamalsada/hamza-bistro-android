@@ -109,8 +109,11 @@ data class StaffOrder(
     val status: OrderStatus,
     @SerialName("eta_minutes") val etaMinutes: Int? = null,
     @SerialName("cancel_reason") val cancelReason: CancelReason? = null,
-    /** Delivered to within the last month. False is the order worth a call. */
-    @SerialName("returning_customer") val returningCustomer: Boolean = false,
+    /**
+     * Delivered to within the last month. False is the order worth a call;
+     * left out, it counts as returning, as on the site's order card.
+     */
+    @SerialName("returning_customer") val returningCustomer: Boolean = true,
     @SerialName("delivery_fee") val deliveryFee: Double = 0.0,
     @SerialName("small_order_fee") val smallOrderFee: Double = 0.0,
     val discount: Double = 0.0,

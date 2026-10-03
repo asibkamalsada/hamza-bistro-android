@@ -26,7 +26,7 @@ class DrinkVolumeTest {
         assertFalse(DrinkVolume.allowed(-330))
         assertFalse(DrinkVolume.allowed(10_001))
 
-        val edit = DishEdit("Cola 0,33l", "", 2.5, 0, 10, "")
+        val edit = DishEdit("Cola 0,33l", "", 2.5, 0, "")
         assertTrue(edit.copy(volumeMl = 330).valid)
         assertTrue(edit.copy(volumeMl = null).valid)
         assertFalse(edit.copy(volumeMl = 0).valid)
