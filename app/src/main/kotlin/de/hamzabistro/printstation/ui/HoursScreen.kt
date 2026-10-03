@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -103,7 +104,7 @@ data class HoursState(
     val weekBusy: Boolean = false,
     val weekMessage: Message? = null,
     /** A pause planned ahead: one day, from–until in minutes; 1440 is midnight at its end. */
-    val planDay: LocalDate = LocalDate.EPOCH,
+    val planDay: LocalDate = LocalDate.of(1970, 1, 1),
     val planFrom: Int = 14 * 60,
     val planUntil: Int = 17 * 60,
     val planBusy: Boolean = false,
@@ -525,9 +526,11 @@ private fun SpecialDays(shop: ShopHours?, state: HoursState, now: Instant, hours
 private fun Calendar(shop: ShopHours, state: HoursState, today: LocalDate, hours: HoursViewModel) {
     val context = LocalContext.current
     val month = state.month ?: SpecialCalendar.firstMonth(today)
+    val prev = stringResource(R.string.special_prev_month)
+    val next = stringResource(R.string.special_next_month)
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         TextButton(onClick = { hours.showMonth(-1) }, enabled = month.isAfter(SpecialCalendar.firstMonth(today))) {
-            Text("‹", modifier = Modifier.semantics { contentDescription = context.getString(R.string.special_prev_month) })
+            Text("‹", modifier = Modifier.semantics { contentDescription = prev })
         }
         Text(
             DateTimeFormatter.ofPattern("LLLL yyyy", locale(context)).format(month),
@@ -536,7 +539,7 @@ private fun Calendar(shop: ShopHours, state: HoursState, today: LocalDate, hours
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = { hours.showMonth(1) }, enabled = month.isBefore(SpecialCalendar.lastMonth(today))) {
-            Text("›", modifier = Modifier.semantics { contentDescription = context.getString(R.string.special_next_month) })
+            Text("›", modifier = Modifier.semantics { contentDescription = next })
         }
     }
     Row(modifier = Modifier.fillMaxWidth()) {
@@ -606,7 +609,7 @@ private fun SpecialFormFields(shop: ShopHours, state: HoursState, hours: HoursVi
     val context = LocalContext.current
     val form = state.specialForm
     val picked = state.picked
-    val count = context.resources.getQuantityString(R.plurals.special_selected, picked.size, picked.size)
+    val count = pluralStringResource(R.plurals.special_selected, picked.size, picked.size)
     val now =
         picked.singleOrNull()?.let { date ->
             shop.specialOn(date)?.let { stringResource(R.string.special_now_special, specialHoursText(context, it)) }
