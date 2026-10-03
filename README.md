@@ -121,24 +121,38 @@ queue's top bar (**Mehr** on a phone):
   the share sheet. "Bar" or "Karte" taken back within the undo window
   records nothing; after it, a correction is made in the Supabase
   dashboard only.
-- **Speisekarte** — what is sold out, in three tabs, as on `/menu-admin`:
-  a dish; a single choice, which goes off in every dish that offers it; an
-  ingredient, which takes everything made of it off at once and, switched
-  back on, puts back only what was not sold out on its own. A dish's name,
-  description, price, prep time, position and labels are edited behind
-  **Bearbeiten**; a photo picked there is cropped square, shrunk to 256 px
-  WebP on the device and uploaded to the `menu` bucket, and lands on the
-  menu when the form is saved. What an ingredient is used in is set behind
-  the count beside it. **Allergens** (LMIV, the 14 lettered a–n) are ticked
-  in the same form, and per choice behind **Allergene** on the choices tab;
+- **Speisekarte** — the whole menu, in five tabs. What is sold out, as on
+  `/menu-admin`: a dish; a single choice, which goes off in every dish that
+  offers it; an ingredient, which takes everything made of it off at once
+  and, switched back on, puts back only what was not sold out on its own.
+  Behind **Bearbeiten** a dish's name, description, price, **Pfand**,
+  pickup discount, prep time, Füllmenge, **Zusatzstoffe**, category,
+  labels, allergens, photo and its groups of choices (in order); **+
+  Gericht** in a category makes a new one from the same form, starting
+  from what most of the category's dishes have. **Archivieren** asks
+  first, takes the dish off the menu and out of customers' sight (past
+  orders keep it), and **Archiviert** lists what was archived, to restore.
+  **Reihenfolge** puts dishes, choices and categories in order with arrows.
+  On **Optionen** a group is made (exactly one or any number of choices),
+  given choices with their extra charge and Zusatzstoffe, and ticked onto
+  dishes. **Kategorien** adds, renames, orders and photographs the
+  sections; **Angebote** is the week as seven rows, each a category or one
+  dish so much cheaper, or none. Everything goes through the staff
+  functions of `20261003110000_menu_editing.sql` (hamza-bistro-web#116);
+  their refusals read as "Nicht gefunden", "Name schon vergeben" (with an
+  offer to restore the archived dish of that name), "Wert nicht erlaubt",
+  "Erst wiederherstellen" and "Erst die Gruppe von den Gerichten nehmen".
+  A photo picked in a form is cropped square, shrunk to 256 px WebP on the
+  device and uploaded to the `menu` bucket, and lands on the menu when the
+  form is saved. What an ingredient is used in is set behind the count
+  beside it. **Allergens** (LMIV, the 14 lettered a–n) are ticked in the
+  dish's form, and per choice behind **Allergene** on the choices tab;
   nothing ticked stays "not stated" (the menu says "Angaben folgen"), and
   only the separate **Keines der 14** saves "none". Each row shows its
   letters or a red "noch nicht angegeben", and both tabs count what is
-  still missing with a filter to work through it. A drink's **Füllmenge
-  (ml)** is set in the same form (blank for food; 1–10 000, as the database
-  allows), and its row shows "0,33 l · 6,52 €/l", the price per litre
-  without the Pfand, as the menu prints it. Deposits, new dishes and
-  new option groups stay in the Supabase dashboard, as before.
+  still missing with a filter to work through it. A drink's row shows
+  "0,33 l · 6,52 €/l", the price per litre without the Pfand, as the menu
+  prints it.
 - **Lieferzeiten** — the open/closed switch, **Unbeantwortete Bestellungen
   ablehnen** (off, 5, 10 — recommended —, 15, 20 or 30 minutes; saved on
   tap, for every device and the website), closures planned ahead (a
@@ -309,7 +323,7 @@ the app logs it.
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
   and takings (`History`), the Kassensturz (`CashUp`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
-  ingredients (`Menu`, `Allergens`, `DrinkVolume`, `PhotoCrop`), who hears about orders, the print
+  ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer

@@ -6,6 +6,8 @@ import de.hamzabistro.printstation.core.DeliveryBreakException
 import de.hamzabistro.printstation.core.DeliveryPausedException
 import de.hamzabistro.printstation.core.InvalidHoursException
 import de.hamzabistro.printstation.core.InvalidSettingException
+import de.hamzabistro.printstation.core.MenuEditError
+import de.hamzabistro.printstation.core.MenuEditException
 import de.hamzabistro.printstation.core.NotAllowedException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.UnknownAllergenException
@@ -21,6 +23,7 @@ fun failureText(context: Context, e: Exception): String =
         is UnknownAllergenException -> context.getString(R.string.menu_allergen_unknown)
         is DeliveryPausedException -> context.getString(R.string.delivery_paused)
         is DeliveryBreakException -> context.getString(R.string.delivery_break)
+        is MenuEditException -> menuEditText(context, e)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
@@ -36,4 +39,18 @@ suspend fun <T> attempt(context: Context, onFailure: (String) -> Unit, block: su
     } catch (e: Exception) {
         onFailure(failureText(context, e))
         null
+    }
+
+/**
+ * The menu editor's refusals (HB450–HB454), in the words the server's API
+ * note suggests. "Wert nicht erlaubt" keeps the database's own words after
+ * it: they name the rule, which is what tells the owner what to change.
+ */
+private fun menuEditText(context: Context, e: MenuEditException): String =
+    when (e.reason) {
+        MenuEditError.NOT_FOUND -> context.getString(R.string.menu_error_not_found)
+        MenuEditError.NAME_TAKEN -> context.getString(R.string.menu_error_name_taken)
+        MenuEditError.VALUE_NOT_ALLOWED -> context.getString(R.string.menu_error_value, e.message?.substringAfter(": ").orEmpty())
+        MenuEditError.ARCHIVED -> context.getString(R.string.menu_error_archived)
+        MenuEditError.GROUP_WOULD_BE_EMPTY -> context.getString(R.string.menu_error_group_empty)
     }

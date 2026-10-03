@@ -566,7 +566,7 @@ private fun Said(message: Message) {
 }
 
 /** "Thursday", in the device's language; 0 is Sunday, as the database counts. */
-private fun dayName(context: Context, day: Int): String =
+internal fun dayName(context: Context, day: Int): String =
     DayOfWeek.of(if (day == 0) 7 else day).getDisplayName(TextStyle.FULL, locale(context)).replaceFirstChar { it.titlecase(locale(context)) }
 
 /** "11:00"; the end of the day is "24:00", which is what it is. */
