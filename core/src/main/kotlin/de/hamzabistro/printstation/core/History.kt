@@ -39,6 +39,14 @@ interface HistoryBackend {
      * 20261002190000_cash_up.sql). Null on a database without it yet.
      */
     suspend fun cashUp(day: LocalDate?): CashUp?
+
+    /**
+     * The report from one Leipzig day to another, both included
+     * (staff_report() in 20261003130000_staff_report.sql). Null on a
+     * database without it yet; [ReportRangeException] for a range it does
+     * not take (HB455).
+     */
+    suspend fun report(range: ReportRange): Report?
 }
 
 /** [HistoryBackend] over PostgREST, as the signed-in account — staff read every order. */
@@ -92,6 +100,21 @@ class SupabaseHistoryBackend internal constructor(
                 throw e
             }
         return json.decodeFromString(CashUp.serializer(), body)
+    }
+
+    override suspend fun report(range: ReportRange): Report? {
+        val body =
+            try {
+                rest.rpc("staff_report", buildJsonObject {
+                    put("p_from", range.from.toString())
+                    put("p_to", range.to.toString())
+                })
+            } catch (e: BackendException) {
+                if (e.missingFunction) return null
+                if (e.code == "HB455") throw ReportRangeException(e.message ?: "HB455")
+                throw e
+            }
+        return json.decodeFromString(Report.serializer(), body)
     }
 
     @Serializable private class TotalRow(val total: Double)

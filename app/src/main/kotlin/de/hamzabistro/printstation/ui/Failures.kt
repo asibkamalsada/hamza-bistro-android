@@ -9,6 +9,7 @@ import de.hamzabistro.printstation.core.InvalidSettingException
 import de.hamzabistro.printstation.core.MenuEditError
 import de.hamzabistro.printstation.core.MenuEditException
 import de.hamzabistro.printstation.core.NotAllowedException
+import de.hamzabistro.printstation.core.ReportRangeException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.UnknownAllergenException
 import kotlinx.coroutines.CancellationException
@@ -24,6 +25,7 @@ fun failureText(context: Context, e: Exception): String =
         is DeliveryPausedException -> context.getString(R.string.delivery_paused)
         is DeliveryBreakException -> context.getString(R.string.delivery_break)
         is MenuEditException -> menuEditText(context, e)
+        is ReportRangeException -> context.getString(R.string.report_range_invalid)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
