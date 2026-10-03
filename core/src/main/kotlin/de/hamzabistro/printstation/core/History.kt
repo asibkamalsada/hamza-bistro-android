@@ -1,9 +1,13 @@
 package de.hamzabistro.printstation.core
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
 /** What today's delivered orders came to, for the end of a shift. */
@@ -28,6 +32,13 @@ interface HistoryBackend {
      * is the same day.
      */
     suspend fun takings(now: Instant): Takings
+
+    /**
+     * The Kassensturz for one Leipzig [day] — today when null: per driver,
+     * cash, card and unknown, with the orders behind each (cash_up() in
+     * 20261002190000_cash_up.sql). Null on a database without it yet.
+     */
+    suspend fun cashUp(day: LocalDate?): CashUp?
 }
 
 /** [HistoryBackend] over PostgREST, as the signed-in account — staff read every order. */
@@ -68,6 +79,19 @@ class SupabaseHistoryBackend internal constructor(
             }
         // In cents, so forty orders of 19,90 € do not come to 795,9999.
         return Takings(rows.size, Math.round(rows.sumOf { it.total } * 100) / 100.0)
+    }
+
+    override suspend fun cashUp(day: LocalDate?): CashUp? {
+        val body =
+            try {
+                rest.rpc("cash_up", buildJsonObject {
+                    if (day == null) put("p_day", JsonNull) else put("p_day", day.toString())
+                })
+            } catch (e: BackendException) {
+                if (e.missingFunction) return null
+                throw e
+            }
+        return json.decodeFromString(CashUp.serializer(), body)
     }
 
     @Serializable private class TotalRow(val total: Double)

@@ -137,6 +137,14 @@ data class StaffOrder(
     @SerialName("delay_minutes") val delayMinutes: Int = 0,
     /** When the delay last grew, from the database clock. Null if it never did. */
     @SerialName("delayed_at") @Serializable(with = InstantSerializer::class) val delayedAt: Instant? = null,
+    /**
+     * How it was paid, said with "Bar" / "Karte" when it was delivered
+     * (20261002190000_cash_up.sql). Null until then, and for an order
+     * delivered from Telegram or before the column existed.
+     */
+    @SerialName("payment_method") val paymentMethod: PaymentMethod? = null,
+    /** When it was delivered or collected, from the database clock. */
+    @SerialName("delivered_at") @Serializable(with = InstantSerializer::class) val deliveredAt: Instant? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -160,7 +168,7 @@ data class StaffOrder(
                 "postal_code,city,address_note,notes,items,total,status,eta_minutes,cancel_reason," +
                 "returning_customer,delivery_fee,small_order_fee,discount,discount_code,pickup," +
                 "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at,auto_decline_at," +
-                "delay_minutes,delayed_at"
+                "delay_minutes,delayed_at,payment_method,delivered_at"
     }
 }
 
@@ -188,8 +196,14 @@ sealed interface OrderStep {
         override val to = OrderStatus.ON_THE_WAY
     }
 
-    /** At the door, or collected. */
-    data object Done : OrderStep {
+    /**
+     * At the door, or collected — and how it was paid, "Bar" or "Karte",
+     * for the Kassensturz. [payment] is null for an order already paid
+     * online, which keeps the one button. [device] is this device's label,
+     * as staff_app_seen has it, so the Kassensturz can tell two drivers on
+     * one account apart.
+     */
+    data class Done(val payment: PaymentMethod? = null, val device: String? = null) : OrderStep {
         override val to = OrderStatus.DELIVERED
     }
 

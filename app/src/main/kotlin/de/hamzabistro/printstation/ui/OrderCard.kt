@@ -47,6 +47,8 @@ import de.hamzabistro.printstation.core.DeclineUrgency
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
+import de.hamzabistro.printstation.core.Payment
+import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.queue.Pending
@@ -61,6 +63,9 @@ interface OrderActions {
     fun acceptScheduled(order: StaffOrder)
 
     fun moveOn(order: StaffOrder)
+
+    /** "Bar" or "Karte": delivered or collected, and how it was paid. */
+    fun deliver(order: StaffOrder, payment: PaymentMethod)
 
     fun cancel(order: StaffOrder, reason: CancelReason?)
 
@@ -175,6 +180,17 @@ fun reasonLabel(context: Context, reason: CancelReason?): String =
         }
     )
 
+/** "Bar", "Karte", "Online" — or "unbekannt": delivered from Telegram or by an older app. */
+fun paymentLabel(context: Context, method: PaymentMethod?): String =
+    context.getString(
+        when (method) {
+            PaymentMethod.CASH -> R.string.pay_cash
+            PaymentMethod.CARD -> R.string.pay_card
+            PaymentMethod.ONLINE -> R.string.pay_online
+            null -> R.string.pay_unknown
+        }
+    )
+
 /** What a step says while it waits on its undo window. */
 fun stepLabel(context: Context, order: StaffOrder, step: OrderStep): String =
     when (step) {
@@ -182,7 +198,10 @@ fun stepLabel(context: Context, order: StaffOrder, step: OrderStep): String =
         OrderStep.AcceptScheduled ->
             context.getString(R.string.accept_scheduled, Format.slot(context, order.scheduledFor ?: Instant.now()))
         OrderStep.Out -> context.getString(if (order.pickup) R.string.step_ready else R.string.step_on_the_way)
-        OrderStep.Done -> context.getString(if (order.pickup) R.string.step_collected else R.string.step_delivered)
+        is OrderStep.Done -> {
+            val done = context.getString(if (order.pickup) R.string.step_collected else R.string.step_delivered)
+            step.payment?.let { "$done · ${paymentLabel(context, it)}" } ?: done
+        }
         is OrderStep.Cancel ->
             context.getString(if (order.status == OrderStatus.NEW) R.string.pending_declined else R.string.pending_cancelled)
         is OrderStep.Delay -> context.getString(R.string.pending_delayed, step.minutes)
@@ -292,6 +311,10 @@ fun OrderCard(
             )
 
             if (!compact) Contact(order, actions)
+
+            if (order.status == OrderStatus.DELIVERED) {
+                Text(stringResource(R.string.paid_with, paymentLabel(context, order.paymentMethod)), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
 
             if (order.status == OrderStatus.CANCELLED && order.cancelReason != null) {
                 Text(stringResource(R.string.cancel_reason_shown, reasonLabel(context, order.cancelReason)), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -455,22 +478,27 @@ private fun Actions(
                     }
                 }
             }
-            else -> {
-                Button(onClick = { actions.moveOn(order) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stepLabel(context, order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done))
-                }
-                // The kitchen or the driver is behind: say so before the
-                // customer has to ring and ask.
-                val steps = StaffQueue.DELAY_STEPS.filter { StaffQueue.canDelay(order, it) }
-                if (steps.isNotEmpty()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (minutes in steps) {
-                            OutlinedButton(onClick = { actions.delay(order, minutes) }) {
-                                Text(stringResource(R.string.delay_button, minutes))
-                            }
+            Payment.asks(order) -> {
+                // Delivered and paid in one tap: "Bar" or "Karte", for the
+                // Kassensturz. The undo window takes back the wrong one.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(if (order.pickup) R.string.step_collected_paid else R.string.step_delivered_paid),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    for (method in PaymentMethod.DOOR) {
+                        Button(onClick = { actions.deliver(order, method) }, modifier = Modifier.weight(1f)) {
+                            Text(paymentLabel(context, method))
                         }
                     }
                 }
+                DelayButtons(order, actions)
+            }
+            else -> {
+                Button(onClick = { actions.moveOn(order) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stepLabel(context, order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done()))
+                }
+                DelayButtons(order, actions)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -480,6 +508,21 @@ private fun Actions(
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) {
                 Text(stringResource(if (order.status == OrderStatus.NEW) R.string.decline else R.string.cancel_later))
+            }
+        }
+    }
+}
+
+/** "+5 Min.", "+10 Min.": the kitchen or the driver is behind — say so before the customer has to ring and ask. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DelayButtons(order: StaffOrder, actions: OrderActions) {
+    val steps = StaffQueue.DELAY_STEPS.filter { StaffQueue.canDelay(order, it) }
+    if (steps.isEmpty()) return
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (minutes in steps) {
+            OutlinedButton(onClick = { actions.delay(order, minutes) }) {
+                Text(stringResource(R.string.delay_button, minutes))
             }
         }
     }

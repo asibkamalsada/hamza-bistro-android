@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.ui.AppTheme
 import de.hamzabistro.printstation.ui.Format
@@ -109,6 +110,8 @@ private fun AlarmScreen(staff: StaffViewModel, onDone: () -> Unit, onOpenApp: (S
             override fun acceptScheduled(order: StaffOrder) = staff.acceptScheduled(order)
 
             override fun moveOn(order: StaffOrder) = staff.moveOn(order)
+
+            override fun deliver(order: StaffOrder, payment: PaymentMethod) = staff.deliver(order, payment)
 
             override fun cancel(order: StaffOrder, reason: CancelReason?) = staff.cancel(order, reason)
 

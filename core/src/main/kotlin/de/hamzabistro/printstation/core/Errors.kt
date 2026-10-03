@@ -80,5 +80,13 @@ class DeliveryPausedException(message: String) : Exception(message)
  */
 class DeliveryBreakException(message: String) : Exception(message)
 
+/**
+ * The database refused how the order was paid (HB438): the method of an
+ * order already delivered cannot change, and "online" is not staff's to
+ * say. A "Bar" that should have been "Karte" and was not taken back within
+ * the undo window is put right in the dashboard.
+ */
+class PaymentLockedException : Exception("the order's payment method is already recorded")
+
 /** The ticket did not come out: printer off, out of range, or not answering. */
 class PrinterException(message: String, cause: Throwable? = null) : IOException(message, cause)

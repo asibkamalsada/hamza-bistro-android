@@ -5,6 +5,7 @@ import de.hamzabistro.printstation.core.NotDelayableException
 import de.hamzabistro.printstation.core.OrderMovedException
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrderStep
+import de.hamzabistro.printstation.core.PaymentLockedException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.StaffBackend
 import de.hamzabistro.printstation.core.StaffOrder
@@ -31,6 +32,12 @@ sealed interface StepFailure {
 
     /** A delay the database refused: no longer accepted, or at its three hours. */
     data object NotDelayable : StepFailure
+
+    /**
+     * How it was paid was refused (HB438): already recorded. Past the undo
+     * window it is put right in the dashboard only.
+     */
+    data object PaymentLocked : StepFailure
 
     data class Failed(val reason: String) : StepFailure
 }
@@ -111,6 +118,8 @@ class PendingSteps(
                 _failures.tryEmit(StepFailure.Moved)
             } catch (e: NotDelayableException) {
                 _failures.tryEmit(StepFailure.NotDelayable)
+            } catch (e: PaymentLockedException) {
+                _failures.tryEmit(StepFailure.PaymentLocked)
             } catch (e: SignedOutException) {
                 _failures.tryEmit(StepFailure.Failed(e.message ?: "signed out"))
             } catch (e: Exception) {

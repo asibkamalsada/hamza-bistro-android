@@ -123,6 +123,7 @@
     <string name="need_background">background running</string>
     <string name="order_moved">That order had already been changed — this is where it stands now.</string>
     <string name="order_not_delayable">This order can no longer be delayed — this is where it stands now.</string>
+    <string name="payment_locked">How this order was paid is already recorded. After the undo window it can only be corrected in the dashboard.</string>
     <string name="step_failed">Not sent: %1$s</string>
     <string name="printed_by_hand">Ticket #%1$d printed.</string>
 
@@ -170,6 +171,14 @@
     <string name="step_ready">Ready to collect</string>
     <string name="step_delivered">Delivered</string>
     <string name="step_collected">Collected</string>
+    <!-- The last step on the way: delivered or collected, and how it was paid. -->
+    <string name="step_delivered_paid">Delivered ·</string>
+    <string name="step_collected_paid">Collected ·</string>
+    <string name="pay_cash">Cash</string>
+    <string name="pay_card">Card</string>
+    <string name="pay_online">Online</string>
+    <string name="pay_unknown">unknown</string>
+    <string name="paid_with">Paid: %1$s</string>
     <string name="decline">Decline</string>
     <string name="cancel_later">Cancel</string>
     <string name="cancel_why">Why? The customer is told.</string>
@@ -329,6 +338,22 @@
         <item quantity="one">Delivered today: %1$d order · %2$s</item>
         <item quantity="other">Delivered today: %1$d orders · %2$s</item>
     </plurals>
+
+    <!-- Cash-up (CashUpScreen.kt) -->
+    <string name="cash_up_title">Cash-up</string>
+    <!-- The first line of the text shared; %1$s is the day. -->
+    <string name="cash_up_share_title">Cash-up %1$s</string>
+    <string name="cash_up_share">Share</string>
+    <string name="cash_up_previous">Previous day</string>
+    <string name="cash_up_next">Next day</string>
+    <string name="cash_up_today">Today</string>
+    <!-- Kept as it is: {n} and {total} are filled in by the app. -->
+    <string name="cash_up_delivered">{n} delivered · {total}</string>
+    <string name="cash_up_empty">Nothing was delivered that day.</string>
+    <string name="cash_up_nobody">not assigned</string>
+    <string name="cash_up_orders">Orders</string>
+    <string name="cash_up_pickup">collected</string>
+    <string name="cash_up_needs_update">The shop\'s database does not have the cash-up yet: it needs the server update (20261002190000_cash_up).</string>
 
     <!-- Delivery hours (HoursScreen.kt) -->
     <string name="hours_title">Delivery hours</string>

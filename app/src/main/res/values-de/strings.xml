@@ -123,6 +123,7 @@
     <string name="need_background">Hintergrundbetrieb</string>
     <string name="order_moved">Diese Bestellung wurde inzwischen geändert – so steht sie jetzt.</string>
     <string name="order_not_delayable">Diese Bestellung lässt sich nicht mehr verschieben – so steht sie jetzt.</string>
+    <string name="payment_locked">Wie diese Bestellung bezahlt wurde, steht schon fest. Nach dem Rückgängig-Fenster lässt es sich nur noch im Dashboard korrigieren.</string>
     <string name="step_failed">Nicht gesendet: %1$s</string>
     <string name="printed_by_hand">Bon #%1$d gedruckt.</string>
 
@@ -170,6 +171,14 @@
     <string name="step_ready">Abholbereit</string>
     <string name="step_delivered">Geliefert</string>
     <string name="step_collected">Abgeholt</string>
+    <!-- Der letzte Schritt unterwegs: geliefert oder abgeholt, und wie bezahlt wurde. -->
+    <string name="step_delivered_paid">Geliefert ·</string>
+    <string name="step_collected_paid">Abgeholt ·</string>
+    <string name="pay_cash">Bar</string>
+    <string name="pay_card">Karte</string>
+    <string name="pay_online">Online</string>
+    <string name="pay_unknown">unbekannt</string>
+    <string name="paid_with">Bezahlt: %1$s</string>
     <string name="decline">Ablehnen</string>
     <string name="cancel_later">Stornieren</string>
     <string name="cancel_why">Warum? Der Kunde erfährt es.</string>
@@ -329,6 +338,22 @@
         <item quantity="one">Heute geliefert: %1$d Bestellung · %2$s</item>
         <item quantity="other">Heute geliefert: %1$d Bestellungen · %2$s</item>
     </plurals>
+
+    <!-- Kassensturz (CashUpScreen.kt) -->
+    <string name="cash_up_title">Kassensturz</string>
+    <!-- Die erste Zeile des geteilten Texts; %1$s ist der Tag. -->
+    <string name="cash_up_share_title">Kassensturz %1$s</string>
+    <string name="cash_up_share">Teilen</string>
+    <string name="cash_up_previous">Vortag</string>
+    <string name="cash_up_next">Nächster Tag</string>
+    <string name="cash_up_today">Heute</string>
+    <!-- So lassen: {n} und {total} setzt die App ein. -->
+    <string name="cash_up_delivered">{n} geliefert · {total}</string>
+    <string name="cash_up_empty">An diesem Tag wurde nichts geliefert.</string>
+    <string name="cash_up_nobody">ohne Zuordnung</string>
+    <string name="cash_up_orders">Bestellungen</string>
+    <string name="cash_up_pickup">Abholung</string>
+    <string name="cash_up_needs_update">Die Datenbank des Ladens kennt den Kassensturz noch nicht: Dafür braucht es das Server-Update (20261002190000_cash_up).</string>
 
     <!-- Lieferzeiten (HoursScreen.kt) -->
     <string name="hours_title">Lieferzeiten</string>
