@@ -408,7 +408,7 @@ private fun Big(label: String, value: String, modifier: Modifier) {
 
 /** A card with a heading: one table of the report. */
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+private fun ReportSection(title: String, content: @Composable () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -454,7 +454,7 @@ private fun Bar(fraction: Double) {
 private fun ByDay(report: Report, words: ReportWords) {
     val context = LocalContext.current
     val most = report.byDay.maxOfOrNull { it.revenue } ?: 0.0
-    Section(stringResource(R.string.report_by_day)) {
+    ReportSection(stringResource(R.string.report_by_day)) {
         Line(words.day, words.delivered, words.revenue, words.cancelled, muted = true)
         for (day in report.byDay) {
             Line(dayText(context, day.date), day.delivered.toString(), ReportText.euro(day.revenue), day.cancelled.toString())
@@ -466,7 +466,7 @@ private fun ByDay(report: Report, words: ReportWords) {
 @Composable
 private fun Fulfilment(report: Report, words: ReportWords) {
     val f = report.fulfilment
-    Section("${words.delivery} / ${words.pickup}") {
+    ReportSection("${words.delivery} / ${words.pickup}") {
         Line("", words.orders, words.revenue, words.basket, muted = true)
         Line(words.delivery, f.delivery.orders.toString(), ReportText.euro(f.delivery.revenue), ReportText.euro(f.delivery.averageBasket))
         Line(words.pickup, f.pickup.orders.toString(), ReportText.euro(f.pickup.revenue), ReportText.euro(f.pickup.averageBasket))
@@ -476,7 +476,7 @@ private fun Fulfilment(report: Report, words: ReportWords) {
 @Composable
 private fun Rings(report: Report, words: ReportWords) {
     val most = report.rings.maxOfOrNull { it.revenue } ?: 0.0
-    Section(stringResource(R.string.report_rings)) {
+    ReportSection(stringResource(R.string.report_rings)) {
         Line(words.ring, words.orders, words.revenue, stringResource(R.string.report_fees), muted = true)
         for (ring in report.rings) {
             Line(ReportText.ring(ring.ring, words), ring.orders.toString(), ReportText.euro(ring.revenue), ReportText.euro(ring.deliveryFees + ring.smallOrderFees))
@@ -493,14 +493,14 @@ private fun BestSellers(report: Report) {
     val sorted = report.bestSellers(by)
     val shown = if (all) sorted else sorted.take(Report.TOP)
     val most = sorted.firstOrNull()?.let { if (by == DishOrder.QTY) it.qty.toDouble() else it.revenue } ?: 0.0
-    Section(stringResource(R.string.report_best_sellers)) {
+    ReportSection(stringResource(R.string.report_best_sellers)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = by == DishOrder.QTY, onClick = { by = DishOrder.QTY }, label = { Text(stringResource(R.string.report_qty)) })
             FilterChip(selected = by == DishOrder.REVENUE, onClick = { by = DishOrder.REVENUE }, label = { Text(stringResource(R.string.report_revenue)) })
         }
         if (sorted.isEmpty()) {
             Text(stringResource(R.string.report_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@Section
+            return@ReportSection
         }
         for ((index, dish) in shown.withIndex()) {
             Line("${index + 1}. ${dish.name}", "${dish.qty}×", ReportText.euro(dish.revenue))
@@ -525,10 +525,10 @@ private fun BusyHours(grid: BusyGrid) {
     val context = LocalContext.current
     val locale = context.resources.configuration.locales[0]
     val hours = grid.busyHours
-    Section(stringResource(R.string.report_busy_hours)) {
+    ReportSection(stringResource(R.string.report_busy_hours)) {
         if (hours.isEmpty()) {
             Text(stringResource(R.string.report_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@Section
+            return@ReportSection
         }
         Text(stringResource(R.string.report_busy_hours_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row {
@@ -585,7 +585,7 @@ private val CELL = 30.dp
 @Composable
 private fun Times(report: Report, words: ReportWords) {
     val t = report.times
-    Section(stringResource(R.string.report_times)) {
+    ReportSection(stringResource(R.string.report_times)) {
         Line("", stringResource(R.string.report_median), stringResource(R.string.report_p90), muted = true)
         Duration(stringResource(R.string.report_new_to_accepted), t.newToAccepted, words)
         Duration(stringResource(R.string.report_accepted_to_out), t.acceptedToOut, words)
@@ -621,7 +621,7 @@ private fun Late(label: String, late: ReportLateness, words: ReportWords) {
 @Composable
 private fun Cancellations(report: Report, words: ReportWords) {
     val c = report.cancellations
-    Section(stringResource(R.string.report_cancellations)) {
+    ReportSection(stringResource(R.string.report_cancellations)) {
         Line(words.cancelled, c.orders.toString(), ReportText.euro(c.value), bold = true)
         for (row in c.by) Line(ReportText.cancellation(row, words), row.orders.toString(), ReportText.euro(row.value))
     }
@@ -630,7 +630,7 @@ private fun Cancellations(report: Report, words: ReportWords) {
 @Composable
 private fun Discounts(report: Report) {
     val d = report.discounts
-    Section(stringResource(R.string.report_discounts)) {
+    ReportSection(stringResource(R.string.report_discounts)) {
         Line(stringResource(R.string.report_discounts_total), "", ReportText.euro(d.total), bold = true)
         Line(stringResource(R.string.report_codes), d.codes.orders.toString(), ReportText.euro(d.codes.amount))
         for (code in d.codes.byCode) Line("  ${code.code}", code.orders.toString(), ReportText.euro(code.amount), muted = true)
@@ -653,7 +653,7 @@ private fun Discounts(report: Report) {
 @Composable
 private fun Payments(report: Report, words: ReportWords) {
     val p = report.payments
-    Section(stringResource(R.string.report_payments)) {
+    ReportSection(stringResource(R.string.report_payments)) {
         Line(words.cash, p.cash.orders.toString(), ReportText.euro(p.cash.amount))
         Line(words.card, p.card.orders.toString(), ReportText.euro(p.card.amount))
         Line(words.online, p.online.orders.toString(), ReportText.euro(p.online.amount))
