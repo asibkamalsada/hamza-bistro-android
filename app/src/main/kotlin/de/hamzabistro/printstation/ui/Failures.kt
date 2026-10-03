@@ -2,6 +2,8 @@ package de.hamzabistro.printstation.ui
 
 import android.content.Context
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.DeliveryBreakException
+import de.hamzabistro.printstation.core.DeliveryPausedException
 import de.hamzabistro.printstation.core.InvalidHoursException
 import de.hamzabistro.printstation.core.InvalidSettingException
 import de.hamzabistro.printstation.core.NotAllowedException
@@ -17,6 +19,8 @@ fun failureText(context: Context, e: Exception): String =
         is InvalidHoursException -> context.getString(R.string.hours_invalid)
         is InvalidSettingException -> context.getString(R.string.setting_invalid)
         is UnknownAllergenException -> context.getString(R.string.menu_allergen_unknown)
+        is DeliveryPausedException -> context.getString(R.string.delivery_paused)
+        is DeliveryBreakException -> context.getString(R.string.delivery_break)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 

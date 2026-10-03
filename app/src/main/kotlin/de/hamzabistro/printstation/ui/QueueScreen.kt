@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.OrderStatus
+import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.QueueGroup
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
@@ -411,11 +412,11 @@ private fun QueueMenu(onOpen: (StaffScreen) -> Unit) {
 
 /** The shop line's buttons, wired to the view model. */
 internal class ShopButtons(private val viewModel: StaffViewModel) : ShopActions {
-    override fun pause(minutes: Long) = viewModel.pauseShop(minutes)
+    override fun pause(minutes: Long, what: PauseWhat) = viewModel.pauseShop(minutes, what)
 
-    override fun closeForToday() = viewModel.closeShopForToday()
+    override fun closeForToday(what: PauseWhat) = viewModel.closeShopForToday(what)
 
-    override fun closeForGood() = viewModel.closeShopForGood()
+    override fun closeForGood(what: PauseWhat) = viewModel.closeShopForGood(what)
 
     override fun open() = viewModel.openShop()
 

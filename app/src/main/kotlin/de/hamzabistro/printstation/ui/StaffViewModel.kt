@@ -10,6 +10,7 @@ import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.StaffOrder
@@ -254,22 +255,27 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     // The shop: open, paused, closed
     // -------------------------------------------------------------------
 
-    /** Closed for [minutes] from now, rounded up to five: "wieder ab 18:40", not 18:37. */
-    fun pauseShop(minutes: Long) {
+    /**
+     * Closed for [minutes] from now, rounded up to five: "wieder ab 18:40",
+     * not 18:37 — everything, or with [what] only delivery or the outer rings.
+     */
+    fun pauseShop(minutes: Long, what: PauseWhat = PauseWhat.ALL) {
         val step = Duration.ofMinutes(PAUSE_ROUNDING).toMillis()
         val until = Instant.now().plus(minutes, ChronoUnit.MINUTES).toEpochMilli()
-        closeShop(Instant.ofEpochMilli((until + step - 1) / step * step))
+        closeShop(Instant.ofEpochMilli((until + step - 1) / step * step), what)
     }
 
     /** Closed until midnight in Leipzig: tomorrow opens as usual. */
-    fun closeShopForToday() =
+    fun closeShopForToday(what: PauseWhat = PauseWhat.ALL) =
         closeShop(
-            Instant.now().atZone(AlarmPolicy.LEIPZIG).toLocalDate().plusDays(1).atStartOfDay(AlarmPolicy.LEIPZIG).toInstant()
+            Instant.now().atZone(AlarmPolicy.LEIPZIG).toLocalDate().plusDays(1).atStartOfDay(AlarmPolicy.LEIPZIG).toInstant(),
+            what,
         )
 
     /** Closed until somebody opens again — here, on another device, or on the website. */
-    fun closeShopForGood() = closeShop(null)
+    fun closeShopForGood(what: PauseWhat = PauseWhat.ALL) = closeShop(null, what)
 
+    /** Ends every closure running now, a pause of delivery too. */
     fun openShop() = switchShop { graph.shop.open() }
 
     /** Busy mode, here and on every device and the website: the database ends it by itself. */
@@ -277,7 +283,7 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     fun notBusyShop() = switchShop { graph.shop.notBusy() }
 
-    private fun closeShop(until: Instant?) = switchShop { graph.shop.close(until) }
+    private fun closeShop(until: Instant?, what: PauseWhat) = switchShop { graph.shop.close(until, what = what) }
 
     private fun switchShop(call: suspend () -> ShopHours) {
         shop.value = shop.value.copy(busy = true)
