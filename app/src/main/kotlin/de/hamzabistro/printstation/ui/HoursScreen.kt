@@ -386,9 +386,8 @@ private fun Closures(shop: ShopHours?, state: HoursState, now: Instant, hours: H
         for (closure in closures) {
             val running = !closure.startsAt.isAfter(now)
             val range =
-                closureRange(context, closure).let { range ->
-                    if (closure.stopsAll) range else context.getString(R.string.hours_plan_scope, range, scopeText(context, closure.scope, closure.rings))
-                }
+                if (closure.stopsAll) closureRange(context, closure)
+                else stringResource(R.string.hours_plan_scope, closureRange(context, closure), scopeText(context, closure.scope, closure.rings))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -475,7 +474,6 @@ private fun Week(shop: ShopHours?, state: HoursState, hours: HoursViewModel) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Breaks(shop: ShopHours, state: HoursState, hours: HoursViewModel) {
-    val context = LocalContext.current
     Section(stringResource(R.string.breaks_heading)) {
         Text(stringResource(R.string.breaks_note), style = MaterialTheme.typography.bodySmall)
         val saved = DeliveryBreak.weekOrdered(shop.deliveryBreaks)
@@ -492,7 +490,7 @@ private fun Breaks(shop: ShopHours, state: HoursState, hours: HoursViewModel) {
         Text(stringResource(R.string.break_lead_label), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (minutes in DeliveryBreak.leadChoices(shop.breakLeadMinutes)) {
-                val label = context.getString(R.string.break_lead_option, minutes)
+                val label = stringResource(R.string.break_lead_option, minutes)
                 if (minutes == shop.breakLeadMinutes) {
                     Button(onClick = {}, enabled = !state.breakBusy) { Text(label) }
                 } else {
