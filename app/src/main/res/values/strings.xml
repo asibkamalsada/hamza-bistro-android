@@ -156,7 +156,7 @@
     <string name="pickup_discount_label">pickup discount −%1$s</string>
     <string name="discount_label">discount %1$s −%2$s</string>
     <string name="stamp_label">stamp card −%1$s</string>
-    <string name="new_customer">First order — worth a quick call</string>
+    <string name="new_customer">New customer — worth a quick call</string>
     <string name="door_note">At the door</string>
     <string name="unverified_address">Address not verified — confirm it on the call</string>
     <string name="cancel_reason_shown">Reason: %1$s</string>

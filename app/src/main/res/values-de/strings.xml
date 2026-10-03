@@ -156,7 +156,7 @@
     <string name="pickup_discount_label">Selbstabholerrabatt −%1$s</string>
     <string name="discount_label">Rabatt %1$s −%2$s</string>
     <string name="stamp_label">Stempelkarte −%1$s</string>
-    <string name="new_customer">Erste Bestellung – kurz anrufen</string>
+    <string name="new_customer">Neuer Kunde — kurz anrufen</string>
     <string name="door_note">An der Tür</string>
     <string name="unverified_address">Adresse nicht geprüft – beim Anruf bestätigen</string>
     <string name="cancel_reason_shown">Grund: %1$s</string>
