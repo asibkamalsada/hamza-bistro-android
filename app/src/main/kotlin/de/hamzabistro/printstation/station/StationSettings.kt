@@ -56,6 +56,8 @@ data class DevicePrefs(
     val travelMode: TravelMode = TravelMode.BICYCLING,
     /** Keeps the screen on while the queue is open on it. */
     val keepAwake: Boolean = true,
+    /** A driver's phone: the queue opens on "Fahrer", the bags to take and the stops to ride. */
+    val driver: Boolean = false,
 )
 
 /**
@@ -148,6 +150,7 @@ class StationSettings(context: Context) {
             navApp = enumOr(prefs.getString(NAV_APP, null), d.navApp)!!,
             travelMode = enumOr(prefs.getString(TRAVEL_MODE, null), d.travelMode)!!,
             keepAwake = prefs.getBoolean(KEEP_AWAKE, d.keepAwake),
+            driver = prefs.getBoolean(DRIVER, d.driver),
         )
     }
 
@@ -174,6 +177,7 @@ class StationSettings(context: Context) {
             .putString(NAV_APP, p.navApp.name)
             .putString(TRAVEL_MODE, p.travelMode.name)
             .putBoolean(KEEP_AWAKE, p.keepAwake)
+            .putBoolean(DRIVER, p.driver)
             .apply()
     }
 
@@ -216,6 +220,7 @@ class StationSettings(context: Context) {
         private const val NAV_APP = "nav_app"
         private const val TRAVEL_MODE = "travel_mode"
         private const val KEEP_AWAKE = "keep_awake"
+        private const val DRIVER = "driver"
         private const val NEVER = "never"
     }
 }
@@ -226,12 +231,10 @@ data class ChosenPrinter(val address: String, val name: String?)
 /**
  * The alarm settings this device decides by: "Bestellung fertig", until
  * somebody chooses here, as what the device is for says — on for a driver's
- * phone, off for the kitchen tablet. No device is set up as a driver's phone
- * before the driver view (hamza-bistro-android#8), so until then that is
- * off everywhere and the switch in the settings decides.
+ * phone ("Fahrer-Handy", [DevicePrefs.driver]), off for the kitchen tablet.
  */
 val DevicePrefs.alarmForDevice: AlarmSettings
-    get() = alarm.forDevice(driver = false)
+    get() = alarm.forDevice(driver = driver)
 
 /** The alarm mode as the site's device list names it. */
 val NewOrderAlarm.wire: String

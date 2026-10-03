@@ -112,6 +112,31 @@ rules, ported to Kotlin with the site's own test cases
 - held sideways on a tablet, the three headings stand side by side, like
   a kitchen pass.
 
+### Fahrer
+
+A second tab on the queue, and the one a phone opens on when "Fahrer-Handy"
+is switched on in the settings
+([`Driver`](core/src/main/kotlin/de/hamzabistro/printstation/core/Driver.kt),
+#8):
+
+- **Mitnehmen**: the deliveries still in the kitchen, by when they are due,
+  each with its ring, street, the note for the door and what to collect (or
+  "BEZAHLT"). Tick several, then **Mitnehmen (3)**: each goes "Unterwegs" as
+  its own step, with its own undo window, and only from where this device
+  saw it — one another device moved meanwhile is refused alone and shows as
+  it is now, the others go through. Packed bags ("Fertig",
+  hamza-bistro-web#90) come first, the longest-waiting on top.
+- **Unterwegs**: the stops, ring by ring from the shop (inner, near, far,
+  edge), then by postcode, then by street — there are no coordinates on an
+  order yet. ↑ / ↓ put right what that gets wrong. Each stop has Anrufen,
+  the note, the amount and **Bar** / **Karte**.
+- **Route öffnen**: one Google Maps link for the stops, as text addresses,
+  by bike when every stop is in the inner two rings and by car as soon as
+  one is further out (`docs/delivery-area.md` in hamza-bistro-web). Google
+  Maps on a phone takes three waypoints and a destination; a longer trip
+  is split into parts, and the screen says so. Waze and Apple Maps take one
+  destination, so with those it is **Nächster Stopp**, one at a time.
+
 ### Everything else the website's staff pages had
 
 The website still has `/orders`, `/orders/settings`, `/orders/hours` and
@@ -283,8 +308,9 @@ decides, every few seconds and on every change of the queue:
   the phones. The print stations are read every two minutes.
 - **Bestellung fertig**: a bag packed for the driver chimes once, with
   "#57 ist fertig – Georg-Schwarz-Str. 12 · 2 Bestellungen warten" (the
-  street only once the phone is unlocked). Per device, in the settings: off
-  on the kitchen tablet, on for the driver's phone. Not for what was
+  street only once the phone is unlocked). Per device, in the settings: on
+  by default where "Fahrer-Handy" is switched on, off on the kitchen
+  tablet. Not for what was
   already packed when the device started listening, and not twice for a
   bag unpacked and packed again within two minutes.
 

@@ -225,6 +225,9 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                 Chips(TravelMode.entries, prefs.travelMode, { travelName(context, it) }) { mode ->
                     staff.updatePrefs { it.copy(travelMode = mode) }
                 }
+                Text(stringResource(R.string.travel_by_ring_hint), style = MaterialTheme.typography.bodySmall)
+                SwitchRow(stringResource(R.string.driver_device), prefs.driver) { on -> staff.updatePrefs { it.copy(driver = on) } }
+                Text(stringResource(R.string.driver_device_hint), style = MaterialTheme.typography.bodySmall)
             }
 
             Section(stringResource(R.string.section_screen)) {
