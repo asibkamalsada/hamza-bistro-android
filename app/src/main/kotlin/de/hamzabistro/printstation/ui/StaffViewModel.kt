@@ -10,6 +10,8 @@ import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.Kitchen
+import de.hamzabistro.printstation.core.KitchenSlot
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.Payment
 import de.hamzabistro.printstation.core.PaymentMethod
@@ -35,7 +37,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -129,6 +133,31 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
                 state.copy(alarm = alarm, now = now, canPrint = graph.settings.printer != null, shop = shop, addressFailing = address)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StaffState())
+
+    private val kitchenRead = MutableStateFlow<List<KitchenSlot>?>(null)
+
+    /**
+     * The kitchen's next hour for the line above the queue (hamza-bistro-web#73),
+     * read again whenever the queue is. Null on a database without the cap.
+     */
+    val kitchen: StateFlow<List<KitchenSlot>?> =
+        merge(
+            flow<Nothing> { graph.queue.state.map { it.lastLoad }.distinctUntilChanged().collect { readKitchen() } },
+            kitchenRead,
+        )
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** A failure keeps what was last read: the queue's own banner says when the database is out of reach. */
+    private suspend fun readKitchen() {
+        try {
+            val (from, to) = Kitchen.window(Instant.now())
+            kitchenRead.value = graph.shop.kitchenSlots(from, to)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            graph.logger.warn("Reading the kitchen's load failed: ${e.javaClass.simpleName}")
+        }
+    }
 
     private val _events = MutableStateFlow<StaffEvent?>(null)
     val events: StateFlow<StaffEvent?> = _events.asStateFlow()

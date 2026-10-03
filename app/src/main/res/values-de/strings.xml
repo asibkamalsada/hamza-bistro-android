@@ -508,6 +508,15 @@
     <string name="auto_decline_suggested">%1$s (empfohlen)</string>
     <string name="setting_invalid">Die Datenbank nimmt diesen Wert nicht an.</string>
 
+    <!-- Die Küche: Gerichte pro Viertelstunde, unter Lieferzeiten und über der Liste (hamza-bistro-web#73) -->
+    <string name="kitchen_cap_heading">Küche: Gerichte pro Viertelstunde</string>
+    <string name="kitchen_cap_note">So viele Gerichte schafft die Küche in 15 Minuten (Getränke zählen nicht). In eine volle Viertelstunde kann niemand vorbestellen, und „So schnell wie möglich“ bekommt die erste Viertelstunde mit Platz. Annehmen könnt ihr weiterhin alles.</string>
+    <string name="kitchen_cap_off">Aus — keine Grenze</string>
+    <string name="kitchen_cap_n">%1$d Gerichte</string>
+    <string name="kitchen_load_label">Küche, nächste Stunde</string>
+    <string name="kitchen_load_slot">%1$s: %2$d von %3$d Gerichten</string>
+    <string name="kitchen_full">Zu dieser Zeit ist die Küche ausgebucht — bitte eine andere Zeit wählen oder für sofort bestellen.</string>
+
     <!-- Speisekarte (MenuScreen.kt) -->
     <string name="menu_title">Speisekarte</string>
     <string name="menu_tab_dishes">Gerichte</string>

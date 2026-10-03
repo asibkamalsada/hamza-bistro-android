@@ -99,6 +99,14 @@ class DeliveryPausedException(message: String) : Exception(message)
 class DeliveryBreakException(message: String) : Exception(message)
 
 /**
+ * The database took no pre-order for that time: the kitchen's quarter hour
+ * it would leave in is full (HB457, hamza-bistro-web#73). Only orders for a
+ * set time are refused; one for right now is booked into the first quarter
+ * hour with room. Another time, or right now, goes through.
+ */
+class KitchenFullException(message: String) : Exception(message)
+
+/**
  * The database refused how the order was paid (HB438): the method of an
  * order already delivered cannot change, and "online" is not staff's to
  * say. A "Bar" that should have been "Karte" and was not taken back within
