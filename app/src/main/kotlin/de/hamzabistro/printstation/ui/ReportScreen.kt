@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -522,8 +523,7 @@ private fun BestSellers(report: Report) {
  */
 @Composable
 private fun BusyHours(grid: BusyGrid) {
-    val context = LocalContext.current
-    val locale = context.resources.configuration.locales[0]
+    val locale = LocalConfiguration.current.locales[0]
     val hours = grid.busyHours
     ReportSection(stringResource(R.string.report_busy_hours)) {
         if (hours.isEmpty()) {
