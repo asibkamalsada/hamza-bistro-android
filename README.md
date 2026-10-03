@@ -102,6 +102,31 @@ rules, ported to Kotlin with the site's own test cases
 - held sideways on a tablet, the three headings stand side by side, like
   a kitchen pass.
 
+### Fahrer
+
+A second tab on the queue, and the one a phone opens on when "Fahrer-Handy"
+is switched on in the settings
+([`Driver`](core/src/main/kotlin/de/hamzabistro/printstation/core/Driver.kt),
+#8):
+
+- **Mitnehmen**: the deliveries still in the kitchen, by when they are due,
+  each with its ring, street, the note for the door and what to collect (or
+  "BEZAHLT"). Tick several, then **Mitnehmen (3)**: each goes "Unterwegs" as
+  its own step, with its own undo window, and only from where this device
+  saw it — one another device moved meanwhile is refused alone and shows as
+  it is now, the others go through. Once orders carry `packed_at`
+  (hamza-bistro-web#90), packed bags come first.
+- **Unterwegs**: the stops, ring by ring from the shop (inner, near, far,
+  edge), then by postcode, then by street — there are no coordinates on an
+  order yet. ↑ / ↓ put right what that gets wrong. Each stop has Anrufen,
+  the note, the amount and **Bar** / **Karte**.
+- **Route öffnen**: one Google Maps link for the stops, as text addresses,
+  by bike when every stop is in the inner two rings and by car as soon as
+  one is further out (`docs/delivery-area.md` in hamza-bistro-web). Google
+  Maps on a phone takes three waypoints and a destination; a longer trip
+  is split into parts, and the screen says so. Waze and Apple Maps take one
+  destination, so with those it is **Nächster Stopp**, one at a time.
+
 ### Everything else the website's staff pages had
 
 The website still has `/orders`, `/orders/settings`, `/orders/hours` and

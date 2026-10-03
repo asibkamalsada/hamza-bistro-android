@@ -695,4 +695,22 @@
     <string name="update_check">Jetzt prüfen</string>
     <string name="update_changes">Neu:</string>
     <string name="update_hint">„Installieren“ lädt die APK im Browser; öffnen, und Android installiert sie über diese Version. Anmeldung und Drucker bleiben. Beim ersten Mal fragt Android, ob der Browser Apps installieren darf.</string>
+
+    <!-- Der Fahrer: mehrere Tüten auf einmal, eine Route (#8) -->
+    <string name="queue_tab">Bestellungen</string>
+    <string name="driver_tab">Fahrer · %1$d</string>
+    <string name="driver_empty">Keine Lieferungen in der Küche oder unterwegs.</string>
+    <string name="driver_collect">Mitnehmen</string>
+    <string name="driver_collect_hint">Die Tüten antippen, die du mitnimmst, dann „Mitnehmen“: alle gehen auf einmal auf „Unterwegs“, jede mit ihrem eigenen Rückgängig.</string>
+    <string name="driver_take">Mitnehmen (%1$d)</string>
+    <string name="driver_packed_at">fertig seit %1$s</string>
+    <string name="driver_paid">BEZAHLT</string>
+    <string name="driver_call">Anrufen</string>
+    <string name="route_open">Route öffnen</string>
+    <string name="route_open_part">Route %1$d/%2$d öffnen · Stopps %3$d–%4$d</string>
+    <string name="route_split">Google Maps nimmt auf dem Handy höchstens %1$d Stopps pro Route – die Fahrt ist in %2$d Teile geteilt. Den nächsten öffnen, wenn der letzte geschafft ist.</string>
+    <string name="route_next">Nächster Stopp: #%1$d %2$s</string>
+    <string name="travel_by_ring_hint">„Route öffnen“ unter „Fahrer“ wählt Fahrrad oder Auto nach den Ringen der Fahrt: Fahrrad für die inneren zwei, Auto, sobald ein Stopp weiter draußen liegt. Diese Einstellung gilt nur, wo kein Ring bekannt ist.</string>
+    <string name="driver_device">Fahrer-Handy: die Liste öffnet mit „Fahrer“</string>
+    <string name="driver_device_hint">Die Tüten aus der Küche mit einem Tipp mitnehmen, die Stopps in der Reihenfolge der Fahrt, und eine Route für alle.</string>
 </resources>

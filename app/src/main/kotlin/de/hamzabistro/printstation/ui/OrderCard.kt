@@ -330,7 +330,7 @@ fun OrderCard(
 }
 
 @Composable
-private fun Badge(text: String, color: Color) {
+internal fun Badge(text: String, color: Color) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
@@ -339,7 +339,7 @@ private fun Badge(text: String, color: Color) {
 }
 
 @Composable
-private fun Note(label: String, text: String, color: Color) {
+internal fun Note(label: String, text: String, color: Color) {
     Column(
         modifier = Modifier.fillMaxWidth().background(color, RoundedCornerShape(8.dp)).padding(10.dp),
     ) {

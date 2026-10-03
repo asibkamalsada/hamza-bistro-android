@@ -7,6 +7,7 @@ import de.hamzabistro.printstation.AppGraph
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.AlarmPolicy
@@ -164,6 +165,8 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch { graph.steps.failures.collect { _events.value = StaffEvent.Step(it) } }
+        // What is read anyway: collecting liveQueue here would keep the queue running behind the screen.
+        viewModelScope.launch { graph.queue.state.collect { forgetGone(it.orders) } }
     }
 
     fun eventShown() {
@@ -232,6 +235,52 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun undo(order: StaffOrder) = graph.steps.undo(order.id)
+
+    // -------------------------------------------------------------------
+    // The driver: several bags at once, one route (#8)
+    // -------------------------------------------------------------------
+
+    /** Whether this device is a driver's phone, as it is set now: the queue opens on "Fahrer". */
+    val driverDevice: Boolean
+        get() = graph.settings.device.value.driver
+
+    private val _chosen = MutableStateFlow<Set<String>>(emptySet())
+
+    /** The bags ticked for "Mitnehmen". */
+    val chosen: StateFlow<Set<String>> = _chosen.asStateFlow()
+
+    private val _stopOrder = MutableStateFlow<List<String>>(emptyList())
+
+    /** The order the driver put the stops in with ↑ / ↓; empty until they did. */
+    val stopOrder: StateFlow<List<String>> = _stopOrder.asStateFlow()
+
+    fun choose(order: StaffOrder) {
+        if (!Driver.canTake(order)) return
+        _chosen.value = if (order.id in _chosen.value) _chosen.value - order.id else _chosen.value + order.id
+    }
+
+    /**
+     * "Mitnehmen (n)": every ticked bag still in the kitchen goes
+     * "Unterwegs", each one its own step — with its own undo window, and
+     * sent only from where this device saw it, so one that moved on
+     * elsewhere meanwhile is refused alone and the rest go through.
+     */
+    fun takeAlong() {
+        val batch = Driver.batch(_chosen.value, state.value.queue.orders)
+        _chosen.value = emptySet()
+        for (order in batch) graph.steps.take(order, OrderStep.Out)
+    }
+
+    /** ↑ / ↓ on a stop: the driver knows the streets better than the postcode does. */
+    fun moveStop(order: StaffOrder, by: Int) {
+        _stopOrder.value = Driver.move(Driver.stops(state.value.queue.orders, _stopOrder.value), order.id, by)
+    }
+
+    /** Ticks on bags that have left the kitchen meanwhile, here or anywhere, mean nothing any more. */
+    private fun forgetGone(orders: List<StaffOrder>) {
+        val still = Driver.stillChosen(_chosen.value, orders)
+        if (still != _chosen.value) _chosen.value = still
+    }
 
     /** The screen went away: what waits on its undo window goes now, as on /orders. */
     fun flush() = graph.steps.flushAll()
