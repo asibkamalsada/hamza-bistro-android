@@ -34,9 +34,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +68,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.PaymentMethod
@@ -104,6 +108,12 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
 
     val actions = remember(viewModel) { Actions(context, viewModel) }
     val waiting = state.queue.orders.count { it.status == OrderStatus.NEW }
+    // A driver's phone opens on "Fahrer"; any device can switch.
+    var driving by rememberSaveable { mutableStateOf(viewModel.driverDevice) }
+    // A tapped notification is about the queue.
+    LaunchedEffect(asked) { if (asked != null) driving = false }
+    val chosen by viewModel.chosen.collectAsStateWithLifecycle()
+    val stopOrder by viewModel.stopOrder.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -118,9 +128,15 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Banners(state, viewModel, onOpen)
+            val forDriver = state.queue.orders.count(Driver::isForDriver)
+            PrimaryTabRow(selectedTabIndex = if (driving) 1 else 0, modifier = Modifier.padding(top = 8.dp)) {
+                Tab(selected = !driving, onClick = { driving = false }, text = { Text(stringResource(R.string.queue_tab)) })
+                Tab(selected = driving, onClick = { driving = true }, text = { Text(stringResource(R.string.driver_tab, forDriver)) })
+            }
             when {
                 !state.queue.loaded && state.queue.failingSince == null ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                driving -> DriverView(state, chosen, stopOrder, viewModel, actions)
                 state.queue.orders.isEmpty() ->
                     Text(
                         stringResource(R.string.queue_empty),
@@ -454,8 +470,11 @@ internal class Actions(private val context: Context, private val viewModel: Staf
 
     override fun route(order: StaffOrder) {
         val prefs = viewModel.state.value.prefs
-        open(Intent(Intent.ACTION_VIEW, Uri.parse(StaffQueue.navigationUrl(order, prefs.navApp, prefs.travelMode))))
+        link(StaffQueue.navigationUrl(order, prefs.navApp, prefs.travelMode))
     }
+
+    /** A map link: a whole route, or the next stop. */
+    fun link(url: String) = open(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
 
     private fun open(intent: Intent) {
         try {

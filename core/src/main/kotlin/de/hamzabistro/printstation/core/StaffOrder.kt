@@ -148,6 +148,12 @@ data class StaffOrder(
     @SerialName("payment_method") val paymentMethod: PaymentMethod? = null,
     /** When it was delivered or collected, from the database clock. */
     @SerialName("delivered_at") @Serializable(with = InstantSerializer::class) val deliveredAt: Instant? = null,
+    /**
+     * When the bag was packed, "Fertig" (hamza-bistro-web#90). Read when a
+     * row carries it, null otherwise: not in [COLUMNS] until the column
+     * exists, since PostgREST refuses a select naming one it does not know.
+     */
+    @SerialName("packed_at") @Serializable(with = InstantSerializer::class) val packedAt: Instant? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
