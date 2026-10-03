@@ -18,6 +18,9 @@ enum class StaffScreen {
     /** The Kassensturz: per driver, cash and card for a day. */
     CASH_UP,
 
+    /** The Auswertung: sales, best sellers, busy hours, times over a range of days. */
+    REPORT,
+
     /** What is sold out, and what a dish is and costs: the site's /menu-admin. */
     MENU,
 
@@ -41,6 +44,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
         StaffScreen.QUEUE -> QueueScreen(staff, focus, onFocused, onOpen = { screen = it })
         StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
         StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
+        StaffScreen.REPORT -> ReportScreen(onBack = back)
         StaffScreen.MENU -> MenuScreen(onBack = back)
         StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
         StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)

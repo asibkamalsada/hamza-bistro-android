@@ -121,6 +121,15 @@ queue's top bar (**Mehr** on a phone):
   the share sheet. "Bar" or "Karte" taken back within the undo window
   records nothing; after it, a correction is made in the Supabase
   dashboard only.
+- **Auswertung** — this week, last week, this month, last month or a
+  range picked (at most 366 Leipzig days): Umsatz, Bestellungen,
+  Ø Warenkorb and Verspätet % on top; per day, Lieferung vs Abholung, the
+  rings, the best sellers (top 10, all a tap away, by Menge or Umsatz), the
+  busy hours as a weekday × hour grid, median and p90 of each step's time,
+  cancellations by who and why, discounts and payments. **Teilen** sends
+  the summary as text; **CSV** sends the days, the best sellers and the
+  rings as three files for German Excel (`;`, decimal comma). Counts and
+  sums only, from `staff_report()`.
 - **Speisekarte** — the whole menu, in five tabs. What is sold out, as on
   `/menu-admin`: a dish; a single choice, which goes off in every dish that
   offers it; an ingredient, which takes everything made of it off at once
@@ -321,7 +330,7 @@ the app logs it.
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
-  and takings (`History`), the Kassensturz (`CashUp`), opening and closing the shop, closures and the
+  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
