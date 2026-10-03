@@ -8,9 +8,11 @@ import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.Problem
 import de.hamzabistro.printstation.core.QueueState
+import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.StationNotifications
 import de.hamzabistro.printstation.station.StationState
+import de.hamzabistro.printstation.station.alarmForDevice
 import java.time.Instant
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -95,7 +97,7 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         // precisely and sooner; it does not also chime about the same ticket.
         val elsewhere = printingSince.takeUnless { graph.settings.enabled }
         val decision =
-            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarm, Instant.now(), elsewhere) {
+            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarmForDevice, Instant.now(), elsewhere) {
                 Eta.estimate(it, queue.prep)
             }
         graph.alarm.value = decision
@@ -124,11 +126,16 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         }
 
         // An order answered anywhere takes its notification with it; a
-        // pre-order keeps its "jetzt kochen" until it is on its way.
+        // pre-order keeps its "jetzt kochen", and a packed bag its "ist
+        // fertig", until it is on its way.
         if (orders != null) {
             StationNotifications.clearOrders(
                 context,
-                orders.filter { it.status == OrderStatus.NEW || (it.status == OrderStatus.CONFIRMED && it.scheduledFor != null) },
+                orders.filter {
+                    it.status == OrderStatus.NEW ||
+                        (it.status == OrderStatus.CONFIRMED && it.scheduledFor != null) ||
+                        StaffQueue.isPacked(it)
+                },
             )
         }
     }

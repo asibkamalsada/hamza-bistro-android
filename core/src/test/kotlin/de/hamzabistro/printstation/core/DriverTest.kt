@@ -48,7 +48,7 @@ class DriverTest {
     }
 
     @Test
-    fun `puts packed bags first, the one waiting longest on top, once packed_at exists`() {
+    fun `puts packed bags first, the one waiting longest on top`() {
         val dueFirst = order("due-first", confirmedAt = "2026-09-26T15:50:00Z")
         val packedLate = order("packed-late", confirmedAt = "2026-09-26T16:20:00Z").copy(packedAt = at("2026-09-26T16:40:00Z"))
         val packedEarly = order("packed-early", confirmedAt = "2026-09-26T16:30:00Z").copy(packedAt = at("2026-09-26T16:35:00Z"))
@@ -67,8 +67,8 @@ class DriverTest {
             at("2026-09-26T16:20:00Z"),
             json.decodeFromString(StaffOrder.serializer(), "$base,\"packed_at\":\"2026-09-26T16:20:00+00:00\"}").packedAt,
         )
-        // Not asked for until the column exists: PostgREST refuses a select naming an unknown one.
-        assertFalse("packed_at" in StaffOrder.COLUMNS)
+        // Asked for now that the column exists (20261003180000_packed_step.sql).
+        assertTrue("packed_at" in StaffOrder.COLUMNS.split(","))
     }
 
     @Test

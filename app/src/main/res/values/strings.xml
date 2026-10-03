@@ -63,6 +63,12 @@
     <string name="chime_offline_text">Since %1$s — new orders do not reach this device just now. Check Wi-Fi or mobile data.</string>
     <string name="chime_declining">Order #%1$d: declined automatically in 2 min</string>
     <string name="chime_declining_text">Nobody has answered it. Accept or decline now — otherwise the customer is told it could not be taken.</string>
+    <string name="chime_packed">#%1$d is packed – %2$s</string>
+    <string name="chime_packed_public">#%1$d is packed</string>
+    <plurals name="chime_packed_waiting">
+        <item quantity="one">%1$d order waiting</item>
+        <item quantity="other">%1$d orders waiting</item>
+    </plurals>
 
     <string name="slot_today">today</string>
     <string name="slot_tomorrow">tomorrow</string>
@@ -124,6 +130,7 @@
     <string name="order_moved">That order had already been changed — this is where it stands now.</string>
     <string name="order_not_delayable">This order can no longer be delayed — this is where it stands now.</string>
     <string name="payment_locked">How this order was paid is already recorded. After the undo window it can only be corrected in the dashboard.</string>
+    <string name="order_not_packable">This order is no longer an accepted delivery — this is where it stands now.</string>
     <string name="step_failed">Not sent: %1$s</string>
     <string name="printed_by_hand">Ticket #%1$d printed.</string>
 
@@ -141,6 +148,7 @@
     <string name="status_new">New</string>
     <string name="status_confirmed">Accepted</string>
     <string name="status_ready">Ready to collect</string>
+    <string name="status_packed">Packed</string>
     <string name="status_on_the_way">On the way</string>
     <string name="status_delivered">Delivered</string>
     <string name="status_collected">Collected</string>
@@ -169,6 +177,9 @@
     <string name="eta_button">%1$d min</string>
     <string name="step_on_the_way">On the way</string>
     <string name="step_ready">Ready to collect</string>
+    <string name="step_packed">Packed</string>
+    <string name="step_unpack">Not packed after all</string>
+    <string name="packed_for">packed %1$d min ago</string>
     <string name="step_delivered">Delivered</string>
     <string name="step_collected">Collected</string>
     <!-- The last step on the way: delivered or collected, and how it was paid. -->
@@ -237,6 +248,8 @@
     <string name="alarm_printer">Printer: say when a ticket did not print</string>
     <string name="alarm_unprinted">Say when an accepted order has not printed anywhere two minutes on</string>
     <string name="alarm_connection">Say when the connection to the shop is gone</string>
+    <string name="alarm_packed">Order packed: say when a bag is ready for the driver</string>
+    <string name="alarm_packed_hint">It chimes when the kitchen taps \"Packed\". On by itself where \"Driver\'s phone\" is switched on; off on the kitchen tablet.</string>
     <string name="minutes_n">%1$d min</string>
     <string name="seconds_n">%1$d s</string>
     <string name="quiet_never">None</string>

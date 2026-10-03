@@ -117,6 +117,10 @@ private fun AlarmScreen(staff: StaffViewModel, onDone: () -> Unit, onOpenApp: (S
 
             override fun delay(order: StaffOrder, minutes: Int) = staff.delay(order, minutes)
 
+            override fun pack(order: StaffOrder) = staff.pack(order)
+
+            override fun unpack(order: StaffOrder) = staff.unpack(order)
+
             override fun undo(order: StaffOrder) = staff.undo(order)
 
             override fun print(order: StaffOrder) = Unit

@@ -93,16 +93,77 @@ object StaffQueue {
         return if (ms >= 0) ms / 60_000 else -((-ms + 59_999) / 60_000)
     }
 
+    // -----------------------------------------------------------------------
+    // Packed: "Fertig" (20261003180000_packed_step.sql, hamza-bistro-web#90)
+    // -----------------------------------------------------------------------
+
     /**
-     * The order the queue is read in: every new order first, the
-     * longest-waiting on top; then everything accepted by when it is due,
-     * which puts a pre-order due in ten minutes above an order for right
-     * away due in thirty.
+     * Whether the bag is packed and waiting for the driver: an accepted
+     * delivery staff marked "Fertig" that has not left yet. isPacked() of the
+     * site. packed_at stays once it goes out, so the status counts too.
+     */
+    fun isPacked(order: StaffOrder): Boolean = order.status == OrderStatus.CONFIRMED && !order.pickup && order.packedAt != null
+
+    /**
+     * Whether a card offers "Fertig": an accepted delivery not packed yet.
+     * Never a pickup — "Abholbereit" already is its ready step. What
+     * order_packed lets through; anything else comes back as HB458.
+     */
+    fun canPack(order: StaffOrder): Boolean = order.status == OrderStatus.CONFIRMED && !order.pickup && order.packedAt == null
+
+    /**
+     * Packed bags before everything else, the one waiting longest on top;
+     * any two not both packed are left as they are. The first rule of the
+     * driver's pick-up list, and of [order] after the new orders — for any
+     * list that has to agree with "Unterwegs & abholbereit".
+     */
+    val packedFirst: Comparator<StaffOrder> = Comparator { a, b ->
+        val aPacked = isPacked(a)
+        val bPacked = isPacked(b)
+        when {
+            aPacked != bPacked -> if (aPacked) -1 else 1
+            aPacked -> a.packedAt!!.compareTo(b.packedAt!!)
+            else -> 0
+        }
+    }
+
+    /** The bags packed and waiting for the driver now: "2 Bestellungen warten". */
+    fun packedWaiting(orders: List<StaffOrder>): Int = orders.count(::isPacked)
+
+    /**
+     * "fertig seit 3 Min.": whole minutes a packed bag has waited, rounded
+     * down, and how loud to say it — amber from [PACKED_SOON_MINUTES], red
+     * from [PACKED_LATE_MINUTES], as on /orders: food on the counter cools.
+     * Null for an order that is not [isPacked].
+     */
+    fun packedWait(order: StaffOrder, now: Instant): PackedWait? {
+        if (!isPacked(order)) return null
+        val minutes = maxOf(0L, Duration.between(order.packedAt, now).toMillis() / 60_000)
+        val urgency =
+            when {
+                minutes >= PACKED_LATE_MINUTES -> PackedUrgency.LATE
+                minutes >= PACKED_SOON_MINUTES -> PackedUrgency.SOON
+                else -> PackedUrgency.CALM
+            }
+        return PackedWait(minutes, urgency)
+    }
+
+    const val PACKED_SOON_MINUTES = 5L
+    const val PACKED_LATE_MINUTES = 10L
+
+    /**
+     * The order the queue is read in — compareQueue() of the site: every
+     * new order first, the longest-waiting on top; then the packed bags, the
+     * longest-waiting on top, which is the driver's pick-up list; then
+     * everything else accepted by when it is due, which puts a pre-order due
+     * in ten minutes above an order for right away due in thirty.
      */
     val order: Comparator<StaffOrder> = Comparator { a, b ->
         val aNew = a.status == OrderStatus.NEW
         val bNew = b.status == OrderStatus.NEW
         if (aNew != bNew) return@Comparator if (aNew) -1 else 1
+        val packed = packedFirst.compare(a, b)
+        if (packed != 0) return@Comparator packed
         if (!aNew) {
             val aDue = promisedAt(a) ?: Instant.MAX
             val bDue = promisedAt(b) ?: Instant.MAX
@@ -112,11 +173,15 @@ object StaffQueue {
         a.createdAt.compareTo(b.createdAt)
     }
 
-    /** Which heading an order sits under: what the person holding the phone does next. */
+    /**
+     * Which heading an order sits under: what the person holding the phone
+     * does next. A packed bag is out of the kitchen, at the top of
+     * "Unterwegs & abholbereit" ([order]).
+     */
     fun groupOf(order: StaffOrder): QueueGroup =
         when (order.status) {
             OrderStatus.NEW -> QueueGroup.DECIDE
-            OrderStatus.CONFIRMED -> QueueGroup.COOK
+            OrderStatus.CONFIRMED -> if (isPacked(order)) QueueGroup.OUT else QueueGroup.COOK
             else -> QueueGroup.OUT
         }
 
@@ -199,8 +264,18 @@ enum class QueueGroup {
     /** Accepted: in the kitchen. */
     COOK,
 
-    /** On a bike, or on the counter waiting to be collected. */
+    /** On a bike, on the counter waiting to be collected, or packed and waiting for the driver. */
     OUT,
+}
+
+/** How long a packed bag has waited for the driver, and how loud the card says it. */
+data class PackedWait(val minutes: Long, val urgency: PackedUrgency)
+
+/** Calm, amber from five minutes, red from ten. */
+enum class PackedUrgency {
+    CALM,
+    SOON,
+    LATE,
 }
 
 /** The navigation apps a phone can be set to open. */
