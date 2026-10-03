@@ -65,6 +65,7 @@ internal class SupabaseRest(
             // whoever asked can still make it a collection.
             DELIVERY_PAUSED -> DeliveryPausedException("$what: $message")
             DELIVERY_BREAK -> DeliveryBreakException("$what: $message")
+            KITCHEN_FULL -> KitchenFullException("$what: $message")
             else -> BackendException(status, "$what: $message", code)
         }
     }
@@ -73,5 +74,8 @@ internal class SupabaseRest(
         /** See 20261002180000_scoped_pause.sql in hamza-bistro-web. */
         const val DELIVERY_PAUSED = "HB436"
         const val DELIVERY_BREAK = "HB437"
+
+        /** See 20261003160000_kitchen_capacity.sql in hamza-bistro-web. */
+        const val KITCHEN_FULL = "HB457"
     }
 }

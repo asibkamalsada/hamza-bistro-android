@@ -286,6 +286,7 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (Staff
 
     Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) }, onHours = { onOpen(StaffScreen.HOURS) })
+        KitchenLoadLine(viewModel.kitchen.collectAsStateWithLifecycle().value, state.now)
         val delayingAll by viewModel.delayingAll.collectAsStateWithLifecycle()
         DelayAll(state.delayableAll.size, delayingAll, viewModel::delayAll)
         if (!state.prefs.onShift) {

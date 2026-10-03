@@ -189,8 +189,10 @@ queue's top bar (**Mehr** on a phone):
   prints it.
 - **Lieferzeiten** — the open/closed switch, **Unbeantwortete Bestellungen
   ablehnen** (off, 5, 10 — recommended —, 15, 20 or 30 minutes; saved on
-  tap, for every device and the website), closures planned ahead (a
-  holiday, a day off; also open-ended), and the week's delivery hours, saved
+  tap, for every device and the website), **Küche: Gerichte pro
+  Viertelstunde** (Aus, 3, 4, 5, 6, 8, 10, 12 or 15; see below), closures
+  planned ahead (a holiday, a day off; also open-ended), and the week's
+  delivery hours, saved
   all at once, on the quarter hour.
 - **Einstellungen**, besides this device's own settings: **Wer von
   Bestellungen erfährt** (the devices on shift with this app, with how they
@@ -238,6 +240,22 @@ here within one poll.
 The week's delivery hours and closures planned ahead (a holiday, a day
 off) are set under **Lieferzeiten**, which the line also opens. Without that
 migration the line is simply not there.
+
+### The kitchen's next hour
+
+Below the shop line, as on `/orders`: "Küche, nächste Stunde 18:00 ■■■■□
+18:15 ■■■■■ +2 …" — the four quarter hours from the current one, one square
+per dish of the cap, filled for each dish due to leave the kitchen then, a
+full or overbooked one in the warn colour; above ten per quarter hour,
+"7/12" instead. So whoever accepts sees what "15 Min." really means. The
+cap is set under **Lieferzeiten** (`set_dishes_per_slot`); customers cannot
+pre-order into a full quarter hour, and an order for right now is quoted
+for the first one with room. Staff can still accept anything. The numbers
+are `kitchen_slots()`, read again with every read of the queue
+([`Kitchen`](core/src/main/kotlin/de/hamzabistro/printstation/core/Kitchen.kt),
+[`20261003160000_kitchen_capacity.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261003160000_kitchen_capacity.sql),
+hamza-bistro-web#73). With the cap off, or without that migration, neither
+the line nor the setting is there.
 
 ### The alarm
 

@@ -72,6 +72,7 @@ import de.hamzabistro.printstation.core.AutoDecline
 import de.hamzabistro.printstation.core.DayHours
 import de.hamzabistro.printstation.core.DeliveryBreak
 import de.hamzabistro.printstation.core.DeliveryDay
+import de.hamzabistro.printstation.core.Kitchen
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.ShopClosure
 import de.hamzabistro.printstation.core.ShopHours
@@ -113,6 +114,9 @@ data class HoursState(
     val settings: ShopSettings? = null,
     val autoDeclineBusy: Boolean = false,
     val autoDeclineMessage: Message? = null,
+    /** The kitchen's cap (hamza-bistro-web#73), in [settings]. */
+    val dishesBusy: Boolean = false,
+    val dishesMessage: Message? = null,
     /** Weekly delivery breaks changed here and not saved yet, by id. */
     val breakEdits: Map<Long, DeliveryBreak> = emptyMap(),
     /** The form for adding one. */
@@ -173,6 +177,22 @@ class HoursViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update { it.copy(settings = saved, autoDeclineMessage = Message(app.getString(R.string.hours_saved), error = false)) }
             }
             _state.update { it.copy(autoDeclineBusy = false) }
+        }
+    }
+
+    /** At most [dishes] dishes per quarter hour for customers, 0 being off; saved at once. */
+    fun setDishesPerSlot(dishes: Int) {
+        if (_state.value.dishesBusy) return
+        _state.update { it.copy(dishesBusy = true, dishesMessage = null) }
+        viewModelScope.launch {
+            val saved =
+                attempt(app, { error -> _state.update { it.copy(dishesMessage = Message(error, error = true)) } }) {
+                    graph.shop.setDishesPerSlot(dishes)
+                }
+            if (saved != null) {
+                _state.update { it.copy(settings = saved, dishesMessage = Message(app.getString(R.string.hours_saved), error = false)) }
+            }
+            _state.update { it.copy(dishesBusy = false) }
         }
     }
 
@@ -435,6 +455,7 @@ fun HoursScreen(staff: StaffViewModel, onBack: () -> Unit) {
                 }
             }
             AutoDeclineSetting(state, hours)
+            KitchenCapSetting(state, hours)
             SpecialDays(shop, state, staffState.now, hours)
             Pauses(state, hours)
             Week(shop, state, hours)
@@ -470,6 +491,31 @@ private fun AutoDeclineSetting(state: HoursState, hours: HoursViewModel) {
             }
         }
         state.autoDeclineMessage?.let { Said(it) }
+    }
+}
+
+/**
+ * How many dishes the kitchen sends out per quarter hour — the select of the
+ * site's /orders/hours. Left out on a database without the cap.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun KitchenCapSetting(state: HoursState, hours: HoursViewModel) {
+    val saved = state.settings?.dishesPerSlot ?: return
+    Section(stringResource(R.string.kitchen_cap_heading)) {
+        Text(stringResource(R.string.kitchen_cap_note), style = MaterialTheme.typography.bodySmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (dishes in Kitchen.choices(saved)) {
+                val label = if (dishes == 0) stringResource(R.string.kitchen_cap_off) else stringResource(R.string.kitchen_cap_n, dishes)
+                val enabled = !state.dishesBusy
+                if (dishes == saved) {
+                    Button(onClick = {}, enabled = enabled) { Text(label) }
+                } else {
+                    OutlinedButton(onClick = { hours.setDishesPerSlot(dishes) }, enabled = enabled) { Text(label) }
+                }
+            }
+        }
+        state.dishesMessage?.let { Said(it) }
     }
 }
 
