@@ -55,6 +55,7 @@ import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.station.AlarmSound
 import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.StationSettings
+import de.hamzabistro.printstation.station.alarmForDevice
 import java.time.LocalTime
 
 /** The night windows offered: none, or the hours a shop that closes at nine sleeps through. */
@@ -168,6 +169,11 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                 SwitchRow(stringResource(R.string.alarm_connection), prefs.alarm.connection) { on ->
                     staff.updatePrefs { it.copy(alarm = it.alarm.copy(connection = on)) }
                 }
+                // "Bestellung fertig": for the driver's phone, not the kitchen tablet.
+                SwitchRow(stringResource(R.string.alarm_packed), prefs.alarmForDevice.packed == true) { on ->
+                    staff.updatePrefs { it.copy(alarm = it.alarm.copy(packed = on)) }
+                }
+                Text(stringResource(R.string.alarm_packed_hint), style = MaterialTheme.typography.bodySmall)
             }
 
             Section(stringResource(R.string.section_ringing)) {

@@ -2,9 +2,11 @@ package de.hamzabistro.printstation.queue
 
 import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.NotDelayableException
+import de.hamzabistro.printstation.core.NotPackableException
 import de.hamzabistro.printstation.core.OrderMovedException
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrderStep
+import de.hamzabistro.printstation.core.PackingUnavailableException
 import de.hamzabistro.printstation.core.PaymentLockedException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.StaffBackend
@@ -39,6 +41,12 @@ sealed interface StepFailure {
      */
     data object PaymentLocked : StepFailure
 
+    /**
+     * "Fertig" or "Doch nicht fertig" refused (HB458): the order is no
+     * accepted delivery any more — out of the door, or cancelled.
+     */
+    data object NotPackable : StepFailure
+
     data class Failed(val reason: String) : StepFailure
 }
 
@@ -68,6 +76,14 @@ class PendingSteps(
 
     private val timers = mutableMapOf<String, Job>()
 
+    private val _packing = MutableStateFlow(true)
+
+    /**
+     * Whether the database knows "Fertig" (hamza-bistro-web#90). False once
+     * it said it has no order_packed: the button goes, without a word.
+     */
+    val packing: StateFlow<Boolean> = _packing.asStateFlow()
+
     /** The order ids being sent or waiting to be: the alarm leaves them alone. */
     private val _busy = MutableStateFlow<Set<String>>(emptySet())
     val busy: StateFlow<Set<String>> = _busy.asStateFlow()
@@ -85,6 +101,16 @@ class PendingSteps(
             delay(seconds * 1000L)
             send(order.id)
         }
+    }
+
+    /**
+     * Sends [step] at once, past the undo window: "Doch nicht fertig", which
+     * is itself the undo of a "Fertig" already sent, and tells nobody.
+     */
+    @Synchronized
+    fun takeNow(order: StaffOrder, step: OrderStep) {
+        if (order.id in _pending.value || order.id in _busy.value) return
+        commit(order, step)
     }
 
     @Synchronized
@@ -120,6 +146,12 @@ class PendingSteps(
                 _failures.tryEmit(StepFailure.NotDelayable)
             } catch (e: PaymentLockedException) {
                 _failures.tryEmit(StepFailure.PaymentLocked)
+            } catch (e: NotPackableException) {
+                _failures.tryEmit(StepFailure.NotPackable)
+            } catch (e: PackingUnavailableException) {
+                // A database from before "Fertig": nothing to say, nothing to offer.
+                logger.info("The database has no order_packed: Fertig is hidden")
+                _packing.value = false
             } catch (e: SignedOutException) {
                 _failures.tryEmit(StepFailure.Failed(e.message ?: "signed out"))
             } catch (e: Exception) {

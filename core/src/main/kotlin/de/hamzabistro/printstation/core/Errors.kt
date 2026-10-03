@@ -72,6 +72,20 @@ class InvalidSpecialDayException(val reason: SpecialDayError, message: String) :
 class NeedsServerUpdateException(val migration: String) : Exception("needs the server update $migration")
 
 /**
+ * The database would not mark the order packed, or unpacked (HB458, or
+ * P0002 for one that is gone): it is no accepted delivery any more — out of
+ * the door, cancelled, or a pickup. The queue is read again and shows it as
+ * it is.
+ */
+class NotPackableException : Exception("the order is no longer an accepted delivery")
+
+/**
+ * The shop's database has no "Fertig" yet (order_packed is missing, before
+ * 20261003180000_packed_step): the button goes away without a word.
+ */
+class PackingUnavailableException : Exception("the database has no order_packed")
+
+/**
  * The database refused a shop setting: auto-decline minutes outside 3–60
  * (HB433 from set_auto_decline_minutes), or busy mode's minutes or length
  * (HB434).

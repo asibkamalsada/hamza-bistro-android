@@ -149,9 +149,10 @@ data class StaffOrder(
     /** When it was delivered or collected, from the database clock. */
     @SerialName("delivered_at") @Serializable(with = InstantSerializer::class) val deliveredAt: Instant? = null,
     /**
-     * When the bag was packed, "Fertig" (hamza-bistro-web#90). Read when a
-     * row carries it, null otherwise: not in [COLUMNS] until the column
-     * exists, since PostgREST refuses a select naming one it does not know.
+     * When staff said the bag is packed and waits for the driver, "Fertig"
+     * (20261003180000_packed_step.sql, hamza-bistro-web#90), from the
+     * database clock. Only ever set on an accepted delivery, and kept once
+     * it goes out; null when nobody said so, or it was taken back.
      */
     @SerialName("packed_at") @Serializable(with = InstantSerializer::class) val packedAt: Instant? = null,
     /**
@@ -185,7 +186,7 @@ data class StaffOrder(
                 "postal_code,city,address_note,notes,items,total,status,eta_minutes,cancel_reason," +
                 "returning_customer,delivery_fee,small_order_fee,discount,discount_code,pickup," +
                 "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at,auto_decline_at," +
-                "delay_minutes,delayed_at,payment_method,delivered_at"
+                "delay_minutes,delayed_at,payment_method,delivered_at,packed_at"
 
         /**
          * What the open queue reads: [COLUMNS] and the kitchen slot the
@@ -199,7 +200,7 @@ data class StaffOrder(
 /**
  * One step on an order: where it goes, and what goes with it. Exactly the
  * steps /orders offers; the database refuses any other (HB412) — and the
- * one that moves no status, [Delay].
+ * ones that move no status: [Delay], [Pack] and [Unpack].
  */
 sealed interface OrderStep {
     /** The status it goes to; null for [Delay], which leaves it where it is. */
@@ -242,6 +243,21 @@ sealed interface OrderStep {
      * phone tapping at the same time adds its own rather than overwriting.
      */
     data class Delay(val minutes: Int) : OrderStep {
+        override val to: OrderStatus? = null
+    }
+
+    /**
+     * "Fertig": the bag is packed and waits for the driver (order_packed,
+     * hamza-bistro-web#90). Not a status: the order stays accepted, and
+     * nothing that watches the status — the customer's email, Telegram,
+     * printing — sees it.
+     */
+    data object Pack : OrderStep {
+        override val to: OrderStatus? = null
+    }
+
+    /** "Doch nicht fertig": takes back a "Fertig" the undo window already sent (order_unpacked). */
+    data object Unpack : OrderStep {
         override val to: OrderStatus? = null
     }
 }

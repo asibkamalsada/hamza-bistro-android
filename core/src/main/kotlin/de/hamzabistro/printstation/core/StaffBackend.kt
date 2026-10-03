@@ -32,7 +32,10 @@ interface StaffBackend {
      * Moves [order] one [step] on — but only from where this device saw it.
      * Throws [OrderMovedException] when it had moved on meanwhile,
      * [NotDelayableException] for an [OrderStep.Delay] the database refused,
-     * and [PaymentLockedException] when it refused how it was paid.
+     * [PaymentLockedException] when it refused how it was paid,
+     * [NotPackableException] for an [OrderStep.Pack] or [OrderStep.Unpack]
+     * on an order that is no accepted delivery (any more), and
+     * [PackingUnavailableException] when the database has no "Fertig" yet.
      */
     suspend fun move(order: StaffOrder, step: OrderStep)
 
@@ -103,6 +106,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
 
     override suspend fun move(order: StaffOrder, step: OrderStep) {
         if (step is OrderStep.Delay) return delay(order, step.minutes)
+        if (step is OrderStep.Pack || step is OrderStep.Unpack) return packing(order, step)
         val url =
             rest.endpoint("rest/v1/orders")
                 .addQueryParameter("id", "eq.${order.id}")
@@ -143,6 +147,22 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         } catch (e: BackendException) {
             // Not accepted any more, at its three hours, or gone.
             if (e.code == "HB435" || e.code == "P0002") throw NotDelayableException()
+            throw e
+        }
+    }
+
+    /**
+     * "Fertig" or "Doch nicht fertig", by the database's own functions: they
+     * set packed_at to the database clock and keep the first time when two
+     * phones tap at once, so nothing but the order is sent.
+     */
+    private suspend fun packing(order: StaffOrder, step: OrderStep) {
+        try {
+            rest.rpc(Packing.function(step), Packing.body(order))
+        } catch (e: BackendException) {
+            // Not a confirmed delivery any more (HB458), or gone (P0002).
+            if (e.code == "HB458" || e.code == "P0002") throw NotPackableException()
+            if (e.missingFunction) throw PackingUnavailableException()
             throw e
         }
     }
@@ -222,6 +242,22 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         /** More open orders than this at once is not an evening that exists. */
         const val QUEUE_LIMIT = 100
     }
+}
+
+/**
+ * What "Fertig" sends (20261003180000_packed_step.sql in hamza-bistro-web):
+ * order_packed or order_unpacked, with the order's id and nothing else.
+ */
+object Packing {
+    /** The function [step] calls: an [OrderStep.Pack] or an [OrderStep.Unpack]. */
+    fun function(step: OrderStep): String =
+        when (step) {
+            OrderStep.Pack -> "order_packed"
+            OrderStep.Unpack -> "order_unpacked"
+            else -> throw IllegalArgumentException("not a packing step: $step")
+        }
+
+    fun body(order: StaffOrder): JsonObject = buildJsonObject { put("p_order_id", order.id) }
 }
 
 /** PostgREST's answer for a function the database does not have (yet). */

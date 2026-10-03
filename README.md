@@ -95,6 +95,16 @@ rules, ported to Kotlin with the site's own test cases
   pre-order's "kochen ab" moves with it, and a customer who asked for
   updates gets an email
   ([`20261002170000_order_delay.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261002170000_order_delay.sql));
+- **Fertig** on an accepted delivery in "In der Küche", for a shop where
+  somebody other than the cook rides: through the undo window, then
+  `order_packed`. The bag moves to the top of "Unterwegs & abholbereit",
+  the longest-waiting first, with a "Fertig" badge and "fertig seit 3 Min."
+  — amber from five minutes, red from ten — and **Doch nicht fertig**
+  (`order_unpacked`) to take it back. "Unterwegs" stays on the card,
+  outlined: a shop where the cook rides skips "Fertig". Not on a pickup,
+  whose ready step is "Abholbereit"
+  ([`20261003180000_packed_step.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261003180000_packed_step.sql),
+  hamza-bistro-web#90). On a database without it, the button is not there;
 - the phone number opens the dialler, the address opens the route in the
   chosen map app, the note for the door has a box of its own;
 - "Bon gedruckt 18:05" on an accepted order, "Bon drucken" on a device with
@@ -114,8 +124,8 @@ is switched on in the settings
   "BEZAHLT"). Tick several, then **Mitnehmen (3)**: each goes "Unterwegs" as
   its own step, with its own undo window, and only from where this device
   saw it — one another device moved meanwhile is refused alone and shows as
-  it is now, the others go through. Once orders carry `packed_at`
-  (hamza-bistro-web#90), packed bags come first.
+  it is now, the others go through. Packed bags ("Fertig",
+  hamza-bistro-web#90) come first, the longest-waiting on top.
 - **Unterwegs**: the stops, ring by ring from the shop (inner, near, far,
   edge), then by postcode, then by street — there are no coordinates on an
   order yet. ↑ / ↓ put right what that gets wrong. Each stop has Anrufen,
@@ -296,6 +306,13 @@ decides, every few seconds and on every change of the queue:
   while a print station registered before it was accepted is meant to
   print it — the rule of the "nicht gedruckte Bons" push the server sends
   the phones. The print stations are read every two minutes.
+- **Bestellung fertig**: a bag packed for the driver chimes once, with
+  "#57 ist fertig – Georg-Schwarz-Str. 12 · 2 Bestellungen warten" (the
+  street only once the phone is unlocked). Per device, in the settings: on
+  by default where "Fahrer-Handy" is switched on, off on the kitchen
+  tablet. Not for what was
+  already packed when the device started listening, and not twice for a
+  bag unpacked and packed again within two minutes.
 
 The full-screen alarm shows the order number, what to cook and the total
 — never the customer's name, phone or address, which stay behind the lock

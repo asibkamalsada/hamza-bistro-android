@@ -47,6 +47,7 @@ import de.hamzabistro.printstation.core.DeclineUrgency
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
+import de.hamzabistro.printstation.core.PackedUrgency
 import de.hamzabistro.printstation.core.Payment
 import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.StaffOrder
@@ -71,6 +72,12 @@ interface OrderActions {
 
     /** "+10 Min." on an accepted order. */
     fun delay(order: StaffOrder, minutes: Int)
+
+    /** "Fertig": the bag is packed and waits for the driver. */
+    fun pack(order: StaffOrder)
+
+    /** "Doch nicht fertig". */
+    fun unpack(order: StaffOrder)
 
     fun undo(order: StaffOrder)
 
@@ -148,6 +155,21 @@ private fun declineTiming(context: Context, order: StaffOrder, now: Instant): Ti
     return Timing(text, tone)
 }
 
+/**
+ * "fertig seit 3 Min." on a packed bag — packedTiming() of the site: amber
+ * from five minutes, red from ten.
+ */
+fun packedTiming(context: Context, order: StaffOrder, now: Instant): Timing? {
+    val wait = StaffQueue.packedWait(order, now) ?: return null
+    val tone =
+        when (wait.urgency) {
+            PackedUrgency.CALM -> Tone.OK
+            PackedUrgency.SOON -> Tone.SOON
+            PackedUrgency.LATE -> Tone.LATE
+        }
+    return Timing(context.getString(R.string.packed_for, wait.minutes), tone)
+}
+
 @Composable
 fun toneColor(tone: Tone): Color =
     when (tone) {
@@ -161,7 +183,8 @@ fun statusLabel(context: Context, order: StaffOrder): String =
     context.getString(
         when (order.status) {
             OrderStatus.NEW -> R.string.status_new
-            OrderStatus.CONFIRMED -> R.string.status_confirmed
+            // Packed and waiting for the driver: the badge the pick-up list is read by.
+            OrderStatus.CONFIRMED -> if (StaffQueue.isPacked(order)) R.string.status_packed else R.string.status_confirmed
             OrderStatus.ON_THE_WAY -> if (order.pickup) R.string.status_ready else R.string.status_on_the_way
             OrderStatus.DELIVERED -> if (order.pickup) R.string.status_collected else R.string.status_delivered
             OrderStatus.CANCELLED -> R.string.status_cancelled
@@ -205,6 +228,8 @@ fun stepLabel(context: Context, order: StaffOrder, step: OrderStep): String =
         is OrderStep.Cancel ->
             context.getString(if (order.status == OrderStatus.NEW) R.string.pending_declined else R.string.pending_cancelled)
         is OrderStep.Delay -> context.getString(R.string.pending_delayed, step.minutes)
+        OrderStep.Pack -> context.getString(R.string.step_packed)
+        OrderStep.Unpack -> context.getString(R.string.step_unpack)
     }
 
 /**
@@ -231,6 +256,8 @@ fun OrderCard(
     focused: Boolean = false,
     compact: Boolean = false,
     readOnly: Boolean = false,
+    /** Whether the database knows "Fertig": without it, no button for it. */
+    packing: Boolean = true,
 ) {
     val context = LocalContext.current
     val estimate = Eta.estimate(order, prep)
@@ -265,6 +292,9 @@ fun OrderCard(
 
             if (order.status.open) {
                 timing(context, order, estimate, now)?.let {
+                    Text(it.text, color = toneColor(it.tone), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                packedTiming(context, order, now)?.let {
                     Text(it.text, color = toneColor(it.tone), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             } else if (StaffQueue.isDelayed(order)) {
@@ -323,7 +353,7 @@ fun OrderCard(
             if (order.status == OrderStatus.CONFIRMED) PrintLine(order, now)
 
             if (order.status.open && !readOnly) {
-                Actions(order, Eta.estimate(order, prep, busyMinutes, now), prefs, pending, busy, canPrint && !compact, actions)
+                Actions(order, Eta.estimate(order, prep, busyMinutes, now), prefs, pending, busy, canPrint && !compact, packing, actions)
             }
         }
     }
@@ -402,6 +432,7 @@ private fun Actions(
     pending: Pending?,
     busy: Boolean,
     canPrint: Boolean,
+    packing: Boolean,
     actions: OrderActions,
 ) {
     val context = LocalContext.current
@@ -495,8 +526,22 @@ private fun Actions(
                 DelayButtons(order, actions)
             }
             else -> {
-                Button(onClick = { actions.moveOn(order) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stepLabel(context, order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done()))
+                // "Fertig" first, filled, while the bag is not packed; "Losfahren"
+                // stays, outlined — a shop where the cook rides skips "Fertig".
+                val canPack = packing && StaffQueue.canPack(order)
+                if (canPack) {
+                    Button(onClick = { actions.pack(order) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stepLabel(context, order, OrderStep.Pack))
+                    }
+                }
+                val next = stepLabel(context, order, if (order.status == OrderStatus.CONFIRMED) OrderStep.Out else OrderStep.Done())
+                if (canPack) {
+                    OutlinedButton(onClick = { actions.moveOn(order) }, modifier = Modifier.fillMaxWidth()) { Text(next) }
+                } else {
+                    Button(onClick = { actions.moveOn(order) }, modifier = Modifier.fillMaxWidth()) { Text(next) }
+                }
+                if (packing && StaffQueue.isPacked(order)) {
+                    TextButton(onClick = { actions.unpack(order) }) { Text(stepLabel(context, order, OrderStep.Unpack)) }
                 }
                 DelayButtons(order, actions)
             }

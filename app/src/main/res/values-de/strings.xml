@@ -63,6 +63,12 @@
     <string name="chime_offline_text">Seit %1$s – neue Bestellungen kommen hier gerade nicht an. WLAN oder mobile Daten prüfen.</string>
     <string name="chime_declining">Bestellung #%1$d: in 2 Min. automatisch abgelehnt</string>
     <string name="chime_declining_text">Niemand hat sie beantwortet. Jetzt annehmen oder ablehnen – sonst erfährt der Kunde, dass sie nicht angenommen werden konnte.</string>
+    <string name="chime_packed">#%1$d ist fertig – %2$s</string>
+    <string name="chime_packed_public">#%1$d ist fertig</string>
+    <plurals name="chime_packed_waiting">
+        <item quantity="one">%1$d Bestellung wartet</item>
+        <item quantity="other">%1$d Bestellungen warten</item>
+    </plurals>
 
     <string name="slot_today">heute</string>
     <string name="slot_tomorrow">morgen</string>
@@ -124,6 +130,7 @@
     <string name="order_moved">Diese Bestellung wurde inzwischen geändert – so steht sie jetzt.</string>
     <string name="order_not_delayable">Diese Bestellung lässt sich nicht mehr verschieben – so steht sie jetzt.</string>
     <string name="payment_locked">Wie diese Bestellung bezahlt wurde, steht schon fest. Nach dem Rückgängig-Fenster lässt es sich nur noch im Dashboard korrigieren.</string>
+    <string name="order_not_packable">Diese Bestellung ist keine angenommene Lieferung mehr – so steht sie jetzt.</string>
     <string name="step_failed">Nicht gesendet: %1$s</string>
     <string name="printed_by_hand">Bon #%1$d gedruckt.</string>
 
@@ -141,6 +148,7 @@
     <string name="status_new">Neu</string>
     <string name="status_confirmed">Angenommen</string>
     <string name="status_ready">Abholbereit</string>
+    <string name="status_packed">Fertig</string>
     <string name="status_on_the_way">Unterwegs</string>
     <string name="status_delivered">Geliefert</string>
     <string name="status_collected">Abgeholt</string>
@@ -169,6 +177,9 @@
     <string name="eta_button">%1$d Min.</string>
     <string name="step_on_the_way">Unterwegs</string>
     <string name="step_ready">Abholbereit</string>
+    <string name="step_packed">Fertig</string>
+    <string name="step_unpack">Doch nicht fertig</string>
+    <string name="packed_for">fertig seit %1$d Min.</string>
     <string name="step_delivered">Geliefert</string>
     <string name="step_collected">Abgeholt</string>
     <!-- Der letzte Schritt unterwegs: geliefert oder abgeholt, und wie bezahlt wurde. -->
@@ -237,6 +248,8 @@
     <string name="alarm_printer">Drucker: Bescheid, wenn ein Bon nicht rauskam</string>
     <string name="alarm_unprinted">Melden, wenn eine angenommene Bestellung nach zwei Minuten nirgends gedruckt ist</string>
     <string name="alarm_connection">Bescheid, wenn die Verbindung zum Shop weg ist</string>
+    <string name="alarm_packed">Bestellung fertig: Bescheid, wenn eine Tüte für den Fahrer gepackt ist</string>
+    <string name="alarm_packed_hint">Es meldet sich, wenn die Küche \"Fertig\" tippt. Von selbst an, wo \"Fahrer-Handy\" eingeschaltet ist; auf dem Küchen-Tablet aus.</string>
     <string name="minutes_n">%1$d Min.</string>
     <string name="seconds_n">%1$d Sek.</string>
     <string name="quiet_never">Keine</string>

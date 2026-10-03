@@ -49,18 +49,13 @@ object Driver {
 
     /**
      * The order the pick-up list is read in: packed bags first, the one
-     * waiting longest on top (packed_at, hamza-bistro-web#90 — absent until
-     * then, which leaves every order unpacked); then by when it is due; then
-     * by when it was placed.
+     * waiting longest on top ([StaffQueue.packedFirst], hamza-bistro-web#90
+     * — the same rule as the top of "Unterwegs & abholbereit"); then by when
+     * it is due; then by when it was placed.
      */
     val pickUpOrder: Comparator<StaffOrder> = Comparator { a, b ->
-        val aPacked = a.packedAt
-        val bPacked = b.packedAt
-        if ((aPacked != null) != (bPacked != null)) return@Comparator if (aPacked != null) -1 else 1
-        if (aPacked != null && bPacked != null) {
-            val packed = aPacked.compareTo(bPacked)
-            if (packed != 0) return@Comparator packed
-        }
+        val packed = StaffQueue.packedFirst.compare(a, b)
+        if (packed != 0) return@Comparator packed
         val due = (StaffQueue.promisedAt(a) ?: Instant.MAX).compareTo(StaffQueue.promisedAt(b) ?: Instant.MAX)
         if (due != 0) return@Comparator due
         a.createdAt.compareTo(b.createdAt)

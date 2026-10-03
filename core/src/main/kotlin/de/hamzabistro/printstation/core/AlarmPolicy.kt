@@ -33,6 +33,13 @@ data class AlarmSettings(
     /** A chime when the queue could not be read for a while. */
     val connection: Boolean = true,
     /**
+     * "Bestellung fertig": a chime when a bag is packed and waits for the
+     * driver (hamza-bistro-web#90). Null until somebody chooses on this
+     * device: then it follows what the device is for — on for a driver's
+     * phone, off for the kitchen tablet ([forDevice]).
+     */
+    val packed: Boolean? = null,
+    /**
      * The night window, Leipzig time: inside it nothing rings, and a new
      * order is a silent notification — for the pre-order somebody places at
      * one in the morning. Both null: never quiet.
@@ -41,7 +48,14 @@ data class AlarmSettings(
     val quietTo: LocalTime? = LocalTime.of(9, 0),
     /** How long "Stumm" silences the orders ringing at that moment. */
     val silenceSeconds: Int = 60,
-)
+) {
+    /**
+     * These settings on a device that is a driver's phone or not: a choice
+     * not made yet for "Bestellung fertig" made as [driver] says. What
+     * [AlarmPolicy.decide] is given.
+     */
+    fun forDevice(driver: Boolean): AlarmSettings = if (packed != null) this else copy(packed = driver)
+}
 
 /** A one-off alert: a sound once, and a notification. */
 sealed interface Chime {
@@ -62,6 +76,12 @@ sealed interface Chime {
      * escalates, once, with a sound and a vibration of its own.
      */
     data class DecliningSoon(val order: StaffOrder) : Chime
+
+    /**
+     * "#57 ist fertig": the bag is packed and waits for the driver, with
+     * [waiting] packed bags in all, this one included.
+     */
+    data class Packed(val order: StaffOrder, val waiting: Int) : Chime
 }
 
 /** What the alarm should be doing now. */
@@ -103,6 +123,11 @@ data class AlarmDecision(
  *     print station registered before it was accepted is meant to print it
  *     — the rule of remind_staff_of_waiting_orders()'s "unprinted" stamp in
  *     20260930150000_order_printing.sql.
+ *   * A bag packed for the driver ("Fertig", hamza-bistro-web#90) chimes
+ *     once, on a device that wants it: not for what was already packed
+ *     when this device started listening, and not again for one unpacked
+ *     and packed again within [REPACK_WINDOW] — a slip of the finger
+ *     corrected.
  *
  * Holds what it has already said, so it is one per device; [decide] is
  * pure otherwise, with the clock passed in.
@@ -121,6 +146,8 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     private var offlineSince: Instant? = null
     private var offlineChimed = false
     private var lastRinging: List<StaffOrder> = emptyList()
+    private val packedSeen = mutableMapOf<String, Instant>()
+    private var packedLook: Instant? = null
 
     /** "Stumm": what is ringing now stays quiet for [seconds]. */
     @Synchronized
@@ -198,6 +225,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
                 }
                 unprintedPrimed = true
             }
+            chimes += packedChimes(orders, settings, now)
             val ids = orders.map { it.id }.toSet()
             chimedNew.retainAll(ids)
             escalated.retainAll(ids)
@@ -239,6 +267,31 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     }
 
     /**
+     * "Bestellung fertig", decided apart from the rest: which of [orders]
+     * are packed bags this device has not chimed for.
+     *
+     * Each packed bag is remembered with when it was last seen packed, and
+     * forgotten [REPACK_WINDOW] after that — not when it leaves the list, so
+     * one hidden for a moment while a step is on its way here does not chime
+     * again when it comes back. A look after a longer gap (the first one, or
+     * the first since the shift was off) takes in what is packed without a
+     * word, as the other chimes treat a starting picture.
+     */
+    private fun packedChimes(orders: List<StaffOrder>, settings: AlarmSettings, now: Instant): List<Chime> {
+        val primed = packedLook?.let { !now.isAfter(it.plus(REPACK_WINDOW)) } == true
+        packedLook = now
+        val packed = orders.filter(StaffQueue::isPacked)
+        val chimes = mutableListOf<Chime>()
+        for (order in packed) {
+            val seen = packedSeen.put(order.id, now)
+            val known = seen != null && !now.isAfter(seen.plus(REPACK_WINDOW))
+            if (primed && !known && settings.packed == true) chimes += Chime.Packed(order, packed.size)
+        }
+        packedSeen.values.removeAll { now.isAfter(it.plus(REPACK_WINDOW)) }
+        return chimes
+    }
+
+    /**
      * A new order worth ringing about: in the first hour after it arrived,
      * or — a pre-order — in the hour before its time. The same windows as
      * remind_staff_of_waiting_orders(): one left over from closing time does
@@ -266,6 +319,13 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         private val PRINTER_GRACE = Duration.ofSeconds(30)
         private val PRINTER_AGAIN = Duration.ofMinutes(3)
         private val OFFLINE_GRACE = Duration.ofMinutes(2)
+
+        /**
+         * How long a packed bag is remembered once it is not seen packed:
+         * "Doch nicht fertig" and "Fertig" again within it is one bag, not
+         * two.
+         */
+        val REPACK_WINDOW: Duration = Duration.ofMinutes(2)
 
         /** Several of a station's looks, each trying a failed ticket again: as the server waits. */
         private val UNPRINTED_GRACE = Duration.ofMinutes(2)
