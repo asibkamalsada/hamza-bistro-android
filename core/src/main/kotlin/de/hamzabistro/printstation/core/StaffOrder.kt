@@ -154,6 +154,14 @@ data class StaffOrder(
      * exists, since PostgREST refuses a select naming one it does not know.
      */
     @SerialName("packed_at") @Serializable(with = InstantSerializer::class) val packedAt: Instant? = null,
+    /**
+     * The quarter hour place_order planned it to leave the kitchen in
+     * (20261003160000_kitchen_capacity.sql, hamza-bistro-web#73): the first
+     * with room, which the customer was quoted (#74). Null for an order made
+     * some other way, one from before the column, and on a database without
+     * it.
+     */
+    @SerialName("kitchen_slot") @Serializable(with = InstantSerializer::class) val kitchenSlot: Instant? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -178,6 +186,13 @@ data class StaffOrder(
                 "returning_customer,delivery_fee,small_order_fee,discount,discount_code,pickup," +
                 "pickup_discount,stamp_discount,delivery_zone,delivery_zone_source,printed_at,auto_decline_at," +
                 "delay_minutes,delayed_at,payment_method,delivered_at"
+
+        /**
+         * What the open queue reads: [COLUMNS] and the kitchen slot the
+         * pre-selected minutes wait for. Without the column the queue reads
+         * [COLUMNS] alone, and the minutes are those of before.
+         */
+        const val QUEUE_COLUMNS = "$COLUMNS,kitchen_slot"
     }
 }
 
