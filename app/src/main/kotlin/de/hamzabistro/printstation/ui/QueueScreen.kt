@@ -147,6 +147,7 @@ fun StaffEvents(viewModel: StaffViewModel, snackbar: SnackbarHostState) {
                         StepFailure.Moved -> resources.getString(R.string.order_moved)
                         StepFailure.NotDelayable -> resources.getString(R.string.order_not_delayable)
                         StepFailure.PaymentLocked -> resources.getString(R.string.payment_locked)
+                        StepFailure.NotPackable -> resources.getString(R.string.order_not_packable)
                         is StepFailure.Failed -> resources.getString(R.string.step_failed, failure.reason)
                     }
                 is StaffEvent.Printed -> resources.getString(R.string.printed_by_hand, shown.order)
@@ -250,6 +251,7 @@ private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, act
             actions = actions,
             busyMinutes = state.busyMinutes,
             focused = order.id == focus,
+            packing = state.packing,
         )
     }
 }
@@ -443,6 +445,10 @@ internal class Actions(private val context: Context, private val viewModel: Staf
     override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
 
     override fun delay(order: StaffOrder, minutes: Int) = viewModel.delay(order, minutes)
+
+    override fun pack(order: StaffOrder) = viewModel.pack(order)
+
+    override fun unpack(order: StaffOrder) = viewModel.unpack(order)
 
     override fun undo(order: StaffOrder) = viewModel.undo(order)
 

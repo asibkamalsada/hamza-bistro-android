@@ -59,6 +59,8 @@ data class StaffState(
     val shop: ShopView = ShopView(),
     /** The delivery address check is failing: orders are priced on what the customer typed. */
     val addressFailing: Boolean = false,
+    /** Whether the database knows "Fertig": false on one from before it, and the button goes. */
+    val packing: Boolean = true,
 ) {
     /** Busy mode's minutes on every promise, now: 0 while it is off, or once it ran out. */
     val busyMinutes: Int
@@ -106,8 +108,13 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val parts =
-        combine(graph.liveQueue, graph.settings.device, graph.steps.pending, graph.steps.busy) { queue, prefs, pending, busy ->
-            StaffState(queue = queue, prefs = prefs, pending = pending, busy = busy)
+        combine(graph.liveQueue, graph.settings.device, graph.steps.pending, graph.steps.busy, graph.steps.packing) {
+            queue,
+            prefs,
+            pending,
+            busy,
+            packing ->
+            StaffState(queue = queue, prefs = prefs, pending = pending, busy = busy, packing = packing)
         }
 
     /** Shared with the hours screen, which changes it too. */
@@ -230,6 +237,16 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    /**
+     * "Fertig": the bag is packed and waits for the driver — whose phone
+     * chimes. Held for the undo window like a step, so "Rückgängig" inside
+     * it sends nothing.
+     */
+    fun pack(order: StaffOrder) = graph.steps.take(order, OrderStep.Pack)
+
+    /** "Doch nicht fertig": the undo for a "Fertig" the window already sent, at once, as on /orders. */
+    fun unpack(order: StaffOrder) = graph.steps.takeNow(order, OrderStep.Unpack)
 
     fun undo(order: StaffOrder) = graph.steps.undo(order.id)
 

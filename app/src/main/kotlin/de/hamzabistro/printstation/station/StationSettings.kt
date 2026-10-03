@@ -129,6 +129,7 @@ class StationSettings(context: Context) {
                     printer = prefs.getBoolean(PRINTER_ALARM, a.printer),
                     unprinted = prefs.getBoolean(UNPRINTED_ALARM, a.unprinted),
                     connection = prefs.getBoolean(CONNECTION_ALARM, a.connection),
+                    packed = if (prefs.contains(PACKED_ALARM)) prefs.getBoolean(PACKED_ALARM, false) else a.packed,
                     quietFrom = time(QUIET_FROM, a.quietFrom),
                     quietTo = time(QUIET_TO, a.quietTo),
                     silenceSeconds = prefs.getInt(SILENCE, a.silenceSeconds).takeIf { it in SILENCE_CHOICES } ?: a.silenceSeconds,
@@ -160,6 +161,8 @@ class StationSettings(context: Context) {
             .putBoolean(PRINTER_ALARM, p.alarm.printer)
             .putBoolean(UNPRINTED_ALARM, p.alarm.unprinted)
             .putBoolean(CONNECTION_ALARM, p.alarm.connection)
+            // Not chosen is no key at all: the device's purpose decides.
+            .run { p.alarm.packed?.let { putBoolean(PACKED_ALARM, it) } ?: remove(PACKED_ALARM) }
             .putString(QUIET_FROM, p.alarm.quietFrom?.toString() ?: NEVER)
             .putString(QUIET_TO, p.alarm.quietTo?.toString() ?: NEVER)
             .putInt(SILENCE, p.alarm.silenceSeconds)
@@ -201,6 +204,7 @@ class StationSettings(context: Context) {
         private const val PRINTER_ALARM = "alarm_printer"
         private const val UNPRINTED_ALARM = "alarm_unprinted"
         private const val CONNECTION_ALARM = "alarm_connection"
+        private const val PACKED_ALARM = "alarm_packed"
         private const val QUIET_FROM = "quiet_from"
         private const val QUIET_TO = "quiet_to"
         private const val SILENCE = "silence_seconds"
@@ -218,6 +222,16 @@ class StationSettings(context: Context) {
 
 /** The printer chosen from the scan, by its Bluetooth address. */
 data class ChosenPrinter(val address: String, val name: String?)
+
+/**
+ * The alarm settings this device decides by: "Bestellung fertig", until
+ * somebody chooses here, as what the device is for says — on for a driver's
+ * phone, off for the kitchen tablet. No device is set up as a driver's phone
+ * before the driver view (hamza-bistro-android#8), so until then that is
+ * off everywhere and the switch in the settings decides.
+ */
+val DevicePrefs.alarmForDevice: AlarmSettings
+    get() = alarm.forDevice(driver = false)
 
 /** The alarm mode as the site's device list names it. */
 val NewOrderAlarm.wire: String

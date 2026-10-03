@@ -244,6 +244,16 @@ object StationNotifications {
                         context.getString(R.string.chime_declining_text),
                         chime.order.id,
                     )
+                // "#57 ist fertig – Georg-Schwarz-Str. 12 · 2 Bestellungen warten",
+                // in the order's own place: it goes once the bag is on its way.
+                // Over the lock screen without the street ([packedPublic]).
+                is Chime.Packed ->
+                    Shown(
+                        ORDER_IDS + (chime.order.orderNumber % 100_000).toInt(),
+                        context.getString(R.string.chime_packed, chime.order.orderNumber, packedStreet(chime.order)),
+                        context.resources.getQuantityString(R.plurals.chime_packed_waiting, chime.waiting, chime.waiting),
+                        chime.order.id,
+                    )
             }
         val channel =
             when {
@@ -261,9 +271,30 @@ object StationNotifications {
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setContentIntent(openApp(context, order))
                 .setAutoCancel(true)
+                .apply { if (chime is Chime.Packed) packedPublic(context, channel, chime) }
                 .build()
         notify(context, id, notification)
     }
+
+    /**
+     * The street stays behind the lock screen, as an address does everywhere
+     * here: over it, "#57 ist fertig · 2 Bestellungen warten".
+     */
+    private fun Notification.Builder.packedPublic(context: Context, channel: String, chime: Chime.Packed) {
+        val waiting = context.resources.getQuantityString(R.plurals.chime_packed_waiting, chime.waiting, chime.waiting)
+        setVisibility(Notification.VISIBILITY_PRIVATE)
+        setPublicVersion(
+            Notification.Builder(context, channel)
+                .setSmallIcon(R.drawable.ic_stat_bell)
+                .setContentTitle(context.getString(R.string.chime_packed_public, chime.order.orderNumber))
+                .setContentText(waiting)
+                .build()
+        )
+    }
+
+    /** The street a driver reads once the phone is unlocked: the street line, without postcode and town. */
+    private fun packedStreet(order: StaffOrder): String =
+        order.street?.trim()?.takeIf { it.isNotEmpty() } ?: order.address.substringBefore(',').trim()
 
     /** Takes the notifications off for orders nobody needs to act on any more. */
     fun clearOrders(context: Context, keep: Collection<StaffOrder>) {
