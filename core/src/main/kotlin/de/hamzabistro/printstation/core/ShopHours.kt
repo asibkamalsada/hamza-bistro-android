@@ -233,7 +233,8 @@ data class Busy(val minutes: Int, val until: Instant, val by: String?) {
 
 /**
  * The shop's settings, as shop_settings() answers staff
- * (20261002150000_auto_decline.sql and 20261002160000_busy_mode.sql).
+ * (20261002150000_auto_decline.sql, 20261002160000_busy_mode.sql and
+ * 20261003160000_kitchen_capacity.sql).
  */
 @Serializable
 data class ShopSettings(
@@ -247,6 +248,8 @@ data class ShopSettings(
     @SerialName("busy_until") @Serializable(with = InstantSerializer::class) val busyUntil: Instant? = null,
     @SerialName("busy_set_at") @Serializable(with = InstantSerializer::class) val busySetAt: Instant? = null,
     @SerialName("busy_set_by") val busySetBy: String? = null,
+    /** The kitchen's cap: dishes per quarter hour, 0 being off; null on a database without it. */
+    @SerialName("dishes_per_slot") val dishesPerSlot: Int? = null,
 )
 
 /**
@@ -325,6 +328,19 @@ interface ShopBackend {
      * Throws [InvalidSettingException] outside [AutoDecline.ALLOWED].
      */
     suspend fun setAutoDecline(minutes: Int?): ShopSettings
+
+    /**
+     * At most [dishes] dishes per quarter hour for customers to book; 0
+     * switches the cap off. Throws [InvalidSettingException] outside
+     * [Kitchen.ALLOWED].
+     */
+    suspend fun setDishesPerSlot(dishes: Int): ShopSettings
+
+    /**
+     * How full the kitchen is in every quarter hour from [from]'s up to
+     * [to]; null on a database without the kitchen's cap.
+     */
+    suspend fun kitchenSlots(from: Instant, to: Instant): List<KitchenSlot>?
 }
 
 /** [ShopBackend] over PostgREST, as the signed-in account. */
@@ -433,6 +449,32 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
             throw e
         }
 
+    override suspend fun setDishesPerSlot(dishes: Int): ShopSettings =
+        try {
+            json.decodeFromString(
+                ShopSettings.serializer(),
+                rest.rpc("set_dishes_per_slot", buildJsonObject { put("p_dishes", dishes) }),
+            )
+        } catch (e: BackendException) {
+            if (e.code == INVALID_HOURS) throw InvalidSettingException(e.message ?: "dishes per slot")
+            throw e
+        }
+
+    override suspend fun kitchenSlots(from: Instant, to: Instant): List<KitchenSlot>? =
+        try {
+            Kitchen.parse(
+                rest.rpc(
+                    "kitchen_slots",
+                    buildJsonObject {
+                        put("p_from", from.toString())
+                        put("p_to", to.toString())
+                    },
+                )
+            )
+        } catch (e: BackendException) {
+            if (e.missingFunction) null else throw e
+        }
+
     private suspend fun call(name: String, args: JsonObject): ShopHours =
         try {
             parse(rest.rpc(name, args))
@@ -446,7 +488,7 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
     private fun parse(body: String): ShopHours = json.decodeFromString(ShopHours.serializer(), body)
 
     private companion object {
-        /** See 20261001150000_shop_hours.sql. */
+        /** See 20261001150000_shop_hours.sql; set_dishes_per_slot() refuses with it too. */
         const val INVALID_HOURS = "HB432"
 
         /** See 20261002150000_auto_decline.sql. */

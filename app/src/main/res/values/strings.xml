@@ -508,6 +508,15 @@
     <string name="auto_decline_suggested">%1$s (recommended)</string>
     <string name="setting_invalid">The database refused that value.</string>
 
+    <!-- The kitchen's cap, under Lieferzeiten and above the queue (hamza-bistro-web#73) -->
+    <string name="kitchen_cap_heading">Kitchen: dishes per quarter hour</string>
+    <string name="kitchen_cap_note">How many dishes the kitchen sends out per 15 minutes (drinks do not count). Customers cannot pre-order into a full quarter hour, and “as soon as possible” is quoted for the first one with room. You can still accept anything.</string>
+    <string name="kitchen_cap_off">Off — no limit</string>
+    <string name="kitchen_cap_n">%1$d dishes</string>
+    <string name="kitchen_load_label">Kitchen, next hour</string>
+    <string name="kitchen_load_slot">%1$s: %2$d of %3$d dishes</string>
+    <string name="kitchen_full">The kitchen is fully booked at that time — choose another time, or order for right now.</string>
+
     <!-- The menu (MenuScreen.kt) -->
     <string name="menu_title">Menu</string>
     <string name="menu_tab_dishes">Dishes</string>
