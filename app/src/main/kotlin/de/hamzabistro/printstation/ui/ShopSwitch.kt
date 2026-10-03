@@ -104,6 +104,10 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
                 color = textColor,
                 fontWeight = if (state == ShopState.CLOSED) FontWeight.Bold else null,
             )
+            // A special day today (hamza-bistro-web#119): "Heute 17:00–21:00 Uhr (Silvester)".
+            hours.todayAt(now)?.takeIf { it.special }?.let {
+                Text(todayLine(context, it), color = textColor, style = MaterialTheme.typography.bodySmall)
+            }
             hours.closureAt(now)?.by?.let {
                 Text(
                     stringResource(R.string.shop_closed_by, it),

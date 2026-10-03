@@ -53,6 +53,24 @@ class NotDelayableException : Exception("the order can no longer be delayed")
  */
 class InvalidHoursException(message: String) : Exception(message)
 
+/** Why special_days_set() refused: the dates (HB456), or the hours or label (HB432). */
+enum class SpecialDayError {
+    /** A date before today in Leipzig, more than 366 days ahead, or no date at all. */
+    DATE,
+
+    /** Off the quarter hour, the end not after the start, or a label over 60 characters. */
+    HOURS,
+}
+
+/** The database refused special days (hamza-bistro-web#119), for [reason]. */
+class InvalidSpecialDayException(val reason: SpecialDayError, message: String) : Exception(message)
+
+/**
+ * The shop's database has not got what was asked for yet: it needs the
+ * server update [migration] ("20261003140000_special_days").
+ */
+class NeedsServerUpdateException(val migration: String) : Exception("needs the server update $migration")
+
 /**
  * The database refused a shop setting: auto-decline minutes outside 3–60
  * (HB433 from set_auto_decline_minutes), or busy mode's minutes or length

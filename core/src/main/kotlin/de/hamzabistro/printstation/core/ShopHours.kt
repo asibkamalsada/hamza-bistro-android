@@ -2,6 +2,7 @@ package de.hamzabistro.printstation.core
 
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -104,7 +105,40 @@ data class ShopHours(
     @SerialName("delivery_breaks") val deliveryBreaks: List<DeliveryBreak> = emptyList(),
     /** From this many minutes before a break, delivery for right now is refused. */
     @SerialName("delivery_break_lead_minutes") val breakLeadMinutes: Int = DeliveryBreak.DEFAULT_LEAD,
+    /**
+     * The special days from today on (hamza-bistro-web#119), by date; null
+     * from a database without them, which needs the server update first.
+     */
+    @SerialName("special_days") val specialDays: List<SpecialDay>? = null,
+    /** The hours in force today, special or not, as read; null from a database without special days. */
+    val today: DayHours? = null,
 ) {
+    /** The special day on [date], or null for the normal week. */
+    fun specialOn(date: LocalDate): SpecialDay? = specialDays?.firstOrNull { it.day == date }
+
+    /**
+     * The hours in force on [date]: its special day where it has one, its
+     * weekday's otherwise; null when the week was not sent.
+     */
+    fun hoursOn(date: LocalDate): DayHours? {
+        specialOn(date)?.let { special ->
+            val open = special.hours
+            return DayHours(date, delivers = open != null, opens = open?.opens, closes = open?.closes, special = true, label = special.label)
+        }
+        val week = delivery.firstOrNull { it.day == SpecialCalendar.weekday(date) } ?: return null
+        return DayHours(date, week.delivers, week.opens, week.closes)
+    }
+
+    /**
+     * Today's hours at [now]: [today] as the database said them, or — once
+     * midnight has passed since this was read — worked out for the new day
+     * from the week and the special days.
+     */
+    fun todayAt(now: Instant): DayHours? {
+        val date = SpecialCalendar.today(now)
+        return today?.takeIf { it.day == date } ?: hoursOn(date)
+    }
+
     /**
      * Busy mode at [now], or null while it is off — or over since this was
      * read: it ends by itself at [busyUntil], and the app stops adding the
@@ -254,6 +288,19 @@ interface ShopBackend {
     suspend fun removeClosure(id: Long): ShopHours
 
     /**
+     * The same [hours] on every date in [days], replacing what they had
+     * (hamza-bistro-web#119). The answer's [ShopHours.preordersInside] says
+     * how many orders already booked on those dates the new hours do not
+     * take. Throws [InvalidSpecialDayException] for dates or hours the
+     * database refuses, and [NeedsServerUpdateException] on a database
+     * without special days.
+     */
+    suspend fun setSpecialDays(days: Collection<LocalDate>, hours: SpecialHours, label: String): ShopHours
+
+    /** "Zurück auf normal": [days] go back to the normal week. A date without special hours is no error. */
+    suspend fun clearSpecialDays(days: Collection<LocalDate>): ShopHours
+
+    /**
      * The whole week at once, so it is never saved half-changed. Throws
      * [InvalidHoursException] for a day that closes before it opens.
      */
@@ -329,6 +376,25 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
 
     override suspend fun removeClosure(id: Long): ShopHours = call("shop_closure_delete", buildJsonObject { put("p_id", id) })
 
+    override suspend fun setSpecialDays(days: Collection<LocalDate>, hours: SpecialHours, label: String): ShopHours =
+        special("special_days_set", specialDaysSetBody(days, hours, label))
+
+    override suspend fun clearSpecialDays(days: Collection<LocalDate>): ShopHours =
+        special("special_days_clear", buildJsonObject { put("p_days", daysArray(days)) })
+
+    /** The special days' calls: their own refusals, and a database that has not got them yet. */
+    private suspend fun special(name: String, args: JsonObject): ShopHours =
+        try {
+            parse(rest.rpc(name, args))
+        } catch (e: BackendException) {
+            when {
+                e.code == INVALID_SPECIAL_DATE -> throw InvalidSpecialDayException(SpecialDayError.DATE, e.message ?: name)
+                e.code == INVALID_HOURS -> throw InvalidSpecialDayException(SpecialDayError.HOURS, e.message ?: name)
+                e.missingFunction -> throw NeedsServerUpdateException(SPECIAL_DAYS_MIGRATION)
+                else -> throw e
+            }
+        }
+
     override suspend fun saveWeek(week: List<DeliveryDay>): ShopHours =
         call(
             "set_delivery_hours",
@@ -388,5 +454,10 @@ class SupabaseShopBackend internal constructor(private val rest: SupabaseRest) :
 
         /** See 20261002160000_busy_mode.sql. */
         const val INVALID_BUSY = "HB434"
+
+        /** A date in the past, more than 366 days ahead, or none: 20261003140000_special_days.sql. */
+        const val INVALID_SPECIAL_DATE = "HB456"
+
+        const val SPECIAL_DAYS_MIGRATION = "20261003140000_special_days"
     }
 }
