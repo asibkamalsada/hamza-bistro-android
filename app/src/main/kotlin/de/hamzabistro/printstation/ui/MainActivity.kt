@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.hamzabistro.printstation.CrashLog
 import de.hamzabistro.printstation.station.Role
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -34,14 +36,24 @@ class MainActivity : ComponentActivity() {
         window.decorView.filterTouchesWhenObscured = true
         enableEdgeToEdge()
         take(intent)
+        // Read before any screen: the one that crashed may be the first.
+        val crash = mutableStateOf(CrashLog.pending(this))
         setContent {
             AppTheme {
-                val state by main.state.collectAsStateWithLifecycle()
-                when {
-                    state.account == null || state.role == Role.PRINTER -> MainScreen(main)
-                    state.role == Role.STAFF -> StaffApp(staff, main, focus, onFocused = { focus.value = null })
-                    // Finding out what this account is.
-                    else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                val trace = crash.value
+                if (trace != null) {
+                    CrashScreen(trace) {
+                        CrashLog.clear(this)
+                        crash.value = null
+                    }
+                } else {
+                    val state by main.state.collectAsStateWithLifecycle()
+                    when {
+                        state.account == null || state.role == Role.PRINTER -> MainScreen(main)
+                        state.role == Role.STAFF -> StaffApp(staff, main, focus, onFocused = { focus.value = null })
+                        // Finding out what this account is.
+                        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    }
                 }
             }
         }

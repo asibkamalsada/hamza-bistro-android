@@ -10,6 +10,8 @@ class PrintStationApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // First: a crash anywhere from here on is kept for the next start.
+        CrashLog.install(this)
         graph = AppGraph(this)
         StationNotifications.createChannels(this)
     }

@@ -914,4 +914,10 @@
     <string name="report_source_phone">Telefon</string>
     <string name="report_source_counter">Theke</string>
     <string name="report_source_extra">%1$s: %2$d hier gegessen, %3$d Gebühr erlassen</string>
+    <!-- The last crash, shown on the next start (CrashLog). -->
+    <string name="crash_title">Die App wurde unerwartet beendet</string>
+    <string name="crash_text">Beim letzten Mal hat sich die App von selbst geschlossen. Bitte kopiere den Text unten und schick ihn an den, der die App betreut, damit der Fehler behoben werden kann.</string>
+    <string name="crash_copy">Kopieren</string>
+    <string name="crash_copied">Kopiert</string>
+    <string name="crash_continue">Weiter</string>
 </resources>

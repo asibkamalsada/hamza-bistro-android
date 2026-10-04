@@ -914,4 +914,10 @@
     <string name="report_source_phone">Phone</string>
     <string name="report_source_counter">Counter</string>
     <string name="report_source_extra">%1$s: %2$d eaten in, %3$d fee waived</string>
+    <!-- The last crash, shown on the next start (CrashLog). -->
+    <string name="crash_title">The app closed unexpectedly</string>
+    <string name="crash_text">Last time the app closed by itself. Please copy what is below and send it to whoever looks after the app, so it can be fixed.</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_copied">Copied</string>
+    <string name="crash_continue">Continue</string>
 </resources>
