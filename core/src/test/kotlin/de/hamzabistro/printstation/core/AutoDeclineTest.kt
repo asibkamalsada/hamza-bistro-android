@@ -69,7 +69,8 @@ class AutoDeclineTest {
     @Test
     fun `a person never gives the database's own reason`() {
         assertFalse(CancelReason.TIMEOUT in CancelReason.CHOSEN)
-        assertEquals(CancelReason.entries.size - 1, CancelReason.CHOSEN.size)
+        // Nor the driver's no-show, nor one this app does not know: everything else is a button.
+        assertEquals(CancelReason.entries - listOf(CancelReason.TIMEOUT, CancelReason.NO_SHOW, CancelReason.UNKNOWN), CancelReason.CHOSEN)
     }
 }
 

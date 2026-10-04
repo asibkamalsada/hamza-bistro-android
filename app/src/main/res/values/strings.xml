@@ -803,4 +803,14 @@
     </plurals>
     <string name="report_ratings_comments">Recent comments</string>
     <string name="report_ratings_no_comments">No comments</string>
+    <string name="reason_no_show">Not met at the door</string>
+    <string name="reason_unknown">Other reason</string>
+    <string name="no_show">Not met at the door</string>
+    <string name="no_show_confirm">Called and waited a few minutes? Cancelling #%1$d as not met at the door counts against the account.</string>
+    <string name="no_show_yes">Yes, not met</string>
+    <string name="no_shows_before">%1$d× not met at the door</string>
+    <string name="no_shows_reset">Reset the count</string>
+    <string name="no_shows_reset_done">Count reset (it was %1$d).</string>
+    <string name="no_shows_reset_gone">The count can no longer be reset: the order no longer says whose account it was.</string>
+    <string name="no_show_delivery">No delivery to this account: two deliveries were not taken. Collection still works.</string>
 </resources>

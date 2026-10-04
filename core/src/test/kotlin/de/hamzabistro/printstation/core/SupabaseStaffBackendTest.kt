@@ -50,7 +50,7 @@ class SupabaseStaffBackendTest {
         val request = test.server.takeRequest()
         assertEquals("/rest/v1/orders", request.url.encodedPath)
         assertEquals("in.(new,confirmed,on_the_way)", request.url.queryParameter("status"))
-        assertEquals(StaffOrder.QUEUE_COLUMNS, request.url.queryParameter("select"))
+        assertEquals(StaffOrder.NO_SHOW_COLUMNS, request.url.queryParameter("select"))
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 
@@ -65,9 +65,79 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
+        assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+    }
+
+    @Test
+    fun `reads the queue without no_shows_before on a database before no-shows, and keeps to that`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"code":"42703","message":"column orders.no_shows_before does not exist"}""")
+        test.reply(200, "[$row]")
+        test.reply(200, "[$row]")
+
+        val order = backend.openOrders().single()
+        assertNull(order.noShowsBefore)
+        assertEquals(false, NoShows.canMark(order.copy(status = OrderStatus.ON_THE_WAY)))
+        backend.openOrders()
+
+        test.server.takeRequest()
+        assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
-        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
-        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+    }
+
+    @Test
+    fun `reads the account's no-shows and a no_show reason`() = runBlocking<Unit> {
+        signedIn()
+        val flagged = row.replace(""""printed_at":null,""", """"printed_at":null,"no_shows_before":1,""")
+        val noShow = row.replace(""""id":"a",""", """"id":"b",""").replace(""""status":"new"""", """"status":"cancelled"""")
+            .replace(""""cancel_reason":null""", """"cancel_reason":"no_show"""")
+        test.reply(200, "[$flagged,$noShow]")
+
+        val (first, second) = backend.openOrders()
+        assertEquals(1, first.noShowsBefore)
+        assertEquals(1, NoShows.flag(first))
+        assertEquals(CancelReason.NO_SHOW, second.cancelReason)
+        assertTrue(NoShows.canReset(second))
+    }
+
+    @Test
+    fun `cancels as not met at the door, and HB466 reads as moved on`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(200, """[{"id":"a"}]""")
+        test.reply(400, """{"code":"HB466","message":"order 57 cannot be cancelled as not met at the door from delivered"}""")
+
+        val out = order("a", status = OrderStatus.ON_THE_WAY)
+        backend.move(out, OrderStep.Cancel(CancelReason.NO_SHOW))
+        assertFailsWith<OrderMovedException> { backend.move(out, OrderStep.Cancel(CancelReason.NO_SHOW)) }
+
+        test.server.takeRequest()
+        val cancel = test.server.takeRequest()
+        assertEquals("eq.on_the_way", cancel.url.queryParameter("status"))
+        assertEquals("""{"status":"cancelled","cancel_reason":"no_show"}""", cancel.body!!.utf8())
+    }
+
+    @Test
+    fun `resets an account's no-shows and says what it had`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(200, "1")
+        test.reply(400, """{"code":"P0002","message":"no account is known for order a"}""")
+        test.reply(403, """{"code":"42501","message":"staff only"}""")
+        test.reply(404, """{"code":"PGRST202","message":"Could not find the function public.reset_no_shows"}""")
+
+        val order = order("a", status = OrderStatus.CANCELLED)
+        assertEquals(1, backend.resetNoShows(order))
+        assertFailsWith<NoShowAccountGoneException> { backend.resetNoShows(order) }
+        assertFailsWith<NotAllowedException> { backend.resetNoShows(order) }
+        val update = assertFailsWith<NeedsServerUpdateException> { backend.resetNoShows(order) }
+        assertEquals(NoShows.MIGRATION, update.migration)
+
+        test.server.takeRequest()
+        val reset = test.server.takeRequest()
+        assertEquals("/rest/v1/rpc/reset_no_shows", reset.url.encodedPath)
+        assertEquals("""{"p_order_id":"a"}""", reset.body!!.utf8())
     }
 
     @Test

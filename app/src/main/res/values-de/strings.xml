@@ -803,4 +803,14 @@
     </plurals>
     <string name="report_ratings_comments">Letzte Kommentare</string>
     <string name="report_ratings_no_comments">Keine Kommentare</string>
+    <string name="reason_no_show">Nicht angetroffen</string>
+    <string name="reason_unknown">Anderer Grund</string>
+    <string name="no_show">Nicht angetroffen</string>
+    <string name="no_show_confirm">Angerufen und ein paar Minuten gewartet? #%1$d als „nicht angetroffen“ stornieren – das zählt gegen das Konto.</string>
+    <string name="no_show_yes">Ja, nicht angetroffen</string>
+    <string name="no_shows_before">%1$d× nicht angetroffen</string>
+    <string name="no_shows_reset">Zähler zurücksetzen</string>
+    <string name="no_shows_reset_done">Zähler zurückgesetzt (vorher %1$d).</string>
+    <string name="no_shows_reset_gone">Der Zähler lässt sich nicht mehr zurücksetzen: Die Bestellung sagt nicht mehr, zu welchem Konto sie gehört.</string>
+    <string name="no_show_delivery">Keine Lieferung an dieses Konto: Zwei Lieferungen wurden nicht angenommen. Abholung geht.</string>
 </resources>

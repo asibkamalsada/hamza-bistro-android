@@ -39,6 +39,7 @@ import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.ui.AppTheme
 import de.hamzabistro.printstation.ui.Format
 import de.hamzabistro.printstation.ui.MainActivity
+import de.hamzabistro.printstation.ui.NoShowReset
 import de.hamzabistro.printstation.ui.OrderActions
 import de.hamzabistro.printstation.ui.OrderCard
 import de.hamzabistro.printstation.ui.StaffViewModel
@@ -114,6 +115,8 @@ private fun AlarmScreen(staff: StaffViewModel, onDone: () -> Unit, onOpenApp: (S
             override fun deliver(order: StaffOrder, payment: PaymentMethod) = staff.deliver(order, payment)
 
             override fun cancel(order: StaffOrder, reason: CancelReason?) = staff.cancel(order, reason)
+
+            override fun resetNoShows(order: StaffOrder, done: (NoShowReset) -> Unit) = staff.resetNoShows(order, done)
 
             override fun delay(order: StaffOrder, minutes: Int) = staff.delay(order, minutes)
 
