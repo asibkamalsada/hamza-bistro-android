@@ -340,7 +340,9 @@
     <string name="please_wait">Please wait…</string>
     <string name="remove">Remove</string>
     <string name="settings_reset">Reset this device\'s settings</string>
-    <string name="more_menu">More</string>
+    <string name="menu_open">Open menu</string>
+    <string name="drawer_shop" translatable="false">Hamza Bistro</string>
+    <string name="drawer_device">Device: %1$s</string>
     <string name="problem_not_staff">This account may not do that: it is not (or no longer) on the staff list.</string>
     <string name="address_failing_banner">The address check is not working properly — details in the settings.</string>
 

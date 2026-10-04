@@ -129,7 +129,7 @@ class AppGraph(context: Context) {
 
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 
-    /** The customers' problem reports: "Mehr → Reklamationen" (hamza-bistro-web#88). */
+    /** The customers' problem reports: ☰ → "Reklamationen" (hamza-bistro-web#88). */
     val issues = SupabaseIssuesBackend(config, http, sessions)
 
     /** The customers' ratings: stars in the history, a chime for a bad one (hamza-bistro-web#89). */

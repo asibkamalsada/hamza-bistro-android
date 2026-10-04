@@ -27,14 +27,10 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge as CountBadge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -60,10 +56,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -74,7 +68,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.Driver
-import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.PaymentMethod
@@ -93,7 +86,13 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused: () -> Unit, onOpen: (StaffScreen) -> Unit) {
+fun QueueScreen(
+    viewModel: StaffViewModel,
+    focus: StateFlow<String?>,
+    onFocused: () -> Unit,
+    onOpen: (StaffScreen) -> Unit,
+    onMenu: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val asked by focus.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -129,7 +128,7 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
                 title = {
                     Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
                 },
-                actions = { QueueMenu(onOpen, issues) },
+                navigationIcon = { MenuButton(issues.count, onMenu) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -442,59 +441,6 @@ fun needsNotificationPermission(context: Context): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
-/**
- * Where the queue leads: on a tablet, each a button; on a phone, behind one,
- * so the title keeps its room. "Reklamationen" only on a database that has
- * them, with the number open on it — and on "Mehr" too, so it is seen
- * without opening the menu.
- */
-@Composable
-private fun QueueMenu(onOpen: (StaffScreen) -> Unit, issues: IssuesState) {
-    val open = issues.count
-    val entries =
-        listOfNotNull(
-            StaffScreen.HISTORY to R.string.history_title,
-            (StaffScreen.ISSUES to R.string.issues_title).takeIf { issues.available == true },
-            StaffScreen.CASH_UP to R.string.cash_up_title,
-            StaffScreen.REPORT to R.string.report_title,
-            StaffScreen.MENU to R.string.menu_title,
-            StaffScreen.HOURS to R.string.hours_title,
-            StaffScreen.SETTINGS to R.string.settings,
-        )
-    val width = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
-    if (width >= WIDE) {
-        for ((screen, label) in entries) {
-            TextButton(onClick = { onOpen(screen) }) { Counted(stringResource(label), if (screen == StaffScreen.ISSUES) open else 0) }
-        }
-        return
-    }
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { expanded = true }) { Counted(stringResource(R.string.more_menu), open) }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            for ((screen, label) in entries) {
-                DropdownMenuItem(
-                    text = { Counted(stringResource(label), if (screen == StaffScreen.ISSUES) open else 0) },
-                    onClick = {
-                        expanded = false
-                        onOpen(screen)
-                    },
-                )
-            }
-        }
-    }
-}
-
-/** A label with a number on its corner while [count] is above nought. */
-@Composable
-private fun Counted(label: String, count: Int) {
-    if (count <= 0) {
-        Text(label)
-        return
-    }
-    BadgedBox(badge = { CountBadge { Text(count.toString()) } }) { Text(label, modifier = Modifier.padding(end = 6.dp)) }
-}
-
 /** The shop line's buttons, wired to the view model. */
 internal class ShopButtons(private val viewModel: StaffViewModel) : ShopActions {
     override fun pause(minutes: Long, what: PauseWhat) = viewModel.pauseShop(minutes, what)
@@ -560,6 +506,3 @@ private const val FOCUS_MS = 4_000L
 
 /** Room under the last card, so "Neue Bestellung" never covers its buttons. */
 private val FAB_ROOM = 88.dp
-
-/** From here on the queue's top bar has room for every button. */
-private val WIDE = 720.dp

@@ -156,7 +156,7 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StaffState())
 
     /**
-     * The open problem reports, for the badge on "Mehr → Reklamationen"
+     * The open problem reports, for the badge on ☰ → "Reklamationen"
      * (hamza-bistro-web#88); not available on a database without them.
      */
     val issues: StateFlow<IssuesState> =
@@ -328,6 +328,9 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     /** Whether this device is a driver's phone, as it is set now: the queue opens on "Fahrer". */
     val driverDevice: Boolean
         get() = graph.settings.device.value.driver
+
+    /** This device's name from the settings, or the phone's model while it has none. */
+    fun deviceLabel(): String = graph.deviceLabel()
 
     private val _chosen = MutableStateFlow<Set<String>>(emptySet())
 
