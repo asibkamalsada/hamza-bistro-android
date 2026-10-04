@@ -112,6 +112,37 @@ rules, ported to Kotlin with the site's own test cases
 - held sideways on a tablet, the three headings stand side by side, like
   a kitchen pass.
 
+### Neue Bestellung
+
+A call, or somebody at the counter (#9): **+ Neue Bestellung** on the queue
+types the order in, and it lands already accepted in "In der Küche" on
+every device, counts towards the kitchen's load and prints like any
+accepted order
+([`PhoneOrder`](core/src/main/kotlin/de/hamzabistro/printstation/core/PhoneOrder.kt),
+[`20261004040000_phone_orders.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261004040000_phone_orders.sql)):
+
+- **Telefon** or **Vor Ort / Theke**; **Abholung**, **Vor Ort** (eaten
+  here) or **Lieferung**;
+- dishes from the menu with the site's options dialog: the dish's groups in
+  its order, a "single" group a required choice that starts on its first
+  choice still on sale, a "multiple" one any number; sold out by an
+  ingredient counts. A quantity and a note per dish (80 characters);
+- name and phone, needed for a delivery or a pickup; for a delivery the
+  address goes through the site's own `check-address`, as the signed-in
+  staff account, which shows the ring;
+- as soon as possible, with the minutes chosen as on an incoming order, or
+  a time in the next seven days;
+- the price is the database's own, from a dry run of `staff_place_order`:
+  the deal of the day, the Selbstabholerrabatt, the ring's fee and minimum.
+  **Telefonbestellung, Gebühr erlassen** takes off the delivery fee, the
+  small-order fee and the outer ring's minimum. Saving sends the total
+  shown, so a price that changed meanwhile is refused, not charged;
+- "Küche voll in diesem Slot" warns, and the order goes in all the same.
+
+The card and "Letzte Bestellungen" mark such orders "Telefon" or "Vor Ort /
+Theke", "Hier essen" and "Gebühr erlassen", and never "Neuer Kunde". The
+Auswertung splits by source once there is anything but the website.
+
 ### Fahrer
 
 A second tab on the queue, and the one a phone opens on when "Fahrer-Handy"
@@ -392,7 +423,8 @@ the app logs it.
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
   and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
-  ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`), who hears about orders, the print
+  ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
+  phone and walk-in orders (`PhoneOrder`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer

@@ -84,27 +84,14 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     /**
      * What the queue reads, newest columns first: each one a database turns
      * out not to have yet is dropped for good, oldest last.
+     * [StaffOrder.SOURCE_COLUMNS] (20261004040000_phone_orders), then
      * [StaffOrder.NO_SHOW_COLUMNS] (20261004030000_no_shows), then
      * [StaffOrder.QUEUE_COLUMNS] (20261003160000_kitchen_capacity: no backlog
      * to wait for, so the estimate of before), then [StaffOrder.COLUMNS].
      */
-    @Volatile private var columns = 0
+    private val columns = ColumnLadder(QUEUE_SELECTS)
 
-    override suspend fun openOrders(): List<StaffOrder> {
-        while (true) {
-            val level = columns
-            try {
-                return openOrders(QUEUE_SELECTS[level])
-            } catch (e: BackendException) {
-                if (!e.missingColumn || level == QUEUE_SELECTS.lastIndex) throw e
-                // Without kitchen_slot, older than no_shows_before, it has
-                // neither: straight to the oldest. Another read may have
-                // stepped down meanwhile; never back up.
-                val next = if (e.message.orEmpty().contains("kitchen_slot")) QUEUE_SELECTS.lastIndex else level + 1
-                if (columns < next) columns = next
-            }
-        }
-    }
+    override suspend fun openOrders(): List<StaffOrder> = columns.read { openOrders(it) }
 
     private suspend fun openOrders(columns: String): List<StaffOrder> =
         orders(columns) {
@@ -278,7 +265,8 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         const val QUEUE_LIMIT = 100
 
         /** What the queue reads, newest database first: see [columns]. */
-        val QUEUE_SELECTS = listOf(StaffOrder.NO_SHOW_COLUMNS, StaffOrder.QUEUE_COLUMNS, StaffOrder.COLUMNS)
+        val QUEUE_SELECTS =
+            listOf(StaffOrder.SOURCE_COLUMNS, StaffOrder.NO_SHOW_COLUMNS, StaffOrder.QUEUE_COLUMNS, StaffOrder.COLUMNS)
     }
 }
 
@@ -305,3 +293,44 @@ internal val BackendException.missingFunction: Boolean
 /** Postgres's answer for a column the database does not have (yet). */
 internal val BackendException.missingColumn: Boolean
     get() = code == "42703"
+
+/**
+ * Column lists for one read, newest database first, each one older than the
+ * one before it. A read that hits a column the database does not have (yet)
+ * steps down to the first list without that column — straight past the
+ * lists between that have it too — and stays there for good: a database
+ * does not lose a column. One it cannot name steps down one.
+ */
+internal class ColumnLadder(private val selects: List<String>) {
+    @Volatile private var level = 0
+
+    /** The columns read now, for tests. */
+    val current: String
+        get() = selects[level]
+
+    suspend fun <T> read(block: suspend (String) -> T): T {
+        while (true) {
+            val at = level
+            try {
+                return block(selects[at])
+            } catch (e: BackendException) {
+                if (!e.missingColumn || at == selects.lastIndex) throw e
+                // Another read may have stepped down meanwhile; never back up.
+                val next = next(at, missingColumnName(e.message))
+                if (level < next) level = next
+            }
+        }
+    }
+
+    private fun next(at: Int, column: String?): Int {
+        if (column == null) return at + 1
+        return (at + 1..selects.lastIndex).firstOrNull { column !in selects[it].split(",") } ?: (at + 1)
+    }
+
+    companion object {
+        private val MISSING = Regex("""column (?:"?\w+"?\.)?"?(\w+)"? does not exist""")
+
+        /** "column orders.kitchen_slot does not exist" → "kitchen_slot"; null when it names none. */
+        fun missingColumnName(message: String?): String? = message?.let { MISSING.find(it)?.groupValues?.get(1) }
+    }
+}

@@ -34,6 +34,9 @@ enum class StaffScreen {
 
     /** This device, who hears about orders, the printers, the address check. */
     SETTINGS,
+
+    /** "Neue Bestellung": a phone or walk-in order, typed in (#9). */
+    NEW_ORDER,
 }
 
 /**
@@ -67,6 +70,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
         StaffScreen.MENU -> MenuScreen(onBack = back)
         StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
         StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
+        StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
     }
 }
 

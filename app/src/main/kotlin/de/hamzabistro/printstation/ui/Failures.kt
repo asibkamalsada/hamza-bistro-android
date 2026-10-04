@@ -16,6 +16,8 @@ import de.hamzabistro.printstation.core.NeedsServerUpdateException
 import de.hamzabistro.printstation.core.NoShowAccountGoneException
 import de.hamzabistro.printstation.core.NoShowDeliveryException
 import de.hamzabistro.printstation.core.NotAllowedException
+import de.hamzabistro.printstation.core.PhoneOrderError
+import de.hamzabistro.printstation.core.PhoneOrderException
 import de.hamzabistro.printstation.core.ReportRangeException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.SpecialDayError
@@ -41,6 +43,7 @@ fun failureText(context: Context, e: Exception): String =
         is MenuEditException -> menuEditText(context, e)
         is ReportRangeException -> context.getString(R.string.report_range_invalid)
         is IssueActionException -> issueText(context, e.reason)
+        is PhoneOrderException -> phoneOrderText(context, e)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
@@ -56,6 +59,24 @@ suspend fun <T> attempt(context: Context, onFailure: (String) -> Unit, block: su
     } catch (e: Exception) {
         onFailure(failureText(context, e))
         null
+    }
+
+/** Why staff_place_order refused a phone or walk-in order (#9). */
+private fun phoneOrderText(context: Context, e: PhoneOrderException): String =
+    when (e.reason) {
+        PhoneOrderError.NOT_STAFF -> context.getString(R.string.phone_error_not_staff)
+        PhoneOrderError.BAD_VALUE -> context.getString(R.string.phone_error_bad_value)
+        PhoneOrderError.CONTACT -> context.getString(R.string.phone_error_contact)
+        PhoneOrderError.ETA -> context.getString(R.string.phone_error_eta)
+        PhoneOrderError.TIME -> context.getString(R.string.phone_error_time)
+        PhoneOrderError.BASKET -> context.getString(R.string.phone_error_basket)
+        PhoneOrderError.ADDRESS_INCOMPLETE -> context.getString(R.string.phone_error_address_incomplete)
+        PhoneOrderError.OUTSIDE -> context.getString(R.string.phone_error_outside)
+        PhoneOrderError.MINIMUM ->
+            e.minimum?.let { context.getString(R.string.phone_error_minimum, Format.euro(it)) }
+                ?: context.getString(R.string.phone_error_minimum_plain)
+        PhoneOrderError.UNCHECKED -> context.getString(R.string.phone_error_unchecked)
+        PhoneOrderError.TOTAL_CHANGED -> context.getString(R.string.phone_error_total_changed)
     }
 
 /** Why a problem report could not be answered (HB461–HB463, P0002). */

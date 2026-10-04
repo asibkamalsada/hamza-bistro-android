@@ -5,6 +5,7 @@ import android.app.DatePickerDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
+import android.content.res.Resources
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -44,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -65,6 +67,7 @@ import de.hamzabistro.printstation.core.BusyGrid
 import de.hamzabistro.printstation.core.CashUp
 import de.hamzabistro.printstation.core.DishOrder
 import de.hamzabistro.printstation.core.OrderRatings
+import de.hamzabistro.printstation.core.OrderSource
 import de.hamzabistro.printstation.core.Report
 import de.hamzabistro.printstation.core.ReportCsv
 import de.hamzabistro.printstation.core.ReportDuration
@@ -379,6 +382,8 @@ private fun LazyListScope.reportItems(report: Report, words: ReportWords) {
     item(key = "days") { ByDay(report, words) }
     item(key = "fulfilment") { Fulfilment(report, words) }
     item(key = "rings") { Rings(report, words) }
+    // Only once something came in by phone or at the counter (#9): otherwise it is all "Website".
+    if (report.enteredByStaff) item(key = "sources") { Sources(report, words) }
     item(key = "best") { BestSellers(report) }
     item(key = "grid") { BusyHours(report.grid) }
     item(key = "times") { Times(report, words) }
@@ -491,6 +496,34 @@ private fun Rings(report: Report, words: ReportWords) {
         }
     }
 }
+
+/** Website, Telefon, Theke: what each brought in, and how many were eaten here or had the fee waived. */
+@Composable
+private fun Sources(report: Report, words: ReportWords) {
+    val resources = LocalResources.current
+    ReportSection(stringResource(R.string.report_by_source)) {
+        Line(stringResource(R.string.report_source), words.orders, words.revenue, words.basket, muted = true)
+        for (source in report.bySource) {
+            Line(sourceName(resources, source.source), source.delivered.toString(), ReportText.euro(source.revenue), ReportText.euro(source.averageBasket))
+        }
+        for (source in report.bySource) {
+            if (source.dineIn == 0 && source.feesWaived == 0) continue
+            Text(
+                stringResource(R.string.report_source_extra, sourceName(resources, source.source), source.dineIn, source.feesWaived),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun sourceName(resources: Resources, source: String): String =
+    when (source) {
+        OrderSource.WEB -> resources.getString(R.string.report_source_web)
+        OrderSource.PHONE.wire -> resources.getString(R.string.report_source_phone)
+        OrderSource.COUNTER.wire -> resources.getString(R.string.report_source_counter)
+        else -> source
+    }
 
 /** The top ten, by Menge or by Umsatz, and all of them a tap away. */
 @Composable

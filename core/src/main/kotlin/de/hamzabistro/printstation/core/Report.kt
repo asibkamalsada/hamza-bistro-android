@@ -68,6 +68,25 @@ data class ReportRing(
     @SerialName("small_order_fees") val smallOrderFees: Double = 0.0,
 )
 
+/**
+ * How the orders came in: web, phone or counter, always all three in that
+ * order (20261004040000_phone_orders.sql). [placed] and [cancelled] by the
+ * day placed; the rest count delivered orders, as "fulfilment" does.
+ */
+@Serializable
+data class ReportSource(
+    val source: String,
+    val placed: Int = 0,
+    val cancelled: Int = 0,
+    val delivered: Int = 0,
+    val revenue: Double = 0.0,
+    @SerialName("average_basket") val averageBasket: Double? = null,
+    /** Delivered orders eaten here. */
+    @SerialName("dine_in") val dineIn: Int = 0,
+    /** Delivered orders whose fee or minimum staff waived. */
+    @SerialName("fees_waived") val feesWaived: Int = 0,
+)
+
 /** A dish sold; [revenue] is what its lines charged, before order-wide discounts. */
 @Serializable
 data class ReportDish(
@@ -247,7 +266,13 @@ data class Report(
     val payments: ReportPayments = ReportPayments(),
     /** Null from a server before 20261004020000. */
     val ratings: ReportRatings? = null,
+    /** Empty from a server before 20261004040000. */
+    @SerialName("by_source") val bySource: List<ReportSource> = emptyList(),
 ) {
+    /** Whether anything came in other than on the site: otherwise the split says nothing. */
+    val enteredByStaff: Boolean
+        get() = bySource.any { it.source != OrderSource.WEB && it.placed > 0 }
+
     val range: ReportRange
         get() = ReportRange(LocalDate.parse(from), LocalDate.parse(to))
 
