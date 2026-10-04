@@ -227,6 +227,15 @@ data class StaffOrder(
     @SerialName("dine_in") val dineIn: Boolean = false,
     /** Staff ticked "Gebühr erlassen" and it took a fee or the minimum off. */
     @SerialName("fees_waived") val feesWaived: Boolean = false,
+    /**
+     * Where the address is on the map, to about a metre
+     * (20261004060000_order_coords.sql, hamza-bistro-web#141): both set or
+     * both null. Null for a pickup, an address decided by its postcode, an
+     * order from before the columns or older than 30 days, and on a
+     * database without them. Read it as [point].
+     */
+    val lat: Double? = null,
+    val lon: Double? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -250,6 +259,10 @@ data class StaffOrder(
      */
     val newCustomer: Boolean
         get() = !returningCustomer && !enteredByStaff
+
+    /** Where the stop is, or null when the order has no coordinate. */
+    val point: GeoPoint?
+        get() = if (lat != null && lon != null) GeoPoint(lat, lon) else null
 
     /** Ordered from an address the map could not place: the price came from the postcode. */
     val unverifiedAddress: Boolean
@@ -280,8 +293,16 @@ data class StaffOrder(
         /** How it came in (20261004040000_phone_orders.sql), read where the database has them. */
         const val SOURCE_FIELDS = "source,dine_in,fees_waived"
 
-        /** [NO_SHOW_COLUMNS] and [SOURCE_FIELDS]: what the open queue reads first. */
+        /** [NO_SHOW_COLUMNS] and [SOURCE_FIELDS]. */
         const val SOURCE_COLUMNS = "$NO_SHOW_COLUMNS,$SOURCE_FIELDS"
+
+        /**
+         * [SOURCE_COLUMNS] and where each address is on the map
+         * (20261004060000_order_coords.sql), which the driver's stop order
+         * is ridden by: what the open queue reads first. A database without
+         * them reads [SOURCE_COLUMNS].
+         */
+        const val POINT_COLUMNS = "$SOURCE_COLUMNS,lat,lon"
 
         /** What "Letzte Bestellungen" reads first; [COLUMNS] on a database without [SOURCE_FIELDS]. */
         const val HISTORY_COLUMNS = "$COLUMNS,$SOURCE_FIELDS"

@@ -70,6 +70,7 @@ internal fun DriverView(
     val orders = state.queue.orders
     val collect = Driver.toCollect(orders)
     val stops = Driver.stops(orders, stopOrder)
+    val legs = Driver.legs(stops)
     // A stop whose "Geliefert" waits on its undo window is as good as done: the route leaves it out.
     val riding = stops.filter { it.id !in state.pending && it.id !in state.busy }
     val taking = Driver.batch(chosen, orders).filter { it.id !in state.pending && it.id !in state.busy }
@@ -104,7 +105,7 @@ internal fun DriverView(
                 heading("stops", stopsHeading)
                 item(key = "route") { Route(riding, state, actions) }
                 itemsIndexed(stops, key = { _, it -> "stop-${it.id}" }) { index, order ->
-                    StopCard(index, stops.size, order, state, viewModel, actions)
+                    StopCard(index, stops.size, order, legs[index], state, viewModel, actions)
                 }
             }
         }
@@ -162,10 +163,22 @@ private fun CollectCard(order: StaffOrder, state: StaffState, ticked: Boolean, v
     }
 }
 
-/** A stop on the way: where, what to collect, the call, and "Bar" / "Karte" at the door. */
+/**
+ * A stop on the way: where, how far from the stop before ([leg], null
+ * without a coordinate), what to collect, the call, and "Bar" / "Karte" at
+ * the door.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StopCard(index: Int, count: Int, order: StaffOrder, state: StaffState, viewModel: StaffViewModel, actions: Actions) {
+private fun StopCard(
+    index: Int,
+    count: Int,
+    order: StaffOrder,
+    leg: Double?,
+    state: StaffState,
+    viewModel: StaffViewModel,
+    actions: Actions,
+) {
     val context = LocalContext.current
     val pending = state.pending[order.id]
     val busy = order.id in state.busy
@@ -175,6 +188,13 @@ private fun StopCard(index: Int, count: Int, order: StaffOrder, state: StaffStat
             Text("${index + 1}.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Title(order)
+                leg?.let {
+                    Text(
+                        stringResource(if (index == 0) R.string.driver_leg_shop else R.string.driver_leg, Driver.km(it)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Where(order, onRoute = { actions.route(order) })
                 when {
                     pending != null -> PendingLine(order, pending, actions)
