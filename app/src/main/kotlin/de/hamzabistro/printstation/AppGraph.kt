@@ -11,6 +11,8 @@ import de.hamzabistro.printstation.core.DeviceReport
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.FilePrintLog
 import de.hamzabistro.printstation.core.GitHubReleases
+import de.hamzabistro.printstation.core.IssueWatch
+import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrdersRealtime
@@ -25,6 +27,7 @@ import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabasePrintBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
+import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
@@ -108,6 +111,9 @@ class AppGraph(context: Context) {
 
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 
+    /** The customers' problem reports: "Mehr → Reklamationen" (hamza-bistro-web#88). */
+    val issues = SupabaseIssuesBackend(config, http, sessions)
+
     val settings = StationSettings(this.context)
 
     /** Not in a backup, like everything else: see data_extraction_rules.xml. */
@@ -184,6 +190,32 @@ class AppGraph(context: Context) {
             undoSeconds = { settings.device.value.undoSeconds },
             now = System::currentTimeMillis,
         )
+
+    // -----------------------------------------------------------------------
+    // The problem reports
+    // -----------------------------------------------------------------------
+
+    /** How many reports are open, for the badge and the chime. */
+    val issueWatch = IssueWatch(issues, logger)
+
+    /** Keeps [issueWatch] counting while anybody collects [liveIssues], through sign-outs, as [queueRunner] does. */
+    private val issueRunner =
+        flow<Nothing> {
+                while (true) {
+                    sessions.account.first { it != null }
+                    issueWatch.reset()
+                    try {
+                        issueWatch.run(realtime.changes(OrdersRealtime.Watch.ISSUES))
+                    } catch (e: SignedOutException) {
+                        logger.warn("The problem reports stopped: signed out")
+                        sessions.account.first { it == null }
+                    }
+                }
+            }
+            .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
+
+    /** The open reports as counted, kept fresh for as long as it is collected. */
+    val liveIssues: Flow<IssuesState> = merge(issueRunner, issueWatch.state)
 
     // -----------------------------------------------------------------------
     // A newer build

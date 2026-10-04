@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge as CountBadge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -69,6 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.Driver
+import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.PaymentMethod
@@ -114,6 +117,7 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
     LaunchedEffect(asked) { if (asked != null) driving = false }
     val chosen by viewModel.chosen.collectAsStateWithLifecycle()
     val stopOrder by viewModel.stopOrder.collectAsStateWithLifecycle()
+    val issues by viewModel.issues.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -121,7 +125,7 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
                 title = {
                     Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
                 },
-                actions = { QueueMenu(onOpen) },
+                actions = { QueueMenu(onOpen, issues) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -398,13 +402,17 @@ fun needsNotificationPermission(context: Context): Boolean =
 
 /**
  * Where the queue leads: on a tablet, each a button; on a phone, behind one,
- * so the title keeps its room.
+ * so the title keeps its room. "Reklamationen" only on a database that has
+ * them, with the number open on it — and on "Mehr" too, so it is seen
+ * without opening the menu.
  */
 @Composable
-private fun QueueMenu(onOpen: (StaffScreen) -> Unit) {
+private fun QueueMenu(onOpen: (StaffScreen) -> Unit, issues: IssuesState) {
+    val open = issues.count
     val entries =
-        listOf(
+        listOfNotNull(
             StaffScreen.HISTORY to R.string.history_title,
+            (StaffScreen.ISSUES to R.string.issues_title).takeIf { issues.available == true },
             StaffScreen.CASH_UP to R.string.cash_up_title,
             StaffScreen.REPORT to R.string.report_title,
             StaffScreen.MENU to R.string.menu_title,
@@ -413,24 +421,36 @@ private fun QueueMenu(onOpen: (StaffScreen) -> Unit) {
         )
     val width = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
     if (width >= WIDE) {
-        for ((screen, label) in entries) TextButton(onClick = { onOpen(screen) }) { Text(stringResource(label)) }
+        for ((screen, label) in entries) {
+            TextButton(onClick = { onOpen(screen) }) { Counted(stringResource(label), if (screen == StaffScreen.ISSUES) open else 0) }
+        }
         return
     }
-    var open by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { open = true }) { Text(stringResource(R.string.more_menu)) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        TextButton(onClick = { expanded = true }) { Counted(stringResource(R.string.more_menu), open) }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             for ((screen, label) in entries) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
+                    text = { Counted(stringResource(label), if (screen == StaffScreen.ISSUES) open else 0) },
                     onClick = {
-                        open = false
+                        expanded = false
                         onOpen(screen)
                     },
                 )
             }
         }
     }
+}
+
+/** A label with a number on its corner while [count] is above nought. */
+@Composable
+private fun Counted(label: String, count: Int) {
+    if (count <= 0) {
+        Text(label)
+        return
+    }
+    BadgedBox(badge = { CountBadge { Text(count.toString()) } }) { Text(label, modifier = Modifier.padding(end = 6.dp)) }
 }
 
 /** The shop line's buttons, wired to the view model. */

@@ -26,7 +26,8 @@ import okhttp3.WebSocketListener
 
 /**
  * Says within a second that an order changed, over Supabase Realtime — the
- * same postgres_changes subscription the site's queue has.
+ * same postgres_changes subscription the site's queue has — or, for
+ * [Watch.ISSUES], that a problem report did.
  *
  * Only ever a hint to look: what it carries is not read (it would be the
  * order, name and address included), and the poll of whoever listens stays
@@ -177,7 +178,7 @@ class OrdersRealtime(
                             addJsonObject {
                                 put("event", "*")
                                 put("schema", "public")
-                                put("table", "orders")
+                                put("table", watch.table)
                                 watch.filter?.let { put("filter", it) }
                             }
                         }
@@ -217,13 +218,19 @@ class OrdersRealtime(
         class Closed(val why: String) : Frame
     }
 
-    /** Which orders a socket is about. */
-    enum class Watch(val topic: String, val filter: String?) {
+    /** Which orders — or which table's rows — a socket is about. */
+    enum class Watch(val topic: String, val filter: String?, val table: String = "orders") {
         /** What a print station prints; the rest is not its business. */
         ACCEPTED("realtime:print-station", "status=eq.confirmed"),
 
         /** Every order, as the staff queue on /orders watches them. */
         ALL("realtime:staff-queue", null),
+
+        /**
+         * The customers' problem reports (hamza-bistro-web#88): a new one
+         * chimes, one answered on another device is counted again.
+         */
+        ISSUES("realtime:order-issues", null, "order_issues"),
     }
 
     companion object {

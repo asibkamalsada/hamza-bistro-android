@@ -258,6 +258,8 @@ fun OrderCard(
     readOnly: Boolean = false,
     /** Whether the database knows "Fertig": without it, no button for it. */
     packing: Boolean = true,
+    /** The customer reported a problem with it ("Reklamation", hamza-bistro-web#88): in the history. */
+    reported: Boolean = false,
 ) {
     val context = LocalContext.current
     val estimate = Eta.estimate(order, prep)
@@ -282,6 +284,7 @@ fun OrderCard(
                     Badge(stringResource(R.string.preorder_badge, Format.slot(context, it, now)), MaterialTheme.colorScheme.tertiaryContainer)
                 }
                 if (order.pickup) Badge(stringResource(R.string.pickup_badge), MaterialTheme.colorScheme.primaryContainer)
+                if (reported) Badge(stringResource(R.string.issue_had_report), MaterialTheme.colorScheme.errorContainer)
                 Text(
                     stringResource(R.string.ordered_at, Format.clock(order.createdAt)),
                     style = MaterialTheme.typography.bodySmall,
