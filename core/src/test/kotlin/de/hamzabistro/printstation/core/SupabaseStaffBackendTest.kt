@@ -50,8 +50,24 @@ class SupabaseStaffBackendTest {
         val request = test.server.takeRequest()
         assertEquals("/rest/v1/orders", request.url.encodedPath)
         assertEquals("in.(new,confirmed,on_the_way)", request.url.queryParameter("status"))
-        assertEquals(StaffOrder.COLUMNS, request.url.queryParameter("select"))
+        assertEquals(StaffOrder.QUEUE_COLUMNS, request.url.queryParameter("select"))
         assertEquals("Bearer access-1", request.headers["Authorization"])
+    }
+
+    @Test
+    fun `reads the queue without kitchen_slot on a database without the cap, and keeps to that`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"code":"42703","message":"column orders.kitchen_slot does not exist"}""")
+        test.reply(200, "[$row]")
+        test.reply(200, "[$row]")
+
+        assertEquals(null, backend.openOrders().single().kitchenSlot)
+        backend.openOrders()
+
+        test.server.takeRequest()
+        assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
 
     @Test

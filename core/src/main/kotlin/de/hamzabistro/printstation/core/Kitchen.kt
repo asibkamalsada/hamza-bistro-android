@@ -82,6 +82,37 @@ object Kitchen {
         return from to from.plus(LINE)
     }
 
+    /**
+     * An order for right now leaves at the earliest in the quarter hour this
+     * far off: place_order's c_asap_kitchen, ASAP_KITCHEN_MINUTES of the site.
+     */
+    val ASAP: Duration = Duration.ofMinutes(10)
+
+    /**
+     * The kitchen's backlog for an order already placed (hamza-bistro-web#74),
+     * read off the slot place_order gave it — orderKitchenWait() of
+     * kitchen.ts: how long from [now] until that slot starts, when it is past
+     * the order's natural one, the quarter hour [ASAP] after it came in.
+     * Nothing when it kept its natural slot, since then the cooking is the
+     * wait; nor for a pre-order, nor one with no slot (made some other way,
+     * from before the cap, or a database without it), nor once the slot has
+     * begun.
+     *
+     * The order's own slot rather than a fresh look at [KitchenSlot]s: the
+     * order is in its slot already, and a fresh search would count it against
+     * itself and offer a quarter hour later than the customer was shown.
+     */
+    fun orderWaitMillis(order: StaffOrder, now: Instant): Long {
+        if (order.scheduledFor != null) return 0
+        val slot = order.kitchenSlot ?: return 0
+        val natural = floorToSlot(order.createdAt.plus(ASAP).toEpochMilli())
+        if (slot.toEpochMilli() <= natural) return 0
+        return maxOf(0, slot.toEpochMilli() - now.toEpochMilli())
+    }
+
+    /** slotOf() of kitchen.ts: the quarter hour, on the epoch, which Leipzig's offsets keep. */
+    private fun floorToSlot(millis: Long): Long = Math.floorDiv(millis, SLOT.toMillis()) * SLOT.toMillis()
+
     /** kitchen_slots()'s answer. */
     fun parse(body: String): List<KitchenSlot> = json.decodeFromString(ListSerializer(KitchenSlot.serializer()), body)
 

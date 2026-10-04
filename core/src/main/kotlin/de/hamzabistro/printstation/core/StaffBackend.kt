@@ -72,8 +72,22 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         return staff
     }
 
+    /** Whether the database has orders.kitchen_slot: until it says otherwise, yes. */
+    @Volatile private var kitchenSlots = true
+
     override suspend fun openOrders(): List<StaffOrder> =
-        orders {
+        try {
+            openOrders(if (kitchenSlots) StaffOrder.QUEUE_COLUMNS else StaffOrder.COLUMNS)
+        } catch (e: BackendException) {
+            // The site's database without 20261003160000_kitchen_capacity:
+            // no backlog to wait for, so the estimate of before.
+            if (!kitchenSlots || !e.missingColumn) throw e
+            kitchenSlots = false
+            openOrders(StaffOrder.COLUMNS)
+        }
+
+    private suspend fun openOrders(columns: String): List<StaffOrder> =
+        orders(columns) {
             addQueryParameter("status", "in.(new,confirmed,on_the_way)")
             // Right away first, then in the order they have to be cooked;
             // the screen sorts by when each is due.
@@ -81,8 +95,8 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
             addQueryParameter("limit", QUEUE_LIMIT.toString())
         }
 
-    private suspend fun orders(query: HttpUrl.Builder.() -> Unit): List<StaffOrder> {
-        val url = rest.endpoint("rest/v1/orders").addQueryParameter("select", StaffOrder.COLUMNS).apply(query).build()
+    private suspend fun orders(columns: String, query: HttpUrl.Builder.() -> Unit): List<StaffOrder> {
+        val url = rest.endpoint("rest/v1/orders").addQueryParameter("select", columns).apply(query).build()
         return rest.call({ it.url(url).get() }) { response ->
             val body = response.body.string()
             if (!response.isSuccessful) throw rest.rejected(response.code, body, "orders")
@@ -249,3 +263,7 @@ object Packing {
 /** PostgREST's answer for a function the database does not have (yet). */
 internal val BackendException.missingFunction: Boolean
     get() = status == 404 || code == "PGRST202"
+
+/** Postgres's answer for a column the database does not have (yet). */
+internal val BackendException.missingColumn: Boolean
+    get() = code == "42703"

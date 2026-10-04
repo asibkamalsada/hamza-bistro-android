@@ -251,7 +251,7 @@ fun OrderCard(
     canPrint: Boolean,
     actions: OrderActions,
     modifier: Modifier = Modifier,
-    /** Busy mode's minutes, added to the pre-selected accept button only. */
+    /** Busy mode's minutes, added to the pre-selected accept button only — as is the kitchen's backlog. */
     busyMinutes: Int = 0,
     focused: Boolean = false,
     compact: Boolean = false,
@@ -353,7 +353,7 @@ fun OrderCard(
             if (order.status == OrderStatus.CONFIRMED) PrintLine(order, now)
 
             if (order.status.open && !readOnly) {
-                Actions(order, Eta.estimate(order, prep, busyMinutes), prefs, pending, busy, canPrint && !compact, packing, actions)
+                Actions(order, Eta.estimate(order, prep, busyMinutes, now), prefs, pending, busy, canPrint && !compact, packing, actions)
             }
         }
     }
