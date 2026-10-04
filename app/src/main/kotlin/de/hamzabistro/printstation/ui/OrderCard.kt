@@ -34,6 +34,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -324,6 +326,7 @@ fun OrderCard(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // Line by line as placed: two Döner with different notes are two lines.
                 for (item in order.items) {
                     Text(
                         buildString {
@@ -332,6 +335,7 @@ fun OrderCard(
                         },
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                    item.dishNote?.let { DishNote(it) }
                 }
             }
 
@@ -399,6 +403,27 @@ internal fun Note(label: String, text: String, color: Color) {
         Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+/**
+ * "ohne Zwiebeln", under its dish: the order note's highlight, a bar on the
+ * left and no label — .order-item-note on the site. Wrapped, never cut.
+ */
+@Composable
+private fun DishNote(text: String) {
+    val bar = MaterialTheme.colorScheme.error
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onErrorContainer,
+        modifier =
+            Modifier.padding(start = 16.dp)
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
+                .drawBehind { drawRect(bar, size = Size(3.dp.toPx(), size.height)) }
+                .padding(start = 9.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+    )
 }
 
 @Composable
