@@ -57,10 +57,15 @@ class SupabaseHistoryBackend internal constructor(
     constructor(config: SupabaseConfig, http: OkHttpClient, sessions: SessionManager) :
         this(SupabaseRest(config, http, sessions))
 
-    override suspend fun recent(): List<StaffOrder> {
+    /** [StaffOrder.HISTORY_COLUMNS], or [StaffOrder.COLUMNS] on a database before phone orders. */
+    private val columns = ColumnLadder(listOf(StaffOrder.HISTORY_COLUMNS, StaffOrder.COLUMNS))
+
+    override suspend fun recent(): List<StaffOrder> = columns.read { recent(it) }
+
+    private suspend fun recent(columns: String): List<StaffOrder> {
         val url =
             rest.endpoint("rest/v1/orders")
-                .addQueryParameter("select", StaffOrder.COLUMNS)
+                .addQueryParameter("select", columns)
                 .addQueryParameter("order", "created_at.desc")
                 .addQueryParameter("limit", HISTORY_LIMIT.toString())
                 .build()

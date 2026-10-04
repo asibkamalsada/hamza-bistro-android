@@ -50,7 +50,7 @@ class SupabaseStaffBackendTest {
         val request = test.server.takeRequest()
         assertEquals("/rest/v1/orders", request.url.encodedPath)
         assertEquals("in.(new,confirmed,on_the_way)", request.url.queryParameter("status"))
-        assertEquals(StaffOrder.NO_SHOW_COLUMNS, request.url.queryParameter("select"))
+        assertEquals(StaffOrder.SOURCE_COLUMNS, request.url.queryParameter("select"))
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 
@@ -65,7 +65,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -83,9 +83,64 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
+        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+    }
+
+    @Test
+    fun `reads the queue without source columns on a database before phone orders, and keeps to that`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"code":"42703","message":"column orders.source does not exist"}""")
+        test.reply(200, "[$row]")
+        test.reply(200, "[$row]")
+
+        val order = backend.openOrders().single()
+        assertEquals(OrderSource.WEB, order.source)
+        assertEquals(false, order.dineIn)
+        assertEquals(false, order.feesWaived)
+        // A web order still says "Neuer Kunde" as before.
+        assertTrue(order.newCustomer)
+        backend.openOrders()
+
+        test.server.takeRequest()
+        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+    }
+
+    @Test
+    fun `a database without no-shows lacks the source columns too, and is read with the queue's columns`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"code":"42703","message":"column orders.source does not exist"}""")
+        test.reply(400, """{"code":"42703","message":"column orders.no_shows_before does not exist"}""")
+        test.reply(200, "[$row]")
+
+        backend.openOrders()
+
+        test.server.takeRequest()
+        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
-        assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+    }
+
+    @Test
+    fun `reads a phone order, its source, eaten here, fees waived, and never a new customer`() = runBlocking<Unit> {
+        signedIn()
+        val phone =
+            row.replace(""""status":"new"""", """"status":"confirmed"""")
+                .replace(""""printed_at":null,""", """"printed_at":null,"source":"counter","dine_in":true,"fees_waived":true,""")
+        test.reply(200, "[$phone]")
+
+        val order = backend.openOrders().single()
+        assertEquals("counter", order.source)
+        assertEquals(OrderSource.COUNTER, OrderSource.of(order.source))
+        assertTrue(order.dineIn)
+        assertTrue(order.feesWaived)
+        assertTrue(order.enteredByStaff)
+        // returning_customer is false on every email-less order: no flag for it.
+        assertEquals(false, order.returningCustomer)
+        assertEquals(false, order.newCustomer)
     }
 
     @Test

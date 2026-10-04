@@ -159,6 +159,27 @@ class ReportTest {
         assertEquals(ReportAmount(1, 9.0), r.payments.unknown)
     }
 
+    @Test
+    fun `reads the split by source, and none from a server before phone orders`() {
+        val r =
+            json.decodeFromString(
+                Report.serializer(),
+                answer.trimEnd().removeSuffix("}") +
+                    ""","by_source": [""" +
+                    """{"source":"web","placed":40,"cancelled":2,"delivered":37,"revenue":812.4,"average_basket":21.96,"dine_in":0,"fees_waived":0},""" +
+                    """{"source":"phone","placed":6,"cancelled":0,"delivered":6,"revenue":101.5,"average_basket":16.92,"dine_in":1,"fees_waived":2},""" +
+                    """{"source":"counter","placed":0,"cancelled":0,"delivered":0,"revenue":0,"average_basket":null,"dine_in":0,"fees_waived":0}]}""",
+            )
+        assertEquals(listOf("web", "phone", "counter"), r.bySource.map { it.source })
+        assertEquals(ReportSource("phone", 6, 0, 6, 101.5, 16.92, 1, 2), r.bySource[1])
+        assertEquals(null, r.bySource[2].averageBasket)
+        assertTrue(r.enteredByStaff)
+
+        val before = json.decodeFromString(Report.serializer(), answer)
+        assertEquals(emptyList(), before.bySource)
+        assertFalse(before.enteredByStaff)
+    }
+
     /** The issue's answer with the ratings section of 20261004020000_report_ratings.sql. */
     private fun withRatings(ratings: String): Report =
         json.decodeFromString(Report.serializer(), answer.trimEnd().removeSuffix("}") + ""","ratings": $ratings}""")

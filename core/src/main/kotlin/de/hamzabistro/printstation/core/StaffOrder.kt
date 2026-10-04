@@ -217,6 +217,16 @@ data class StaffOrder(
      * mark either, so the button stays away ([NoShows]).
      */
     @SerialName("no_shows_before") val noShowsBefore: Int? = null,
+    /**
+     * How it came in: "web", or "phone" / "counter" when staff typed it in
+     * on the tablet (20261004040000_phone_orders.sql, android#9). "web" on a
+     * database without the column, which has no other kind.
+     */
+    val source: String = OrderSource.WEB,
+    /** Eaten here, "Vor Ort": always a pickup as well. */
+    @SerialName("dine_in") val dineIn: Boolean = false,
+    /** Staff ticked "Gebühr erlassen" and it took a fee or the minimum off. */
+    @SerialName("fees_waived") val feesWaived: Boolean = false,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -228,6 +238,18 @@ data class StaffOrder(
     /** The refundable bottle deposit inside the total. */
     val depositTotal: Double
         get() = items.sumOf { it.deposit * it.qty }
+
+    /** Typed in by staff — on the phone or at the counter — rather than ordered on the site. */
+    val enteredByStaff: Boolean
+        get() = source != OrderSource.WEB
+
+    /**
+     * "Neuer Kunde": a first order on the site, worth a call. Never for one
+     * staff typed in: it has no email to tell a first order by, and whoever
+     * typed it has just spoken to the customer.
+     */
+    val newCustomer: Boolean
+        get() = !returningCustomer && !enteredByStaff
 
     /** Ordered from an address the map could not place: the price came from the postcode. */
     val unverifiedAddress: Boolean
@@ -254,6 +276,15 @@ data class StaffOrder(
          * which came later: a database without them reads [QUEUE_COLUMNS].
          */
         const val NO_SHOW_COLUMNS = "$QUEUE_COLUMNS,no_shows_before"
+
+        /** How it came in (20261004040000_phone_orders.sql), read where the database has them. */
+        const val SOURCE_FIELDS = "source,dine_in,fees_waived"
+
+        /** [NO_SHOW_COLUMNS] and [SOURCE_FIELDS]: what the open queue reads first. */
+        const val SOURCE_COLUMNS = "$NO_SHOW_COLUMNS,$SOURCE_FIELDS"
+
+        /** What "Letzte Bestellungen" reads first; [COLUMNS] on a database without [SOURCE_FIELDS]. */
+        const val HISTORY_COLUMNS = "$COLUMNS,$SOURCE_FIELDS"
     }
 }
 

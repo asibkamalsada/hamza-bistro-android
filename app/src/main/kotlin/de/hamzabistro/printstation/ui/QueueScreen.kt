@@ -36,6 +36,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryTabRow
@@ -132,6 +133,12 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        // A call or somebody at the counter (#9): typed in, straight into "In der Küche".
+        floatingActionButton = {
+            if (!driving) {
+                ExtendedFloatingActionButton(onClick = { onOpen(StaffScreen.NEW_ORDER) }) { Text("+ " + stringResource(R.string.new_order)) }
+            }
+        },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Banners(state, viewModel, onOpen) { number ->
@@ -207,7 +214,7 @@ private fun Groups(state: StaffState, actions: OrderActions, focus: String?, onF
                     val orders = groups.firstOrNull { it.first == group }?.second.orEmpty()
                     LazyColumn(
                         modifier = Modifier.weight(1f).fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 8.dp),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = FAB_ROOM),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         heading(group, orders.size)
@@ -220,7 +227,7 @@ private fun Groups(state: StaffState, actions: OrderActions, focus: String?, onF
             LazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = FAB_ROOM),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 for ((group, orders) in groups) {
@@ -550,6 +557,9 @@ internal class Actions(private val context: Context, private val viewModel: Staf
 }
 
 private const val FOCUS_MS = 4_000L
+
+/** Room under the last card, so "Neue Bestellung" never covers its buttons. */
+private val FAB_ROOM = 88.dp
 
 /** From here on the queue's top bar has room for every button. */
 private val WIDE = 720.dp

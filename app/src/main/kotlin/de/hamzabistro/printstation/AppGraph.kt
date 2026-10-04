@@ -31,6 +31,7 @@ import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
+import de.hamzabistro.printstation.core.SupabasePhoneOrderBackend
 import de.hamzabistro.printstation.core.SupabaseOpsBackend
 import de.hamzabistro.printstation.core.SupabaseRatingsBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
@@ -112,6 +113,9 @@ class AppGraph(context: Context) {
 
     /** What is sold out, and what a dish is and costs. */
     val menu = SupabaseMenuBackend(config, http, sessions)
+
+    /** "Neue Bestellung": phone and walk-in orders, typed in on the tablet (#9). */
+    val phoneOrders = SupabasePhoneOrderBackend(config, http, sessions)
 
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 

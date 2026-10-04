@@ -53,6 +53,7 @@ import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.NoShows
 import de.hamzabistro.printstation.core.OrderRating
 import de.hamzabistro.printstation.core.OrderRatings
+import de.hamzabistro.printstation.core.OrderSource
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.PackedUrgency
@@ -231,6 +232,14 @@ fun reasonLabel(context: Context, reason: CancelReason?): String =
         }
     )
 
+/** "Telefon" or "Vor Ort / Theke" for an order staff typed in; null for one from the site. */
+fun sourceLabel(context: Context, order: StaffOrder): String? =
+    when (OrderSource.of(order.source)) {
+        OrderSource.PHONE -> context.getString(R.string.source_phone)
+        OrderSource.COUNTER -> context.getString(R.string.source_counter)
+        null -> null
+    }
+
 /** "Bar", "Karte", "Online" — or "unbekannt": delivered from Telegram or by an older app. */
 fun paymentLabel(context: Context, method: PaymentMethod?): String =
     context.getString(
@@ -317,7 +326,13 @@ fun OrderCard(
                 order.scheduledFor?.let {
                     Badge(stringResource(R.string.preorder_badge, Format.slot(context, it, now)), MaterialTheme.colorScheme.tertiaryContainer)
                 }
-                if (order.pickup) Badge(stringResource(R.string.pickup_badge), MaterialTheme.colorScheme.primaryContainer)
+                // Typed in on the tablet (#9): "Telefon" or "Vor Ort / Theke".
+                sourceLabel(context, order)?.let { Badge(it, MaterialTheme.colorScheme.tertiaryContainer) }
+                when {
+                    order.dineIn -> Badge(stringResource(R.string.dine_in_badge), MaterialTheme.colorScheme.primaryContainer)
+                    order.pickup -> Badge(stringResource(R.string.pickup_badge), MaterialTheme.colorScheme.primaryContainer)
+                }
+                if (order.feesWaived) Badge(stringResource(R.string.fees_waived_badge), MaterialTheme.colorScheme.secondaryContainer)
                 if (reported) Badge(stringResource(R.string.issue_had_report), MaterialTheme.colorScheme.errorContainer)
                 // "★★☆☆☆": one or two stars in the colour of a "Reklamation".
                 rating?.let {
@@ -456,18 +471,25 @@ private fun DishNote(text: String) {
 @Composable
 private fun Contact(order: StaffOrder, actions: OrderActions) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${order.customerName} · ", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                order.phone,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable { actions.call(order.phone) },
-            )
+        // A walk-in eaten here may have given neither.
+        if (order.customerName.isNotBlank() || order.phone.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (order.customerName.isNotBlank()) {
+                    Text(order.customerName + if (order.phone.isNotBlank()) " · " else "", style = MaterialTheme.typography.bodyLarge)
+                }
+                if (order.phone.isNotBlank()) {
+                    Text(
+                        order.phone,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable { actions.call(order.phone) },
+                    )
+                }
+            }
         }
         // Nothing is paid online: the call is the only check that somebody wants the food.
-        if (!order.returningCustomer && order.status == OrderStatus.NEW) {
+        if (order.newCustomer && order.status == OrderStatus.NEW) {
             Text(stringResource(R.string.new_customer), color = toneColor(Tone.SOON), fontWeight = FontWeight.SemiBold)
         }
         // A delivery to this account has failed before (#83): like the first-order flag.

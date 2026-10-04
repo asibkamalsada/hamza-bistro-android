@@ -34,9 +34,25 @@ class HistoryTest {
         assertEquals("/rest/v1/orders", request.url.encodedPath)
         assertEquals("created_at.desc", request.url.queryParameter("order"))
         assertEquals("50", request.url.queryParameter("limit"))
-        assertEquals(StaffOrder.COLUMNS, request.url.queryParameter("select"))
+        assertEquals(StaffOrder.HISTORY_COLUMNS, request.url.queryParameter("select"))
         // Every order, not only the open ones.
         assertEquals(null, request.url.queryParameter("status"))
+    }
+
+    @Test
+    fun `reads the recent orders without the source columns on a database before phone orders, and keeps to that`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(400, """{"code":"42703","message":"column orders.dine_in does not exist"}""")
+        test.reply(200, """[{"id":"a","order_number":57,"created_at":"2026-09-26T16:00:00+00:00","status":"delivered","items":[]}]""")
+        test.reply(200, "[]")
+
+        assertEquals(OrderSource.WEB, backend.recent().single().source)
+        backend.recent()
+
+        test.server.takeRequest()
+        assertEquals(StaffOrder.HISTORY_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
 
     @Test
