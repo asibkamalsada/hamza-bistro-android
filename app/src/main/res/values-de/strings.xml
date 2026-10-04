@@ -671,6 +671,7 @@
     <string name="device_alarm_once">sagt einmal Bescheid</string>
     <string name="device_alarm_off">klingelt nicht</string>
     <string name="device_seen">im Dienst seit %1$s · zuletzt gemeldet %2$s</string>
+    <string name="device_version_outdated">veraltet</string>
     <string name="device_silent">seit %1$s nicht gemeldet – dort die App öffnen oder entfernen</string>
     <string name="device_push_failed">Fehler %1$s: %2$s</string>
     <string name="device_push_sent">zuletzt benachrichtigt %1$s</string>

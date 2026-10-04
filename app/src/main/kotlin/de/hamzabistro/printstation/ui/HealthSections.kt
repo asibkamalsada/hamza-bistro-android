@@ -17,7 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -29,6 +32,7 @@ import de.hamzabistro.printstation.core.AddressProbe
 import de.hamzabistro.printstation.core.AddressVerdict
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.AppDevice
+import de.hamzabistro.printstation.core.AppVersions
 import de.hamzabistro.printstation.core.OpsHealth
 import de.hamzabistro.printstation.core.OpsRow
 import de.hamzabistro.printstation.core.OpsVerdict
@@ -164,6 +168,7 @@ private fun WhoHears(state: HealthState, health: HealthViewModel) {
         }
         if (!apps.isNullOrEmpty()) {
             Hint(stringResource(R.string.who_hears_app_hint))
+            val versions = apps.map { it.appVersion }
             for (device in apps) {
                 val listening = device.listening(now)
                 Listed(
@@ -181,7 +186,11 @@ private fun WhoHears(state: HealthState, health: HealthViewModel) {
                             else stringResource(R.string.device_silent, stamp(device.lastSeenAt))) to listening,
                         ),
                     onRemove = { health.removeAppDevice(device.id) },
-                )
+                ) {
+                    if (AppVersions.parse(device.appVersion) != null) {
+                        AppVersionLine(device.appVersion!!.trim(), AppVersions.outdated(device.appVersion, versions))
+                    }
+                }
             }
         }
         if (!pushes.isNullOrEmpty()) {
@@ -303,7 +312,13 @@ private fun opsText(context: Context, verdict: OpsVerdict): String =
 
 /** One device in a list: its name and whose, a line or two, each good or not, and a way to take it off. */
 @Composable
-private fun Listed(name: String, whose: String?, lines: List<Pair<String, Boolean>>, onRemove: (() -> Unit)?) {
+private fun Listed(
+    name: String,
+    whose: String?,
+    lines: List<Pair<String, Boolean>>,
+    onRemove: (() -> Unit)?,
+    more: @Composable () -> Unit = {},
+) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
             Text(if (whose == null) name else "$name ($whose)", fontWeight = FontWeight.SemiBold)
@@ -314,9 +329,25 @@ private fun Listed(name: String, whose: String?, lines: List<Pair<String, Boolea
                     color = if (ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 )
             }
+            more()
         }
         if (onRemove != null) TextButton(onClick = onRemove) { Text(stringResource(R.string.remove)) }
     }
+}
+
+/** "Version 0.2.57", and "· veraltet" in red behind one older than the newest on the list. */
+@Composable
+private fun AppVersionLine(version: String, outdated: Boolean) {
+    val outdatedText = stringResource(R.string.device_version_outdated)
+    val error = MaterialTheme.colorScheme.error
+    Text(
+        buildAnnotatedString {
+            append(stringResource(R.string.app_version, version))
+            if (outdated) withStyle(SpanStyle(color = error)) { append(" · $outdatedText") }
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

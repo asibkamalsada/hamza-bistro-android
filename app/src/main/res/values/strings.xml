@@ -671,6 +671,7 @@
     <string name="device_alarm_once">says so once</string>
     <string name="device_alarm_off">does not ring</string>
     <string name="device_seen">on shift since %1$s · last heard from %2$s</string>
+    <string name="device_version_outdated">outdated</string>
     <string name="device_silent">not heard from since %1$s — open the app there, or remove it</string>
     <string name="device_push_failed">failed %1$s: %2$s</string>
     <string name="device_push_sent">last notified %1$s</string>

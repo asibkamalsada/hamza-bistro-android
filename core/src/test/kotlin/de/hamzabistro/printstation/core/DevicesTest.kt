@@ -40,6 +40,18 @@ class DevicesTest {
     }
 
     @Test
+    fun `reads which version each device runs`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(
+            200,
+            """[{"id":"d1","label":"Tablet","started_at":"2026-10-02T09:00:00+00:00","last_seen_at":"2026-10-02T10:28:30+00:00","app_version":"0.2.57"},""" +
+                """{"id":"d2","label":"Fahrer 1","started_at":"2026-10-02T09:00:00+00:00","last_seen_at":"2026-10-02T10:28:30+00:00","app_version":null},""" +
+                """{"id":"d3","label":"Fahrer 2","started_at":"2026-10-02T09:00:00+00:00","last_seen_at":"2026-10-02T10:28:30+00:00"}]""",
+        )
+        assertEquals(listOf("0.2.57", null, null), backend.appDevices().map { it.appVersion })
+    }
+
+    @Test
     fun `a database without the device list has none`() = runBlocking<Unit> {
         test.token("access-1", "refresh-1")
         test.reply(404, """{"code":"PGRST202","message":"Could not find the function public.staff_app_devices"}""")
