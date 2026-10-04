@@ -341,6 +341,26 @@
     <string name="remove">Remove</string>
     <string name="settings_reset">Reset this device\'s settings</string>
     <string name="menu_open">Open menu</string>
+    <string name="menu_open_update">Open menu — an update is available</string>
+    <!-- The queue's status strip (android#40). -->
+    <string name="strip_shop">Shop</string>
+    <string name="strip_open">Open</string>
+    <string name="strip_paused">Paused</string>
+    <string name="strip_paused_until">Paused until %1$s</string>
+    <string name="strip_busy">%1$s · Busy +%2$d</string>
+    <string name="strip_closed">Closed</string>
+    <string name="strip_closed_until">Closed until %1$s</string>
+    <string name="strip_outside">Outside hours</string>
+    <string name="strip_kitchen">Kitchen %1$s</string>
+    <plurals name="strip_hints">
+        <item quantity="one">⚠ %1$d notice</item>
+        <item quantity="other">⚠ %1$d notices</item>
+    </plurals>
+    <string name="strip_hints_title">Notices</string>
+    <string name="strip_open_label">Open the shop controls and notices</string>
+    <string name="bar_shift_off">Not on shift — no alarm</string>
+    <string name="bar_not_staff">Not a staff account — ask the owner</string>
+    <string name="bar_offline">Offline since %1$s</string>
     <string name="drawer_shop" translatable="false">Hamza Bistro</string>
     <string name="drawer_device">Device: %1$s</string>
     <string name="problem_not_staff">This account may not do that: it is not (or no longer) on the staff list.</string>

@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge as CountBadge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -24,15 +25,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.AppRelease
 import de.hamzabistro.printstation.core.IssuesState
 import kotlinx.coroutines.launch
 
-/** Who and what the drawer's header names: the account signed in, this device, the build. */
-data class DrawerHeader(val account: String?, val device: String, val version: String)
+/**
+ * Who and what the drawer's header names: the account signed in, this
+ * device, the build — and a newer build when there is one (android#40),
+ * rather than a line above the queue.
+ */
+data class DrawerHeader(val account: String?, val device: String, val version: String, val update: AppRelease? = null)
 
 /**
  * Where the queue leads, in a drawer from the left: opened with ☰ or a swipe
@@ -85,12 +92,20 @@ fun StaffDrawer(
     BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
 }
 
-/** ☰, with the number of open Reklamationen on its corner while there are any. */
+/**
+ * ☰, with the number of open Reklamationen on its corner while there are
+ * any, else a dot while an update waits in the drawer's header.
+ */
 @Composable
-fun MenuButton(open: Int, onClick: () -> Unit) {
+fun MenuButton(open: Int, update: Boolean = false, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        val icon = @Composable { Icon(painterResource(R.drawable.ic_menu), contentDescription = stringResource(R.string.menu_open)) }
-        if (open > 0) BadgedBox(badge = { CountBadge { Text(open.toString()) } }) { icon() } else icon()
+        val label = stringResource(if (update) R.string.menu_open_update else R.string.menu_open)
+        val icon = @Composable { Icon(painterResource(R.drawable.ic_menu), contentDescription = label) }
+        when {
+            open > 0 -> BadgedBox(badge = { CountBadge { Text(open.toString()) } }) { icon() }
+            update -> BadgedBox(badge = { CountBadge() }) { icon() }
+            else -> icon()
+        }
     }
 }
 
@@ -103,6 +118,14 @@ private fun Header(header: DrawerHeader) {
         val muted = MaterialTheme.colorScheme.onSurfaceVariant
         Text(stringResource(R.string.drawer_device, header.device), style = MaterialTheme.typography.bodySmall, color = muted)
         Text(stringResource(R.string.app_version, header.version), style = MaterialTheme.typography.bodySmall, color = muted)
+        header.update?.let { release ->
+            val context = LocalContext.current
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.update_available, release.versionName), style = MaterialTheme.typography.titleSmall)
+            Button(onClick = { context.openDownload(release.downloadUrl) }, modifier = Modifier.padding(top = 4.dp)) {
+                Text(stringResource(R.string.update_install))
+            }
+        }
     }
 }
 

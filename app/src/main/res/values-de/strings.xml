@@ -341,6 +341,26 @@
     <string name="remove">Entfernen</string>
     <string name="settings_reset">Einstellungen dieses Geräts zurücksetzen</string>
     <string name="menu_open">Menü öffnen</string>
+    <string name="menu_open_update">Menü öffnen – ein Update ist verfügbar</string>
+    <!-- Die Statusleiste über der Warteschlange (android#40). -->
+    <string name="strip_shop">Laden</string>
+    <string name="strip_open">Offen</string>
+    <string name="strip_paused">Pause</string>
+    <string name="strip_paused_until">Pause bis %1$s</string>
+    <string name="strip_busy">%1$s · Viel los +%2$d</string>
+    <string name="strip_closed">Geschlossen</string>
+    <string name="strip_closed_until">Geschlossen bis %1$s</string>
+    <string name="strip_outside">Außerhalb der Zeiten</string>
+    <string name="strip_kitchen">Küche %1$s</string>
+    <plurals name="strip_hints">
+        <item quantity="one">⚠ %1$d Hinweis</item>
+        <item quantity="other">⚠ %1$d Hinweise</item>
+    </plurals>
+    <string name="strip_hints_title">Hinweise</string>
+    <string name="strip_open_label">Laden-Steuerung und Hinweise öffnen</string>
+    <string name="bar_shift_off">Keine Schicht – kein Alarm</string>
+    <string name="bar_not_staff">Kein Personal-Konto – beim Inhaber melden</string>
+    <string name="bar_offline">Offline seit %1$s</string>
     <string name="drawer_device">Gerät: %1$s</string>
     <string name="problem_not_staff">Dieses Konto darf das nicht: Es steht nicht (mehr) auf der Personalliste.</string>
     <string name="address_failing_banner">Die Adressprüfung funktioniert gerade nicht richtig – Details in den Einstellungen.</string>

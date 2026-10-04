@@ -11,8 +11,6 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,28 +18,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,11 +45,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,6 +65,7 @@ import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.queue.StepFailure
 import java.time.Duration
+import java.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
@@ -121,6 +111,7 @@ fun QueueScreen(
     val chosen by viewModel.chosen.collectAsStateWithLifecycle()
     val stopOrder by viewModel.stopOrder.collectAsStateWithLifecycle()
     val issues by viewModel.issues.collectAsStateWithLifecycle()
+    val update = viewModel.update.collectAsStateWithLifecycle().value.available
 
     Scaffold(
         topBar = {
@@ -128,7 +119,7 @@ fun QueueScreen(
                 title = {
                     Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
                 },
-                navigationIcon = { MenuButton(issues.count, onMenu) },
+                navigationIcon = { MenuButton(issues.count, update = update != null, onClick = onMenu) },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -139,35 +130,90 @@ fun QueueScreen(
             }
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Banners(state, viewModel, onOpen) { number ->
-                // "Die E-Mail zu #57 …": its card when it is still in the queue, else the history.
-                val order = state.queue.orders.firstOrNull { it.orderNumber == number }
-                if (order != null) tapped = order.id else onOpen(StaffScreen.HISTORY)
+        val status = queueStatus(state, viewModel)
+        val askForNotifications =
+            rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.setOnShift(true) }
+        val statusActions =
+            remember(viewModel, askForNotifications, onOpen) {
+                StatusActions(
+                    shop = ShopButtons(viewModel),
+                    startShift = {
+                        if (needsNotificationPermission(context)) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        else viewModel.setOnShift(true)
+                    },
+                    retry = viewModel::refresh,
+                    delayAll = viewModel::delayAll,
+                    // "Die E-Mail zu #57 …": its card when it is still in the queue, else the history.
+                    openOrder = { number ->
+                        val order = viewModel.state.value.queue.orders.firstOrNull { it.orderNumber == number }
+                        if (order != null) tapped = order.id else onOpen(StaffScreen.HISTORY)
+                    },
+                    open = onOpen,
+                )
             }
-            val forDriver = state.queue.orders.count(Driver::isForDriver)
-            PrimaryTabRow(selectedTabIndex = if (driving) 1 else 0, modifier = Modifier.padding(top = 8.dp)) {
-                Tab(selected = !driving, onClick = { driving = false }, text = { Text(stringResource(R.string.queue_tab)) })
-                Tab(selected = driving, onClick = { driving = true }, text = { Text(stringResource(R.string.driver_tab, forDriver)) })
-            }
-            when {
-                !state.queue.loaded && state.queue.failingSince == null ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                driving -> DriverView(state, chosen, stopOrder, viewModel, actions)
-                state.queue.orders.isEmpty() ->
-                    Text(
-                        stringResource(R.string.queue_empty),
-                        modifier = Modifier.padding(24.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                else ->
-                    Groups(state, actions, asked ?: tapped) {
-                        tapped = null
-                        onFocused()
-                    }
+        // The status scrolls away with the orders; the tabs stay.
+        CollapsingTop(
+            reveal = Triple(status.onShift, status.notStaff, status.offlineSince != null),
+            top = { QueueStatusTop(status, statusActions) },
+            modifier = Modifier.padding(padding),
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                val forDriver = state.queue.orders.count(Driver::isForDriver)
+                PrimaryTabRow(selectedTabIndex = if (driving) 1 else 0) {
+                    Tab(selected = !driving, onClick = { driving = false }, text = { Text(stringResource(R.string.queue_tab)) })
+                    Tab(selected = driving, onClick = { driving = true }, text = { Text(stringResource(R.string.driver_tab, forDriver)) })
+                }
+                when {
+                    !state.queue.loaded && state.queue.failingSince == null ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    driving -> DriverView(state, chosen, stopOrder, viewModel, actions)
+                    state.queue.orders.isEmpty() ->
+                        Text(
+                            stringResource(R.string.queue_empty),
+                            modifier = Modifier.padding(24.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    else ->
+                        Groups(state, actions, asked ?: tapped) {
+                            tapped = null
+                            onFocused()
+                        }
+                }
             }
         }
     }
+}
+
+/**
+ * What the top of the queue says now, gathered for [QueueStatusTop]. The
+ * alarm's permissions are asked again each time the screen comes back: they
+ * are fixed in Android's settings, not here.
+ */
+@Composable
+private fun queueStatus(state: StaffState, viewModel: StaffViewModel): QueueStatus {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    var checks by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { checks++ }
+    val missing = remember(checks, state.prefs.onShift) { if (state.prefs.onShift) missingForAlarm(context) else emptyList() }
+    val kitchen by viewModel.kitchen.collectAsStateWithLifecycle()
+    val delayingAll by viewModel.delayingAll.collectAsStateWithLifecycle()
+    val ops by viewModel.ops.collectAsStateWithLifecycle()
+    return QueueStatus(
+        shop = state.shop,
+        now = state.now,
+        kitchen = kitchen,
+        delayable = state.delayableAll.size,
+        delayingAll = delayingAll,
+        onShift = state.prefs.onShift,
+        notStaff = state.queue.notAllowed,
+        offlineSince = state.queue.failingSince?.let(Instant::ofEpochMilli),
+        alarmMissing = missing.map { resources.getString(it) },
+        silencedUntil = state.alarm.silencedUntil,
+        addressFailing = state.addressFailing,
+        failedEmail = ops.failedEmail,
+        notifyFailingSince = ops.notifyFailingSince,
+    )
 }
 
 /** What happened that the screen says once, in a snackbar: a step, a ticket, the shop switch. */
@@ -292,136 +338,6 @@ private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, act
         )
     }
 }
-
-/**
- * What would stop this device hearing about the next order, one line each,
- * with the fix a tap away — the shift switched off above all.
- */
-@Composable
-private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (StaffScreen) -> Unit, onOrder: (Long) -> Unit) {
-    val context = LocalContext.current
-    val resources = LocalResources.current
-    var checks by remember { mutableIntStateOf(0) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { checks++ }
-    val askForNotifications =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.setOnShift(true) }
-    val update = viewModel.update.collectAsStateWithLifecycle().value.available
-
-    Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ShopSwitch(state.shop, state.now, remember(viewModel) { ShopButtons(viewModel) }, onHours = { onOpen(StaffScreen.HOURS) })
-        KitchenLoadLine(viewModel.kitchen.collectAsStateWithLifecycle().value, state.now)
-        val delayingAll by viewModel.delayingAll.collectAsStateWithLifecycle()
-        DelayAll(state.delayableAll.size, delayingAll, viewModel::delayAll)
-        if (!state.prefs.onShift) {
-            Banner(stringResource(R.string.shift_off_banner), warning = true) {
-                Button(onClick = {
-                    if (needsNotificationPermission(context)) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    else viewModel.setOnShift(true)
-                }) { Text(stringResource(R.string.shift_start)) }
-            }
-        } else {
-            val missing = remember(checks) { missingForAlarm(context) }
-            if (missing.isNotEmpty()) {
-                Banner(stringResource(R.string.alarm_limited, missing.joinToString(", ") { resources.getString(it) }), warning = true) {}
-            }
-        }
-        state.alarm.silencedUntil?.let {
-            Banner(stringResource(R.string.silenced_until, Format.clock(it)), warning = false) {}
-        }
-        if (state.queue.notAllowed) Banner(stringResource(R.string.queue_not_staff), warning = true) {}
-        // Orders priced on whatever postcode was typed: the detail, and the test, are in the settings.
-        if (state.addressFailing) {
-            Banner(stringResource(R.string.address_failing_banner), warning = true) {
-                OutlinedButton(onClick = { onOpen(StaffScreen.SETTINGS) }) { Text(stringResource(R.string.settings)) }
-            }
-        }
-        state.queue.failingSince?.let {
-            Banner(stringResource(R.string.queue_offline_since, Format.clock(it)), warning = true) {
-                OutlinedButton(onClick = viewModel::refresh) { Text(stringResource(R.string.retry)) }
-            }
-        }
-        // The monitoring (hamza-bistro-web#92): an email that did not go out, and the phones' webhook failing.
-        val ops by viewModel.ops.collectAsStateWithLifecycle()
-        ops.failedEmail?.let { failed ->
-            val at = failed.failedAt?.let(Format::clock) ?: ""
-            Banner(stringResource(R.string.ops_email_failed, failed.orderNumber, at, failed.error), warning = true, onClick = { onOrder(failed.orderNumber) }) {}
-        }
-        ops.notifyFailingSince?.let {
-            Banner(stringResource(R.string.ops_notify_failing, Format.clock(it)), warning = false, amber = true) {}
-        }
-        // Last: a newer build can wait until the orders are answered.
-        update?.let { release ->
-            Banner(stringResource(R.string.update_available, release.versionName), warning = false) {
-                OutlinedButton(onClick = { context.openDownload(release.downloadUrl) }) { Text(stringResource(R.string.update_install)) }
-            }
-        }
-    }
-}
-
-/**
- * "Alle +15 Min.", beside busy mode, for an evening that has gone wrong:
- * every promise already made moves later at once, where busy mode moves the
- * ones still to be made. Only while there is something to move, and only
- * after asking — it emails every one of those customers.
- */
-@Composable
-private fun DelayAll(count: Int, working: Boolean, onConfirm: () -> Unit) {
-    // Forgotten once there is nothing left to move, so it does not pop up again later.
-    var asking by remember(count == 0) { mutableStateOf(false) }
-    if (count == 0) return
-    val minutes = StaffQueue.DELAY_ALL_MINUTES
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        OutlinedButton(onClick = { asking = true }, enabled = !working) { Text(stringResource(R.string.delay_all, minutes)) }
-    }
-    if (asking) {
-        AlertDialog(
-            onDismissRequest = { asking = false },
-            text = { Text(pluralStringResource(R.plurals.delay_all_confirm, count, count, minutes)) },
-            confirmButton = {
-                Button(onClick = {
-                    asking = false
-                    onConfirm()
-                }) { Text(stringResource(R.string.delay_all_yes)) }
-            },
-            dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(R.string.cancel_back)) } },
-        )
-    }
-}
-
-@Composable
-private fun Banner(
-    text: String,
-    warning: Boolean,
-    amber: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    action: @Composable () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    when {
-                        warning -> MaterialTheme.colorScheme.errorContainer
-                        amber -> if (isSystemInDarkTheme()) AMBER_DARK else AMBER_LIGHT
-                        else -> MaterialTheme.colorScheme.secondaryContainer
-                    }
-            ),
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(text, modifier = Modifier.weight(1f), color = if (warning) MaterialTheme.colorScheme.onErrorContainer else Color.Unspecified)
-            action()
-        }
-    }
-}
-
-/** "Benachrichtigungen gestört": a warning, not yet an emergency — the app still rings. */
-private val AMBER_LIGHT = Color(0xFFFFE0B2)
-private val AMBER_DARK = Color(0xFF5D3A00)
 
 /** The permissions an alarm needs that this device has not given, as names to show. */
 fun missingForAlarm(context: Context): List<Int> {
