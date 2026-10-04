@@ -44,9 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,12 +64,14 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.BusyGrid
 import de.hamzabistro.printstation.core.CashUp
 import de.hamzabistro.printstation.core.DishOrder
+import de.hamzabistro.printstation.core.OrderRatings
 import de.hamzabistro.printstation.core.Report
 import de.hamzabistro.printstation.core.ReportCsv
 import de.hamzabistro.printstation.core.ReportDuration
 import de.hamzabistro.printstation.core.ReportLateness
 import de.hamzabistro.printstation.core.ReportPreset
 import de.hamzabistro.printstation.core.ReportRange
+import de.hamzabistro.printstation.core.ReportRatings
 import de.hamzabistro.printstation.core.ReportText
 import de.hamzabistro.printstation.core.ReportWords
 import java.io.File
@@ -380,6 +384,7 @@ private fun LazyListScope.reportItems(report: Report, words: ReportWords) {
     item(key = "cancellations") { Cancellations(report, words) }
     item(key = "discounts") { Discounts(report) }
     item(key = "payments") { Payments(report, words) }
+    item(key = "ratings") { Ratings(report.ratings) }
 }
 
 /** Umsatz, Bestellungen, Ø Warenkorb, Verspätet: two by two, to read at a glance. */
@@ -661,3 +666,58 @@ private fun Payments(report: Report, words: ReportWords) {
     }
 }
 
+
+/**
+ * "Wie war's?" over the range: the average with stars, how many rated and
+ * what share of the orders, a bar per star count, then the newest comments.
+ * A server without the section, or nothing rated yet: "Noch keine Bewertungen".
+ */
+@Composable
+private fun Ratings(ratings: ReportRatings?) {
+    ReportSection(stringResource(R.string.report_ratings)) {
+        val average = ratings?.average
+        if (ratings == null || !ratings.any || average == null) {
+            Text(stringResource(R.string.report_ratings_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            val label = stringResource(R.string.report_ratings_average_label, ReportText.tenth(average))
+            Text(
+                stringResource(R.string.report_ratings_average, "${ReportText.tenth(average)} ${ReportText.stars(average)}"),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { contentDescription = label },
+            )
+            Text(
+                pluralStringResource(R.plurals.report_ratings_count, ratings.count, ratings.count, ReportText.percent(ratings.ratedShare)),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val most = (1..5).maxOf(ratings::withStars)
+            for (stars in 5 downTo 1) {
+                val n = ratings.withStars(stars)
+                Line(OrderRatings.starsText(stars), n.toString())
+                if (most > 0) Bar(n.toDouble() / most)
+            }
+        }
+        if (ratings == null) return@ReportSection
+        val comments = ratings.comments
+        // Stars with no comments to go with them (cleared after 30 days) say so; no ratings at all already did.
+        if (comments.isEmpty() && !ratings.any) return@ReportSection
+        Spacer(Modifier.height(8.dp))
+        Text(stringResource(R.string.report_ratings_comments), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        if (comments.isEmpty()) {
+            Text(stringResource(R.string.report_ratings_no_comments), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        for (comment in comments) {
+            val label = stringResource(R.string.rating_label, comment.stars)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    OrderRatings.starsText(comment.stars),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (comment.stars <= OrderRatings.LOW_STARS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { contentDescription = label },
+                )
+                comment.date?.let { Text(dateText(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            Text(stringResource(R.string.rating_comment, comment.text.orEmpty()), style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
+        }
+    }
+}

@@ -4,7 +4,9 @@ import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
@@ -174,6 +176,58 @@ data class ReportPayments(
     val unknown: ReportAmount = ReportAmount(),
 )
 
+/** A comment from "Wie war's?": no name and no order, cleared after about 30 days. */
+@Serializable
+data class ReportComment(
+    val stars: Int = 0,
+    val comment: String? = null,
+    /** When the rating was given, as Postgres sends a timestamptz. */
+    val at: String? = null,
+) {
+    /** The Leipzig day it was given; null if [at] is missing or unreadable. */
+    val date: LocalDate?
+        get() =
+            at?.let {
+                try {
+                    OffsetDateTime.parse(it).atZoneSameInstant(AlarmPolicy.LEIPZIG).toLocalDate()
+                } catch (e: DateTimeParseException) {
+                    null
+                }
+            }
+
+    /** The text to show: trimmed, null when there is none. */
+    val text: String?
+        get() = comment?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * The ratings of the range's delivered or collected orders, by the day of
+ * the order (20261004020000_report_ratings.sql). [recentComments] are the
+ * newest 20 given in the range, newest first.
+ */
+@Serializable
+data class ReportRatings(
+    val count: Int = 0,
+    /** Two decimals; null with no ratings. */
+    val average: Double? = null,
+    /** "1" to "5", every key there. */
+    @SerialName("by_stars") val byStars: Map<String, Int> = emptyMap(),
+    /** Rated orders over delivered ones, 0 to 1; null with nothing delivered. */
+    @SerialName("rated_share") val ratedShare: Double? = null,
+    @SerialName("recent_comments") val recentComments: List<ReportComment> = emptyList(),
+) {
+    /** How many gave [stars] stars; 0 for a key not sent. */
+    fun withStars(stars: Int): Int = byStars[stars.toString()] ?: 0
+
+    /** Whether there is an average to show; otherwise "Noch keine Bewertungen". */
+    val any: Boolean
+        get() = count > 0 && average != null && ratedShare != null
+
+    /** The comments with text, in the order sent. */
+    val comments: List<ReportComment>
+        get() = recentComments.filter { it.text != null }
+}
+
 /** The whole of staff_report() for one range. */
 @Serializable
 data class Report(
@@ -191,6 +245,8 @@ data class Report(
     val late: ReportLate = ReportLate(),
     val discounts: ReportDiscounts = ReportDiscounts(),
     val payments: ReportPayments = ReportPayments(),
+    /** Null from a server before 20261004020000. */
+    val ratings: ReportRatings? = null,
 ) {
     val range: ReportRange
         get() = ReportRange(LocalDate.parse(from), LocalDate.parse(to))
@@ -378,6 +434,9 @@ object ReportText {
 
     /** "37,5 Min.", "3 Min."; "–" for null. */
     fun minutes(minutes: Double?, words: ReportWords): String = minutes?.let { words.minutes.replace("{n}", tenth(it)) } ?: NONE
+
+    /** "★★★★☆": the average rounded to whole stars. */
+    fun stars(average: Double): String = OrderRatings.starsText(Math.round(average).toInt())
 
     /** "37,5", "3": to a tenth, German comma, no ",0". */
     fun tenth(value: Double): String = DecimalFormat("0.#", DecimalFormatSymbols(Locale.GERMANY)).format(value)

@@ -793,4 +793,14 @@
     <string name="ops_stale_never">Not running — never OK yet</string>
     <string name="ops_never">Nothing recorded yet</string>
     <string name="ops_heartbeat_off">Not set up</string>
+    <string name="report_ratings">Ratings</string>
+    <string name="report_ratings_none">No ratings yet</string>
+    <string name="report_ratings_average">Avg. %1$s</string>
+    <string name="report_ratings_average_label">Average %1$s of 5 stars</string>
+    <plurals name="report_ratings_count">
+        <item quantity="one">%1$d rating (%2$s of orders)</item>
+        <item quantity="other">%1$d ratings (%2$s of orders)</item>
+    </plurals>
+    <string name="report_ratings_comments">Recent comments</string>
+    <string name="report_ratings_no_comments">No comments</string>
 </resources>
