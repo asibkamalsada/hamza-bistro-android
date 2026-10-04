@@ -10,12 +10,14 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.alarm.AlarmActionReceiver
 import de.hamzabistro.printstation.alarm.AlarmActivity
 import de.hamzabistro.printstation.core.Chime
+import de.hamzabistro.printstation.core.OrderRatings
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.Problem
 import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StationStatus
 import de.hamzabistro.printstation.ui.Format
+import de.hamzabistro.printstation.ui.HISTORY_FOCUS
 import de.hamzabistro.printstation.ui.ISSUES_FOCUS
 import de.hamzabistro.printstation.ui.MainActivity
 import java.text.DateFormat
@@ -41,6 +43,9 @@ object StationNotifications {
 
     /** "Neue Reklamation": below [ORDER_IDS] as well, it is about no queued order. */
     private const val ISSUE_ID = 7
+
+    /** "Schlechte Bewertung": about no queued order either. */
+    private const val RATING_ID = 8
     private const val ORDER_IDS = 1_000
 
     private const val CHANNEL_RUNNING = "station"
@@ -260,6 +265,21 @@ object StationNotifications {
                         context.resources.getQuantityString(R.plurals.chime_issue_open, chime.open, chime.open),
                         ISSUES_FOCUS,
                     )
+                // "Schlechte Bewertung ★☆☆☆☆ · „Kalt angekommen“": the comment
+                // is a customer's own words and may name somebody, so over the
+                // lock screen only the stars ([ratingPublic]).
+                is Chime.BadRating ->
+                    Shown(
+                        RATING_ID,
+                        context.getString(R.string.chime_bad_rating, OrderRatings.starsText(chime.rating.stars)),
+                        listOfNotNull(
+                                OrderRatings.comment(chime.rating)?.let { context.getString(R.string.rating_comment, it) },
+                                if (chime.added > 1) context.resources.getQuantityString(R.plurals.chime_bad_rating_more, chime.added - 1, chime.added - 1)
+                                else null,
+                            )
+                            .joinToString(" · "),
+                        HISTORY_FOCUS,
+                    )
                 is Chime.Packed ->
                     Shown(
                         ORDER_IDS + (chime.order.orderNumber % 100_000).toInt(),
@@ -284,7 +304,10 @@ object StationNotifications {
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setContentIntent(openApp(context, order))
                 .setAutoCancel(true)
-                .apply { if (chime is Chime.Packed) packedPublic(context, channel, chime) }
+                .apply {
+                    if (chime is Chime.Packed) packedPublic(context, channel, chime)
+                    if (chime is Chime.BadRating) ratingPublic(context, channel, chime)
+                }
                 .build()
         notify(context, id, notification)
     }
@@ -301,6 +324,17 @@ object StationNotifications {
                 .setSmallIcon(R.drawable.ic_stat_bell)
                 .setContentTitle(context.getString(R.string.chime_packed_public, chime.order.orderNumber))
                 .setContentText(waiting)
+                .build()
+        )
+    }
+
+    /** Over the lock screen, "Schlechte Bewertung ★☆☆☆☆" and nothing the customer wrote. */
+    private fun Notification.Builder.ratingPublic(context: Context, channel: String, chime: Chime.BadRating) {
+        setVisibility(Notification.VISIBILITY_PRIVATE)
+        setPublicVersion(
+            Notification.Builder(context, channel)
+                .setSmallIcon(R.drawable.ic_stat_bell)
+                .setContentTitle(context.getString(R.string.chime_bad_rating, OrderRatings.starsText(chime.rating.stars)))
                 .build()
         )
     }

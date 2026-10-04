@@ -16,6 +16,8 @@ import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrdersRealtime
+import de.hamzabistro.printstation.core.RatingWatch
+import de.hamzabistro.printstation.core.RatingsState
 import de.hamzabistro.printstation.core.PrintStation
 import de.hamzabistro.printstation.core.PrinterException
 import de.hamzabistro.printstation.core.QueueState
@@ -29,6 +31,7 @@ import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
+import de.hamzabistro.printstation.core.SupabaseRatingsBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
 import de.hamzabistro.printstation.core.UpdateChecker
@@ -113,6 +116,9 @@ class AppGraph(context: Context) {
 
     /** The customers' problem reports: "Mehr → Reklamationen" (hamza-bistro-web#88). */
     val issues = SupabaseIssuesBackend(config, http, sessions)
+
+    /** The customers' ratings: stars in the history, a chime for a bad one (hamza-bistro-web#89). */
+    val ratings = SupabaseRatingsBackend(config, http, sessions)
 
     val settings = StationSettings(this.context)
 
@@ -216,6 +222,32 @@ class AppGraph(context: Context) {
 
     /** The open reports as counted, kept fresh for as long as it is collected. */
     val liveIssues: Flow<IssuesState> = merge(issueRunner, issueWatch.state)
+
+    // -----------------------------------------------------------------------
+    // The ratings
+    // -----------------------------------------------------------------------
+
+    /** The last day's ratings, for "Schlechte Bewertung". */
+    val ratingWatch = RatingWatch(ratings, logger)
+
+    /** Keeps [ratingWatch] reading while anybody collects [liveRatings], through sign-outs, as [issueRunner] does. */
+    private val ratingRunner =
+        flow<Nothing> {
+                while (true) {
+                    sessions.account.first { it != null }
+                    ratingWatch.reset()
+                    try {
+                        ratingWatch.run(realtime.changes(OrdersRealtime.Watch.RATINGS))
+                    } catch (e: SignedOutException) {
+                        logger.warn("The ratings stopped: signed out")
+                        sessions.account.first { it == null }
+                    }
+                }
+            }
+            .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
+
+    /** The last day's ratings as read, kept fresh for as long as it is collected. */
+    val liveRatings: Flow<RatingsState> = merge(ratingRunner, ratingWatch.state)
 
     // -----------------------------------------------------------------------
     // A newer build

@@ -763,4 +763,13 @@
     </plurals>
     <string name="alarm_issues">Neue Reklamation: Bescheid, wenn ein Kunde ein Problem mit einer Bestellung meldet</string>
     <string name="alarm_issues_hint">Einmal pro Meldung. Auf dem Küchen-Tablet von selbst an; aus, wo \"Fahrer-Handy\" eingeschaltet ist.</string>
+    <string name="rating_label">Bewertet mit %1$d von 5 Sternen</string>
+    <string name="rating_comment">„%1$s“</string>
+    <string name="chime_bad_rating">Schlechte Bewertung %1$s</string>
+    <plurals name="chime_bad_rating_more">
+        <item quantity="one">und %1$d weitere</item>
+        <item quantity="other">und %1$d weitere</item>
+    </plurals>
+    <string name="alarm_bad_ratings">Schlechte Bewertung: Bescheid, wenn ein Kunde ein oder zwei Sterne gibt und sagt, warum</string>
+    <string name="alarm_bad_ratings_hint">Einmal pro Bewertung. Auf dem Küchen-Tablet von selbst an; aus, wo \"Fahrer-Handy\" eingeschaltet ist. Auf dem Sperrbildschirm nur die Sterne.</string>
 </resources>

@@ -33,6 +33,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.OrderRating
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.Takings
 import java.time.Instant
@@ -53,6 +54,8 @@ data class HistoryState(
     val error: String? = null,
     /** The orders a customer reported a problem with; empty when not known. */
     val reported: Set<String> = emptySet(),
+    /** The customers' ratings, by order; empty when not known. */
+    val ratings: Map<String, OrderRating> = emptyMap(),
 )
 
 /**
@@ -78,11 +81,25 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         graph.history.recent() to takings.await()
                     }
                 }
-            // The "Reklamation" badges are a footnote: without them, the list still stands.
-            val reported = read?.let { (orders, _) -> attempt(app, {}) { graph.issues.reported(orders.map { it.id }) } }
+            // The "Reklamation" badges and the stars are footnotes: without them, the list still stands.
+            val (reported, ratings) =
+                read?.let { (orders, _) ->
+                    val ids = orders.map { it.id }
+                    coroutineScope {
+                        val ratings = async { attempt(app, {}) { graph.ratings.forOrders(ids) } }
+                        attempt(app, {}) { graph.issues.reported(ids) } to ratings.await()
+                    }
+                } ?: (null to null)
             _state.update { state ->
                 if (read == null) state.copy(loading = false)
-                else state.copy(loading = false, orders = read.first, takings = read.second, reported = reported.orEmpty())
+                else
+                    state.copy(
+                        loading = false,
+                        orders = read.first,
+                        takings = read.second,
+                        reported = reported.orEmpty(),
+                        ratings = ratings.orEmpty(),
+                    )
             }
         }
     }
@@ -147,6 +164,7 @@ fun HistoryScreen(staff: StaffViewModel, onBack: () -> Unit) {
                     actions = actions,
                     readOnly = true,
                     reported = order.id in state.reported,
+                    rating = state.ratings[order.id],
                 )
             }
         }
