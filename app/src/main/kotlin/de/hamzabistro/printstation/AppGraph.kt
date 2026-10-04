@@ -31,6 +31,7 @@ import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
+import de.hamzabistro.printstation.core.SupabaseOpsBackend
 import de.hamzabistro.printstation.core.SupabaseRatingsBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
@@ -119,6 +120,9 @@ class AppGraph(context: Context) {
 
     /** The customers' ratings: stars in the history, a chime for a bad one (hamza-bistro-web#89). */
     val ratings = SupabaseRatingsBackend(config, http, sessions)
+
+    /** The monitoring: the lines above the queue and "Überwachung" (hamza-bistro-web#92). */
+    val ops = SupabaseOpsBackend(config, http, sessions)
 
     val settings = StationSettings(this.context)
 

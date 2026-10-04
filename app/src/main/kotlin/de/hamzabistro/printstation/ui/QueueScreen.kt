@@ -11,6 +11,8 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -113,8 +115,9 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
     val waiting = state.queue.orders.count { it.status == OrderStatus.NEW }
     // A driver's phone opens on "Fahrer"; any device can switch.
     var driving by rememberSaveable { mutableStateOf(viewModel.driverDevice) }
-    // A tapped notification is about the queue.
-    LaunchedEffect(asked) { if (asked != null) driving = false }
+    // A tapped notification is about the queue; so is a tapped line above it.
+    var tapped by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(asked, tapped) { if (asked != null || tapped != null) driving = false }
     val chosen by viewModel.chosen.collectAsStateWithLifecycle()
     val stopOrder by viewModel.stopOrder.collectAsStateWithLifecycle()
     val issues by viewModel.issues.collectAsStateWithLifecycle()
@@ -131,7 +134,11 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Banners(state, viewModel, onOpen)
+            Banners(state, viewModel, onOpen) { number ->
+                // "Die E-Mail zu #57 …": its card when it is still in the queue, else the history.
+                val order = state.queue.orders.firstOrNull { it.orderNumber == number }
+                if (order != null) tapped = order.id else onOpen(StaffScreen.HISTORY)
+            }
             val forDriver = state.queue.orders.count(Driver::isForDriver)
             PrimaryTabRow(selectedTabIndex = if (driving) 1 else 0, modifier = Modifier.padding(top = 8.dp)) {
                 Tab(selected = !driving, onClick = { driving = false }, text = { Text(stringResource(R.string.queue_tab)) })
@@ -147,7 +154,11 @@ fun QueueScreen(viewModel: StaffViewModel, focus: StateFlow<String?>, onFocused:
                         modifier = Modifier.padding(24.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                else -> Groups(state, actions, asked, onFocused)
+                else ->
+                    Groups(state, actions, asked ?: tapped) {
+                        tapped = null
+                        onFocused()
+                    }
             }
         }
     }
@@ -281,7 +292,7 @@ private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, act
  * with the fix a tap away — the shift switched off above all.
  */
 @Composable
-private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (StaffScreen) -> Unit) {
+private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (StaffScreen) -> Unit, onOrder: (Long) -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
     var checks by remember { mutableIntStateOf(0) }
@@ -323,6 +334,15 @@ private fun Banners(state: StaffState, viewModel: StaffViewModel, onOpen: (Staff
                 OutlinedButton(onClick = viewModel::refresh) { Text(stringResource(R.string.retry)) }
             }
         }
+        // The monitoring (hamza-bistro-web#92): an email that did not go out, and the phones' webhook failing.
+        val ops by viewModel.ops.collectAsStateWithLifecycle()
+        ops.failedEmail?.let { failed ->
+            val at = failed.failedAt?.let(Format::clock) ?: ""
+            Banner(stringResource(R.string.ops_email_failed, failed.orderNumber, at, failed.error), warning = true, onClick = { onOrder(failed.orderNumber) }) {}
+        }
+        ops.notifyFailingSince?.let {
+            Banner(stringResource(R.string.ops_notify_failing, Format.clock(it)), warning = false, amber = true) {}
+        }
         // Last: a newer build can wait until the orders are answered.
         update?.let { release ->
             Banner(stringResource(R.string.update_available, release.versionName), warning = false) {
@@ -363,12 +383,23 @@ private fun DelayAll(count: Int, working: Boolean, onConfirm: () -> Unit) {
 }
 
 @Composable
-private fun Banner(text: String, warning: Boolean, action: @Composable () -> Unit) {
+private fun Banner(
+    text: String,
+    warning: Boolean,
+    amber: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    action: @Composable () -> Unit,
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors =
             CardDefaults.cardColors(
-                containerColor = if (warning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
+                containerColor =
+                    when {
+                        warning -> MaterialTheme.colorScheme.errorContainer
+                        amber -> if (isSystemInDarkTheme()) AMBER_DARK else AMBER_LIGHT
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    }
             ),
     ) {
         Row(
@@ -381,6 +412,10 @@ private fun Banner(text: String, warning: Boolean, action: @Composable () -> Uni
         }
     }
 }
+
+/** "Benachrichtigungen gestört": a warning, not yet an emergency — the app still rings. */
+private val AMBER_LIGHT = Color(0xFFFFE0B2)
+private val AMBER_DARK = Color(0xFF5D3A00)
 
 /** The permissions an alarm needs that this device has not given, as names to show. */
 fun missingForAlarm(context: Context): List<Int> {
