@@ -717,6 +717,8 @@
     <string name="driver_collect_hint">Tick the bags you take, then \"Take along\": all of them go \"On the way\" at once, each with its own undo.</string>
     <string name="driver_take">Take along (%1$d)</string>
     <string name="driver_packed_at">packed at %1$s</string>
+    <string name="driver_leg_shop">%1$s from the shop</string>
+    <string name="driver_leg">%1$s from the stop before</string>
     <string name="driver_paid">PAID</string>
     <string name="driver_call">Call</string>
     <string name="route_open">Open route</string>

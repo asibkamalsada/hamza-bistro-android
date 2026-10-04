@@ -717,6 +717,8 @@
     <string name="driver_collect_hint">Die Tüten antippen, die du mitnimmst, dann „Mitnehmen“: alle gehen auf einmal auf „Unterwegs“, jede mit ihrem eigenen Rückgängig.</string>
     <string name="driver_take">Mitnehmen (%1$d)</string>
     <string name="driver_packed_at">fertig seit %1$s</string>
+    <string name="driver_leg_shop">%1$s ab Laden</string>
+    <string name="driver_leg">%1$s vom vorigen Stopp</string>
     <string name="driver_paid">BEZAHLT</string>
     <string name="driver_call">Anrufen</string>
     <string name="route_open">Route öffnen</string>

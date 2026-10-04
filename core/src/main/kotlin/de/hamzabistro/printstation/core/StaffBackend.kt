@@ -84,6 +84,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     /**
      * What the queue reads, newest columns first: each one a database turns
      * out not to have yet is dropped for good, oldest last.
+     * [StaffOrder.POINT_COLUMNS] (20261004060000_order_coords), then
      * [StaffOrder.SOURCE_COLUMNS] (20261004040000_phone_orders), then
      * [StaffOrder.NO_SHOW_COLUMNS] (20261004030000_no_shows), then
      * [StaffOrder.QUEUE_COLUMNS] (20261003160000_kitchen_capacity: no backlog
@@ -266,7 +267,13 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
 
         /** What the queue reads, newest database first: see [columns]. */
         val QUEUE_SELECTS =
-            listOf(StaffOrder.SOURCE_COLUMNS, StaffOrder.NO_SHOW_COLUMNS, StaffOrder.QUEUE_COLUMNS, StaffOrder.COLUMNS)
+            listOf(
+                StaffOrder.POINT_COLUMNS,
+                StaffOrder.SOURCE_COLUMNS,
+                StaffOrder.NO_SHOW_COLUMNS,
+                StaffOrder.QUEUE_COLUMNS,
+                StaffOrder.COLUMNS,
+            )
     }
 }
 

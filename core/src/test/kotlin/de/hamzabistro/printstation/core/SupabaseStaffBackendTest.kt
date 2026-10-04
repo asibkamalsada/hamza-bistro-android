@@ -50,7 +50,7 @@ class SupabaseStaffBackendTest {
         val request = test.server.takeRequest()
         assertEquals("/rest/v1/orders", request.url.encodedPath)
         assertEquals("in.(new,confirmed,on_the_way)", request.url.queryParameter("status"))
-        assertEquals(StaffOrder.SOURCE_COLUMNS, request.url.queryParameter("select"))
+        assertEquals(StaffOrder.POINT_COLUMNS, request.url.queryParameter("select"))
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 
@@ -65,9 +65,30 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
+        assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+    }
+
+    @Test
+    fun `reads where each address is, and the queue without it on a database before coordinates`() = runBlocking<Unit> {
+        signedIn()
+        val located = row.replace("\"printed_at\":null", "\"printed_at\":null,\"lat\":51.34001,\"lon\":12.3")
+        test.reply(200, "[$located]")
+        test.reply(400, """{"code":"42703","message":"column orders.lat does not exist"}""")
+        test.reply(200, "[$row]")
+        test.reply(200, "[$row]")
+
+        assertEquals(GeoPoint(51.34001, 12.3), backend.openOrders().single().point)
+        assertNull(backend.openOrders().single().point)
+        backend.openOrders()
+
+        test.server.takeRequest()
+        assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        // A database without the coordinates steps down to the columns of before, and stays there.
+        assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
-        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
-        assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
 
     @Test
@@ -83,7 +104,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -104,7 +125,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -119,7 +140,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
