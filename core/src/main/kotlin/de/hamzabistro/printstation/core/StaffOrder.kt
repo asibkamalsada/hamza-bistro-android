@@ -77,7 +77,18 @@ data class OrderItem(
     /** Deposit portion per unit. */
     val deposit: Double = 0.0,
     val qty: Int,
-)
+    /**
+     * "ohne Zwiebeln": what the customer asked for this one dish
+     * (20261004010000_dish_notes.sql, hamza-bistro-web#84). Already clean —
+     * trimmed, at most 80 characters. Absent on older orders and once the
+     * retention job has run; read it as [dishNote].
+     */
+    val note: String? = null,
+) {
+    /** The note to show, or null: a blank one is none. */
+    val dishNote: String?
+        get() = note?.takeIf { it.isNotBlank() }
+}
 
 /**
  * An order as the staff queue reads it — the columns of COLUMNS in the

@@ -134,8 +134,11 @@ object OrderIssues {
         return issue.lines.mapNotNull { items.getOrNull(it) }
     }
 
-    /** "2× Ayran, 1× Döner". */
-    fun linesLabel(issue: OrderIssue): String = missingLines(issue).joinToString(", ") { "${it.qty}× ${it.name}" }
+    /** "2× Ayran, 1× Döner (ohne Zwiebeln)": a dish's note tells two of the same apart. */
+    fun linesLabel(issue: OrderIssue): String =
+        missingLines(issue).joinToString(", ") { line ->
+            "${line.qty}× ${line.name}" + (line.dishNote?.let { " ($it)" } ?: "")
+        }
 
     /**
      * The missing lines' price in cents — the sum of price × qty, Pfand
