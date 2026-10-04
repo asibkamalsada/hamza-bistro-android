@@ -18,6 +18,8 @@ data class DeviceReport(
     val label: String,
     /** How it alarms about a new order: "loop", "once" or "off". */
     val alarm: String,
+    /** This build's versionName, "0.2.57"; blank keeps what the site has. */
+    val version: String? = null,
 )
 
 /** The queue as staff work it: read it, move an order on, say this device is listening. */
@@ -212,11 +214,15 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
 
     override suspend fun seen(device: DeviceReport) {
         try {
-            rest.rpc("staff_app_seen", buildJsonObject {
-                put("p_device", device.id)
-                put("p_label", device.label)
-                put("p_alarm", device.alarm)
-            })
+            val version = device.version?.trim()?.takeIf { it.isNotEmpty() }
+            try {
+                rest.rpc("staff_app_seen", seenBody(device, version))
+            } catch (e: BackendException) {
+                // The site's database without 20261004070000_device_version
+                // knows no p_version: said again without it.
+                if (version == null || !(e.missingFunction || e.message.orEmpty().contains("p_version"))) throw e
+                rest.rpc("staff_app_seen", seenBody(device, null))
+            }
         } catch (e: BackendException) {
             if (!e.missingFunction) throw e
             // The site's database without 20261001120000_staff_app_devices:
@@ -224,6 +230,13 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
             // worth knowing all the same.
             if (!isStaff()) throw NotAllowedException()
         }
+    }
+
+    private fun seenBody(device: DeviceReport, version: String?): JsonObject = buildJsonObject {
+        put("p_device", device.id)
+        put("p_label", device.label)
+        put("p_alarm", device.alarm)
+        if (version != null) put("p_version", version)
     }
 
     override suspend fun off(device: String) {

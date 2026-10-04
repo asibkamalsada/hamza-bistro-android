@@ -177,7 +177,7 @@ class AppGraph(context: Context) {
     private fun deviceReport(): DeviceReport? {
         val device = settings.device.value
         if (device.role != Role.STAFF || !device.onShift) return null
-        return DeviceReport(settings.stationId, deviceLabel(), device.alarm.newOrders.wire)
+        return DeviceReport(settings.stationId, deviceLabel(), device.alarm.newOrders.wire, BuildConfig.VERSION_NAME)
     }
 
     /**

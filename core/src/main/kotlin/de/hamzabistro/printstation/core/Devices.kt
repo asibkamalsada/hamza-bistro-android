@@ -31,6 +31,8 @@ data class AppDevice(
     val alarm: String = "loop",
     @SerialName("started_at") @Serializable(with = InstantSerializer::class) val startedAt: Instant,
     @SerialName("last_seen_at") @Serializable(with = InstantSerializer::class) val lastSeenAt: Instant,
+    /** The app's versionName it last said it runs; null before 20261004070000_device_version. */
+    @SerialName("app_version") val appVersion: String? = null,
 ) {
     /**
      * Heard from recently enough to count. A device on shift says so once a
@@ -45,6 +47,38 @@ data class AppDevice(
     companion object {
         val SILENT_AFTER: Duration = Duration.ofMinutes(3)
     }
+}
+
+/** Versions such as "0.2.57", compared as the site compares them on its device list. */
+object AppVersions {
+    private val PART = Regex("""\d+""")
+
+    /**
+     * The dot-separated numbers of [version], a "-…" or "+…" suffix left
+     * out; null when there are none, or something else stands in their place.
+     */
+    fun parse(version: String?): List<Int>? {
+        val core = version?.trim()?.substringBefore('-')?.substringBefore('+') ?: return null
+        if (core.isEmpty()) return null
+        val parts = core.split('.')
+        if (parts.any { !PART.matches(it) }) return null
+        return parts.map { it.toIntOrNull() ?: return null }
+    }
+
+    /** Part by part, a missing part counting as 0; null when either is not a version. */
+    fun compare(a: String?, b: String?): Int? {
+        val x = parse(a) ?: return null
+        val y = parse(b) ?: return null
+        for (i in 0 until maxOf(x.size, y.size)) {
+            val c = x.getOrElse(i) { 0 }.compareTo(y.getOrElse(i) { 0 })
+            if (c != 0) return c
+        }
+        return 0
+    }
+
+    /** Whether [version] is lower than the highest of [all]: "veraltet" on the list. Never for one that is not a version. */
+    fun outdated(version: String?, all: Iterable<String?>): Boolean =
+        all.any { (compare(version, it) ?: 0) < 0 }
 }
 
 /**

@@ -337,6 +337,55 @@ class SupabaseStaffBackendTest {
     }
 
     @Test
+    fun `says which version it runs`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(204)
+        test.reply(204)
+
+        backend.seen(DeviceReport("device-1234", "Küche", "loop", "0.2.57"))
+        backend.seen(DeviceReport("device-1234", "Küche", "loop", " "))
+
+        test.server.takeRequest()
+        assertEquals(
+            """{"p_device":"device-1234","p_label":"Küche","p_alarm":"loop","p_version":"0.2.57"}""",
+            test.server.takeRequest().body!!.utf8(),
+        )
+        // Blank: left out, and the site keeps what it has.
+        assertEquals("""{"p_device":"device-1234","p_label":"Küche","p_alarm":"loop"}""", test.server.takeRequest().body!!.utf8())
+    }
+
+    @Test
+    fun `a database without the version is told the rest`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(404, """{"code":"PGRST202","message":"Could not find the function public.staff_app_seen(p_alarm, p_device, p_label, p_version) in the schema cache"}""")
+        test.reply(204)
+        test.reply(400, """{"code":"42883","message":"function staff_app_seen(p_version => text) does not exist"}""")
+        test.reply(204)
+
+        val device = DeviceReport("device-1234", "Küche", "loop", "0.2.57")
+        backend.seen(device)
+        backend.seen(device)
+
+        test.server.takeRequest()
+        val bodies = List(4) { test.server.takeRequest().body!!.utf8() }
+        assertTrue(bodies[0].contains("p_version"))
+        assertEquals("""{"p_device":"device-1234","p_label":"Küche","p_alarm":"loop"}""", bodies[1])
+        assertTrue(bodies[2].contains("p_version"))
+        assertEquals("""{"p_device":"device-1234","p_label":"Küche","p_alarm":"loop"}""", bodies[3])
+    }
+
+    @Test
+    fun `any other refusal is not retried without the version`() = runBlocking<Unit> {
+        signedIn()
+        test.reply(400, """{"code":"P0001","message":"staff only"}""")
+
+        assertFailsWith<NotAllowedException> { backend.seen(DeviceReport("device-1234", "Küche", "loop", "0.2.57")) }
+        test.server.takeRequest()
+        test.server.takeRequest()
+        assertEquals(2, test.server.requestCount)
+    }
+
+    @Test
     fun `without the site's device list, asks whether it is still staff instead`() = runBlocking<Unit> {
         signedIn()
         test.reply(404, """{"code":"PGRST202","message":"Could not find the function public.staff_app_seen"}""")
