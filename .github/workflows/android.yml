@@ -1,4 +1,4 @@
-# Tests the core, lints the app and builds the debug and release APKs on
+# Tests the core and the app, lints the app and builds the debug and release APKs on
 # every push and pull request. With the release key in the repository's
 # secrets, a push to main (a merged pull request included) signs the release
 # APK and publishes it as a GitHub release, to install on the tablet.
@@ -46,6 +46,11 @@ jobs:
 
       - name: Core tests
         run: ./gradlew :core:test
+
+      # Robolectric: the view models made and the staff screens drawn, as
+      # right after sign-in — what closed the app in android#24.
+      - name: App tests
+        run: ./gradlew :app:testDebugUnitTest
 
       - name: Lint
         run: ./gradlew :app:lintDebug

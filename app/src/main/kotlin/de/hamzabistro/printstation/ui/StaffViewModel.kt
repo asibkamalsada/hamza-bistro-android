@@ -228,12 +228,6 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     private val _events = MutableStateFlow<StaffEvent?>(null)
     val events: StateFlow<StaffEvent?> = _events.asStateFlow()
 
-    init {
-        viewModelScope.launch { graph.steps.failures.collect { _events.value = StaffEvent.Step(it) } }
-        // What is read anyway: collecting liveQueue here would keep the queue running behind the screen.
-        viewModelScope.launch { graph.queue.state.collect { forgetGone(it.orders) } }
-    }
-
     fun eventShown() {
         _events.value = null
     }
@@ -508,6 +502,17 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
             // Unless an order started ringing meanwhile.
             if (graph.alarm.value.ringing.isEmpty()) graph.alarmPlayer.stopLoop()
         }
+    }
+
+    // Last in the class, after every property: viewModelScope starts on
+    // Main.immediate, so these collectors run inside the constructor and
+    // read the state flows at once. Above a property, they read it while it
+    // is still null — forgetGone() and _chosen closed the app on every start
+    // after sign-in.
+    init {
+        viewModelScope.launch { graph.steps.failures.collect { _events.value = StaffEvent.Step(it) } }
+        // What is read anyway: collecting liveQueue here would keep the queue running behind the screen.
+        viewModelScope.launch { graph.queue.state.collect { forgetGone(it.orders) } }
     }
 
     private companion object {

@@ -49,9 +49,12 @@ import java.io.File
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -77,8 +80,15 @@ class AppGraph(context: Context) {
     /** Milliseconds since boot: intervals that a clock change cannot bend. */
     private val monotonic: () -> Long = SystemClock::elapsedRealtime
 
-    /** For the work that outlives a screen: the queue, the steps on their undo window. */
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /**
+     * For the work that outlives a screen: the queue, the steps on their undo
+     * window. A failure nothing caught is logged and ends only its own
+     * coroutine, never the app: the queue and the alarm run on regardless.
+     */
+    val scope =
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> logger.warn("Background work failed", e) }
+        )
 
     val config = SupabaseConfig(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_KEY)
 
@@ -140,6 +150,30 @@ class AppGraph(context: Context) {
     // The queue
     // -----------------------------------------------------------------------
 
+    /**
+     * Runs [body] while somebody is signed in, for ever: it waits out a
+     * sign-out and starts again with the next account. Anything else that
+     * stops [body] — any exception or error — is logged and [body] starts
+     * again after [RUNNER_RETRY], so one bad answer never ends the queue,
+     * nor the app.
+     */
+    private fun signedInRunner(what: String, body: suspend () -> Unit): Flow<Nothing> = flow {
+        while (true) {
+            sessions.account.first { it != null }
+            try {
+                body()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: SignedOutException) {
+                logger.warn("$what stopped: signed out")
+                sessions.account.first { it == null }
+            } catch (e: Throwable) {
+                logger.warn("$what failed, starting again", e)
+                delay(RUNNER_RETRY)
+            }
+        }
+    }
+
     /** The open orders, read for the screen and the alarm alike. */
     val queue =
         OrderQueue(
@@ -156,17 +190,9 @@ class AppGraph(context: Context) {
      * next account, so it never ends while somebody listens.
      */
     private val queueRunner =
-        flow<Nothing> {
-                while (true) {
-                    sessions.account.first { it != null }
-                    queue.reset()
-                    try {
-                        queue.run(realtime.changes(OrdersRealtime.Watch.ALL))
-                    } catch (e: SignedOutException) {
-                        logger.warn("The queue stopped: signed out")
-                        sessions.account.first { it == null }
-                    }
-                }
+        signedInRunner("The queue") {
+                queue.reset()
+                queue.run(realtime.changes(OrdersRealtime.Watch.ALL))
             }
             .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
 
@@ -214,17 +240,9 @@ class AppGraph(context: Context) {
 
     /** Keeps [issueWatch] counting while anybody collects [liveIssues], through sign-outs, as [queueRunner] does. */
     private val issueRunner =
-        flow<Nothing> {
-                while (true) {
-                    sessions.account.first { it != null }
-                    issueWatch.reset()
-                    try {
-                        issueWatch.run(realtime.changes(OrdersRealtime.Watch.ISSUES))
-                    } catch (e: SignedOutException) {
-                        logger.warn("The problem reports stopped: signed out")
-                        sessions.account.first { it == null }
-                    }
-                }
+        signedInRunner("The problem reports") {
+                issueWatch.reset()
+                issueWatch.run(realtime.changes(OrdersRealtime.Watch.ISSUES))
             }
             .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
 
@@ -240,17 +258,9 @@ class AppGraph(context: Context) {
 
     /** Keeps [ratingWatch] reading while anybody collects [liveRatings], through sign-outs, as [issueRunner] does. */
     private val ratingRunner =
-        flow<Nothing> {
-                while (true) {
-                    sessions.account.first { it != null }
-                    ratingWatch.reset()
-                    try {
-                        ratingWatch.run(realtime.changes(OrdersRealtime.Watch.RATINGS))
-                    } catch (e: SignedOutException) {
-                        logger.warn("The ratings stopped: signed out")
-                        sessions.account.first { it == null }
-                    }
-                }
+        signedInRunner("The ratings") {
+                ratingWatch.reset()
+                ratingWatch.run(realtime.changes(OrdersRealtime.Watch.RATINGS))
             }
             .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
 
@@ -371,6 +381,9 @@ class AppGraph(context: Context) {
         const val TICKET_LANG = "de"
 
         private val TICKET_TIMEOUT = 20.seconds
+
+        /** How long a runner that failed waits before it starts again. */
+        private val RUNNER_RETRY = 5.seconds
     }
 }
 
