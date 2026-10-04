@@ -47,6 +47,13 @@ data class AlarmSettings(
      */
     val issues: Boolean? = null,
     /**
+     * "Schlechte Bewertung": a chime when a customer rates an order one or
+     * two stars and says why (hamza-bistro-web#89). Null until somebody
+     * chooses on this device: then like "Neue Reklamation" — on for the
+     * kitchen tablet, off for a driver's phone ([forDevice]).
+     */
+    val badRatings: Boolean? = null,
+    /**
      * The night window, Leipzig time: inside it nothing rings, and a new
      * order is a silent notification — for the pre-order somebody places at
      * one in the morning. Both null: never quiet.
@@ -58,12 +65,14 @@ data class AlarmSettings(
 ) {
     /**
      * These settings on a device that is a driver's phone or not: a choice
-     * not made yet for "Bestellung fertig" or "Neue Reklamation" made as
-     * [driver] says — the bags for the driver, the reports for the kitchen.
-     * What [AlarmPolicy.decide] is given.
+     * not made yet for "Bestellung fertig", "Neue Reklamation" or
+     * "Schlechte Bewertung" made as [driver] says — the bags for the driver,
+     * the reports and the ratings for the kitchen. What [AlarmPolicy.decide]
+     * is given.
      */
     fun forDevice(driver: Boolean): AlarmSettings =
-        if (packed != null && issues != null) this else copy(packed = packed ?: driver, issues = issues ?: !driver)
+        if (packed != null && issues != null && badRatings != null) this
+        else copy(packed = packed ?: driver, issues = issues ?: !driver, badRatings = badRatings ?: !driver)
 }
 
 /** A one-off alert: a sound once, and a notification. */
@@ -97,6 +106,12 @@ sealed interface Chime {
      * [open] open in all, these included.
      */
     data class Issue(val added: Int, val open: Int) : Chime
+
+    /**
+     * "Schlechte Bewertung": [rating] — the newest of [added] that came in
+     * since the last look — has one or two stars and a comment.
+     */
+    data class BadRating(val rating: OrderRating, val added: Int) : Chime
 }
 
 /** What the alarm should be doing now. */
@@ -146,6 +161,9 @@ data class AlarmDecision(
  *   * A customer's problem report (hamza-bistro-web#88) chimes once, on a
  *     device that wants it: not for what was open when this device started
  *     counting.
+ *   * A one- or two-star rating with a comment (hamza-bistro-web#89) chimes
+ *     once, on a device that wants it: not for what was there when this
+ *     device started reading them — the site's RatingAlarm.
  *
  * Holds what it has already said, so it is one per device; [decide] is
  * pure otherwise, with the clock passed in.
@@ -167,6 +185,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     private val packedSeen = mutableMapOf<String, Instant>()
     private var packedLook: Instant? = null
     private var issuesSeen: Set<String>? = null
+    private var ratingsSeen: Set<String>? = null
 
     /** "Stumm": what is ringing now stays quiet for [seconds]. */
     @Synchronized
@@ -183,8 +202,9 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
      * any, since when some other device has been meant to print every
      * accepted order ([printingSince], null for none or not known), the
      * open problem reports' ids ([issues], null until counted or on a
-     * database without them), how long each pre-order needs ([lead]), and
-     * the time.
+     * database without them), the last day's ratings ([ratings], newest
+     * first, null until read or on a database without them), how long each
+     * pre-order needs ([lead]), and the time.
      */
     @Synchronized
     fun decide(
@@ -195,6 +215,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         now: Instant,
         printingSince: Instant? = null,
         issues: List<String>? = null,
+        ratings: List<OrderRating>? = null,
         lead: (StaffOrder) -> Int,
     ): AlarmDecision {
         val chimes = mutableListOf<Chime>()
@@ -256,6 +277,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         }
 
         issueChime(issues, settings)?.let { chimes += it }
+        ratingChime(ratings, settings)?.let { chimes += it }
 
         if (printer is Problem.NotPrinted) {
             val since = printerSince ?: now.also { printerSince = it }
@@ -332,6 +354,27 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         if (seen == null || settings.issues != true) return null
         val added = issues.count { it !in seen }
         return if (added > 0) Chime.Issue(added, issues.size) else null
+    }
+
+    /**
+     * "Schlechte Bewertung": one chime for the alarming ratings not seen
+     * before — the newest named. The first read, or the first after reading
+     * was lost, takes in what is there without a word; a rating seen while
+     * the device did not want it is not news when it is switched on. What
+     * leaves the day's window never comes back, so what was seen is what
+     * was read last.
+     */
+    private fun ratingChime(ratings: List<OrderRating>?, settings: AlarmSettings): Chime.BadRating? {
+        if (ratings == null) {
+            ratingsSeen = null
+            return null
+        }
+        val seen = ratingsSeen
+        ratingsSeen = ratings.map { it.id }.toSet()
+        if (seen == null || settings.badRatings != true) return null
+        val added = ratings.filter { it.id !in seen && OrderRatings.isAlarming(it) }
+        val newest = added.maxByOrNull { it.createdAt ?: Instant.MIN } ?: return null
+        return Chime.BadRating(newest, added.size)
     }
 
     /**

@@ -763,4 +763,13 @@
     </plurals>
     <string name="alarm_issues">New complaint: chime when a customer reports a problem with an order</string>
     <string name="alarm_issues_hint">Once per report. On by itself on the kitchen tablet; off where \"Driver\'s phone\" is switched on.</string>
+    <string name="rating_label">Rated %1$d of 5 stars</string>
+    <string name="rating_comment">„%1$s“</string>
+    <string name="chime_bad_rating">Bad rating %1$s</string>
+    <plurals name="chime_bad_rating_more">
+        <item quantity="one">and %1$d more</item>
+        <item quantity="other">and %1$d more</item>
+    </plurals>
+    <string name="alarm_bad_ratings">Bad rating: chime when a customer gives one or two stars and says why</string>
+    <string name="alarm_bad_ratings_hint">Once per rating. On by itself on the kitchen tablet; off where \"Driver\'s phone\" is switched on. The lock screen shows only the stars.</string>
 </resources>

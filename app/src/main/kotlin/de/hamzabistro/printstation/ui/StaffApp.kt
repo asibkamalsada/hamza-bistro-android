@@ -45,13 +45,18 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
     var screen by rememberSaveable { mutableStateOf(StaffScreen.QUEUE) }
     val back = { screen = StaffScreen.QUEUE }
     if (screen != StaffScreen.QUEUE) BackHandler(onBack = back)
-    // "Neue Reklamation" tapped: the list, not the queue.
+    // "Neue Reklamation" tapped: the list, not the queue; "Schlechte
+    // Bewertung": the history, where the stars are.
     val asked by focus.collectAsStateWithLifecycle()
     LaunchedEffect(asked) {
-        if (asked == ISSUES_FOCUS) {
-            screen = StaffScreen.ISSUES
-            onFocused()
-        }
+        val target =
+            when (asked) {
+                ISSUES_FOCUS -> StaffScreen.ISSUES
+                HISTORY_FOCUS -> StaffScreen.HISTORY
+                else -> return@LaunchedEffect
+            }
+        screen = target
+        onFocused()
     }
     when (screen) {
         StaffScreen.QUEUE -> QueueScreen(staff, focus, onFocused, onOpen = { screen = it })
@@ -67,3 +72,6 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
 
 /** What a notification asks to focus to open "Reklamationen" rather than an order. */
 const val ISSUES_FOCUS = "#issues"
+
+/** What a notification asks to focus to open "Letzte Bestellungen". */
+const val HISTORY_FOCUS = "#history"

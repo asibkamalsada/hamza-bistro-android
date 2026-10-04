@@ -133,6 +133,7 @@ class StationSettings(context: Context) {
                     connection = prefs.getBoolean(CONNECTION_ALARM, a.connection),
                     packed = if (prefs.contains(PACKED_ALARM)) prefs.getBoolean(PACKED_ALARM, false) else a.packed,
                     issues = if (prefs.contains(ISSUES_ALARM)) prefs.getBoolean(ISSUES_ALARM, false) else a.issues,
+                    badRatings = if (prefs.contains(RATINGS_ALARM)) prefs.getBoolean(RATINGS_ALARM, false) else a.badRatings,
                     quietFrom = time(QUIET_FROM, a.quietFrom),
                     quietTo = time(QUIET_TO, a.quietTo),
                     silenceSeconds = prefs.getInt(SILENCE, a.silenceSeconds).takeIf { it in SILENCE_CHOICES } ?: a.silenceSeconds,
@@ -168,6 +169,7 @@ class StationSettings(context: Context) {
             // Not chosen is no key at all: the device's purpose decides.
             .run { p.alarm.packed?.let { putBoolean(PACKED_ALARM, it) } ?: remove(PACKED_ALARM) }
             .run { p.alarm.issues?.let { putBoolean(ISSUES_ALARM, it) } ?: remove(ISSUES_ALARM) }
+            .run { p.alarm.badRatings?.let { putBoolean(RATINGS_ALARM, it) } ?: remove(RATINGS_ALARM) }
             .putString(QUIET_FROM, p.alarm.quietFrom?.toString() ?: NEVER)
             .putString(QUIET_TO, p.alarm.quietTo?.toString() ?: NEVER)
             .putInt(SILENCE, p.alarm.silenceSeconds)
@@ -212,6 +214,7 @@ class StationSettings(context: Context) {
         private const val CONNECTION_ALARM = "alarm_connection"
         private const val PACKED_ALARM = "alarm_packed"
         private const val ISSUES_ALARM = "alarm_issues"
+        private const val RATINGS_ALARM = "alarm_bad_ratings"
         private const val QUIET_FROM = "quiet_from"
         private const val QUIET_TO = "quiet_to"
         private const val SILENCE = "silence_seconds"
@@ -235,7 +238,7 @@ data class ChosenPrinter(val address: String, val name: String?)
  * The alarm settings this device decides by: "Bestellung fertig", until
  * somebody chooses here, as what the device is for says — on for a driver's
  * phone ("Fahrer-Handy", [DevicePrefs.driver]), off for the kitchen tablet;
- * "Neue Reklamation" the other way round.
+ * "Neue Reklamation" and "Schlechte Bewertung" the other way round.
  */
 val DevicePrefs.alarmForDevice: AlarmSettings
     get() = alarm.forDevice(driver = driver)

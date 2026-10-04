@@ -179,6 +179,11 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                     staff.updatePrefs { it.copy(alarm = it.alarm.copy(issues = on)) }
                 }
                 Text(stringResource(R.string.alarm_issues_hint), style = MaterialTheme.typography.bodySmall)
+                // "Schlechte Bewertung": like the reports, for the kitchen tablet.
+                SwitchRow(stringResource(R.string.alarm_bad_ratings), prefs.alarmForDevice.badRatings == true) { on ->
+                    staff.updatePrefs { it.copy(alarm = it.alarm.copy(badRatings = on)) }
+                }
+                Text(stringResource(R.string.alarm_bad_ratings_hint), style = MaterialTheme.typography.bodySmall)
             }
 
             Section(stringResource(R.string.section_ringing)) {

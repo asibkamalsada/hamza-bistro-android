@@ -27,7 +27,8 @@ import okhttp3.WebSocketListener
 /**
  * Says within a second that an order changed, over Supabase Realtime — the
  * same postgres_changes subscription the site's queue has — or, for
- * [Watch.ISSUES], that a problem report did.
+ * [Watch.ISSUES] and [Watch.RATINGS], that a problem report or a rating
+ * did.
  *
  * Only ever a hint to look: what it carries is not read (it would be the
  * order, name and address included), and the poll of whoever listens stays
@@ -231,6 +232,9 @@ class OrdersRealtime(
          * chimes, one answered on another device is counted again.
          */
         ISSUES("realtime:order-issues", null, "order_issues"),
+
+        /** The customers' ratings (hamza-bistro-web#89): a bad one with a comment chimes. */
+        RATINGS("realtime:order-ratings", null, "order_ratings"),
     }
 
     companion object {

@@ -9,6 +9,7 @@ import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.Problem
 import de.hamzabistro.printstation.core.QueueState
+import de.hamzabistro.printstation.core.RatingsState
 import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.station.DevicePrefs
 import de.hamzabistro.printstation.station.StationNotifications
@@ -41,6 +42,8 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         val handled: Set<String>,
     )
 
+    private class Step(val inputs: Inputs, val printingSince: Instant?, val issues: IssuesState, val ratings: RatingsState)
+
     suspend fun run(queue: Flow<QueueState>) {
         val ticks = flow {
             while (true) {
@@ -58,10 +61,11 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
                 Inputs(q, (station as? StationState.Running)?.status?.problem, prefs, busy + pending.keys)
             }
         try {
-            combine(inputs, graph.alarmPoke, ticks, printingSince(), graph.liveIssues) { now, _, _, since, issues ->
-                    Triple(now, since, issues)
+            val customers = combine(graph.liveIssues, graph.liveRatings) { issues, ratings -> issues to ratings }
+            combine(inputs, graph.alarmPoke, ticks, printingSince(), customers) { read, _, _, since, (issues, ratings) ->
+                    Step(read, since, issues, ratings)
                 }
-                .collect { (now, since, issues) -> act(now, since, issues) }
+                .collect { act(it.inputs, it.printingSince, it.issues, it.ratings) }
         } finally {
             graph.alarmPlayer.stopLoop()
             StationNotifications.cancelAlarm(context)
@@ -93,7 +97,7 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         }
     }
 
-    private fun act(inputs: Inputs, printingSince: Instant?, issues: IssuesState) {
+    private fun act(inputs: Inputs, printingSince: Instant?, issues: IssuesState, ratings: RatingsState) {
         val queue = inputs.queue
         val prefs = inputs.prefs
         val orders = if (queue.loaded && !queue.notAllowed) queue.orders.filterNot { it.id in inputs.handled } else null
@@ -101,7 +105,16 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         // precisely and sooner; it does not also chime about the same ticket.
         val elsewhere = printingSince.takeUnless { graph.settings.enabled }
         val decision =
-            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarmForDevice, Instant.now(), elsewhere, issues.ids.takeIf { issues.available == true }) {
+            graph.alarmPolicy.decide(
+                orders,
+                queue.failingSince != null,
+                inputs.printer,
+                prefs.alarmForDevice,
+                Instant.now(),
+                elsewhere,
+                issues.ids.takeIf { issues.available == true },
+                ratings.recent.takeIf { ratings.available == true },
+            ) {
                 Eta.estimate(it, queue.prep)
             }
         graph.alarm.value = decision

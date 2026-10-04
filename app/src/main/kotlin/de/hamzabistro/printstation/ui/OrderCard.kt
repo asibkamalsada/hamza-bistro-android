@@ -37,6 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -45,6 +48,8 @@ import de.hamzabistro.printstation.core.AutoDecline
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.DeclineUrgency
 import de.hamzabistro.printstation.core.Eta
+import de.hamzabistro.printstation.core.OrderRating
+import de.hamzabistro.printstation.core.OrderRatings
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.PackedUrgency
@@ -260,6 +265,8 @@ fun OrderCard(
     packing: Boolean = true,
     /** The customer reported a problem with it ("Reklamation", hamza-bistro-web#88): in the history. */
     reported: Boolean = false,
+    /** The customer's rating ("Wie war's?", hamza-bistro-web#89): in the history. */
+    rating: OrderRating? = null,
 ) {
     val context = LocalContext.current
     val estimate = Eta.estimate(order, prep)
@@ -285,6 +292,15 @@ fun OrderCard(
                 }
                 if (order.pickup) Badge(stringResource(R.string.pickup_badge), MaterialTheme.colorScheme.primaryContainer)
                 if (reported) Badge(stringResource(R.string.issue_had_report), MaterialTheme.colorScheme.errorContainer)
+                // "★★☆☆☆": one or two stars in the colour of a "Reklamation".
+                rating?.let {
+                    val label = stringResource(R.string.rating_label, it.stars)
+                    Badge(
+                        OrderRatings.starsText(it.stars),
+                        if (OrderRatings.isLow(it)) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+                        Modifier.semantics { contentDescription = label },
+                    )
+                }
                 Text(
                     stringResource(R.string.ordered_at, Format.clock(order.createdAt)),
                     style = MaterialTheme.typography.bodySmall,
@@ -321,6 +337,10 @@ fun OrderCard(
 
             if (order.notes.isNotBlank()) {
                 Note(stringResource(R.string.kitchen_note), order.notes, MaterialTheme.colorScheme.errorContainer)
+            }
+
+            rating?.let(OrderRatings::comment)?.let {
+                Text(stringResource(R.string.rating_comment, it), style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
             }
 
             Text(
@@ -363,11 +383,11 @@ fun OrderCard(
 }
 
 @Composable
-internal fun Badge(text: String, color: Color) {
+internal fun Badge(text: String, color: Color, modifier: Modifier = Modifier) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
-        modifier = Modifier.background(color, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
+        modifier = modifier.background(color, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
 
