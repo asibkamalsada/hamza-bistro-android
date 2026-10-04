@@ -1,5 +1,7 @@
 package de.hamzabistro.printstation.core
 
+import java.time.Instant
+
 /**
  * What to offer as the time to the door when an order for right away comes
  * in — src/app/eta.ts in hamza-bistro-web, figure for figure, so the button
@@ -81,14 +83,37 @@ object Eta {
      * already, and a swamped kitchen's "+30" reads as exactly that on the
      * button. When a pre-order has to go on is timed without it: the extra
      * minutes are a promise to the customer, not extra cooking.
+     *
+     * Given [now], the kitchen's backlog too (hamza-bistro-web#74): the wait
+     * for the slot place_order gave the order, [Kitchen.orderWaitMillis]. It
+     * is the one estimate the checkout quoted, so the button filled in is
+     * the time the customer was shown, give or take the five and the
+     * minutes it took to accept. Without [now], none: how long the food
+     * takes, for timing a pre-order.
      */
-    fun estimate(order: StaffOrder, prep: Map<Long, Int>, busyMinutes: Int = 0): Int {
+    fun estimate(order: StaffOrder, prep: Map<Long, Int>, busyMinutes: Int = 0, now: Instant? = null): Int {
         val travel = if (order.pickup) 0 else travelMinutes(order.address, order.deliveryZone)
-        return roundToFive(prepMinutes(order.items, prep) + travel) + maxOf(0, busyMinutes)
+        val wait = if (now == null) 0L else Kitchen.orderWaitMillis(order, now)
+        return quote(prepMinutes(order.items, prep), travel, busyMinutes, wait)
+    }
+
+    /**
+     * quoteMinutes() of eta.ts: the estimate from its parts. The food leaves
+     * when it is cooked or when its kitchen slot comes round, whichever is
+     * later, so [kitchenWaitMillis] is the larger of the two with the
+     * cooking, not added to it. In milliseconds, as the site counts it, so
+     * 27½ minutes rounds where it does there.
+     */
+    fun quote(cooking: Int, travel: Int, busyMinutes: Int = 0, kitchenWaitMillis: Long = 0): Int {
+        val leaves = maxOf(cooking * MINUTE, kitchenWaitMillis)
+        return roundToFive(leaves + travel * MINUTE) + maxOf(0, busyMinutes)
     }
 
     /** The estimate among the round numbers, so the buttons always include it. */
     fun options(estimate: Int, ladder: List<Int> = LADDER): List<Int> = (ladder + estimate).distinct().sorted()
 
-    private fun roundToFive(minutes: Int): Int = (minutes + 4) / 5 * 5
+    private const val MINUTE = 60_000L
+
+    /** Rounded up to five minutes, because nobody tells a customer "37 minutes". */
+    private fun roundToFive(millis: Long): Int = ((millis + 5 * MINUTE - 1) / (5 * MINUTE) * 5).toInt()
 }
