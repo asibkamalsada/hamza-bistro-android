@@ -51,6 +51,8 @@ data class HistoryState(
     /** Null until read, and when reading it failed: the list is what matters. */
     val takings: Takings? = null,
     val error: String? = null,
+    /** The orders a customer reported a problem with; empty when not known. */
+    val reported: Set<String> = emptySet(),
 )
 
 /**
@@ -76,9 +78,11 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         graph.history.recent() to takings.await()
                     }
                 }
+            // The "Reklamation" badges are a footnote: without them, the list still stands.
+            val reported = read?.let { (orders, _) -> attempt(app, {}) { graph.issues.reported(orders.map { it.id }) } }
             _state.update { state ->
                 if (read == null) state.copy(loading = false)
-                else state.copy(loading = false, orders = read.first, takings = read.second)
+                else state.copy(loading = false, orders = read.first, takings = read.second, reported = reported.orEmpty())
             }
         }
     }
@@ -142,6 +146,7 @@ fun HistoryScreen(staff: StaffViewModel, onBack: () -> Unit) {
                     canPrint = false,
                     actions = actions,
                     readOnly = true,
+                    reported = order.id in state.reported,
                 )
             }
         }

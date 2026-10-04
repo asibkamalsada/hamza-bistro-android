@@ -40,6 +40,13 @@ data class AlarmSettings(
      */
     val packed: Boolean? = null,
     /**
+     * "Neue Reklamation": a chime when a customer reports a problem with an
+     * order (hamza-bistro-web#88). Null until somebody chooses on this
+     * device: then on for the kitchen tablet, off for a driver's phone
+     * ([forDevice]).
+     */
+    val issues: Boolean? = null,
+    /**
      * The night window, Leipzig time: inside it nothing rings, and a new
      * order is a silent notification — for the pre-order somebody places at
      * one in the morning. Both null: never quiet.
@@ -51,10 +58,12 @@ data class AlarmSettings(
 ) {
     /**
      * These settings on a device that is a driver's phone or not: a choice
-     * not made yet for "Bestellung fertig" made as [driver] says. What
-     * [AlarmPolicy.decide] is given.
+     * not made yet for "Bestellung fertig" or "Neue Reklamation" made as
+     * [driver] says — the bags for the driver, the reports for the kitchen.
+     * What [AlarmPolicy.decide] is given.
      */
-    fun forDevice(driver: Boolean): AlarmSettings = if (packed != null) this else copy(packed = driver)
+    fun forDevice(driver: Boolean): AlarmSettings =
+        if (packed != null && issues != null) this else copy(packed = packed ?: driver, issues = issues ?: !driver)
 }
 
 /** A one-off alert: a sound once, and a notification. */
@@ -82,6 +91,12 @@ sealed interface Chime {
      * [waiting] packed bags in all, this one included.
      */
     data class Packed(val order: StaffOrder, val waiting: Int) : Chime
+
+    /**
+     * "Neue Reklamation": [added] reports came in since the last look, with
+     * [open] open in all, these included.
+     */
+    data class Issue(val added: Int, val open: Int) : Chime
 }
 
 /** What the alarm should be doing now. */
@@ -128,6 +143,9 @@ data class AlarmDecision(
  *     when this device started listening, and not again for one unpacked
  *     and packed again within [REPACK_WINDOW] — a slip of the finger
  *     corrected.
+ *   * A customer's problem report (hamza-bistro-web#88) chimes once, on a
+ *     device that wants it: not for what was open when this device started
+ *     counting.
  *
  * Holds what it has already said, so it is one per device; [decide] is
  * pure otherwise, with the clock passed in.
@@ -148,6 +166,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
     private var lastRinging: List<StaffOrder> = emptyList()
     private val packedSeen = mutableMapOf<String, Instant>()
     private var packedLook: Instant? = null
+    private var issuesSeen: Set<String>? = null
 
     /** "Stumm": what is ringing now stays quiet for [seconds]. */
     @Synchronized
@@ -162,8 +181,10 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
      * What to do, given the queue ([orders], null until it was read once),
      * whether reading it fails just now, this device's printer's trouble if
      * any, since when some other device has been meant to print every
-     * accepted order ([printingSince], null for none or not known), how long
-     * each pre-order needs ([lead]), and the time.
+     * accepted order ([printingSince], null for none or not known), the
+     * open problem reports' ids ([issues], null until counted or on a
+     * database without them), how long each pre-order needs ([lead]), and
+     * the time.
      */
     @Synchronized
     fun decide(
@@ -173,6 +194,7 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         settings: AlarmSettings,
         now: Instant,
         printingSince: Instant? = null,
+        issues: List<String>? = null,
         lead: (StaffOrder) -> Int,
     ): AlarmDecision {
         val chimes = mutableListOf<Chime>()
@@ -233,6 +255,8 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
             unprintedDone.retainAll(ids)
         }
 
+        issueChime(issues, settings)?.let { chimes += it }
+
         if (printer is Problem.NotPrinted) {
             val since = printerSince ?: now.also { printerSince = it }
             val due = printerChimed?.let { !now.isBefore(it.plus(PRINTER_AGAIN)) } ?: !now.isBefore(since.plus(PRINTER_GRACE))
@@ -289,6 +313,25 @@ class AlarmPolicy(private val zone: ZoneId = LEIPZIG) {
         }
         packedSeen.values.removeAll { now.isAfter(it.plus(REPACK_WINDOW)) }
         return chimes
+    }
+
+    /**
+     * "Neue Reklamation": one chime for the reports not seen open before.
+     * The first count — or the first after the count was lost, a sign-out or
+     * the shift switched off — takes in what is open without a word, as the
+     * other chimes treat a starting picture. A report answered drops out of
+     * what was seen; one reopened by hand would chime again, which is right.
+     */
+    private fun issueChime(issues: List<String>?, settings: AlarmSettings): Chime.Issue? {
+        if (issues == null) {
+            issuesSeen = null
+            return null
+        }
+        val seen = issuesSeen
+        issuesSeen = issues.toSet()
+        if (seen == null || settings.issues != true) return null
+        val added = issues.count { it !in seen }
+        return if (added > 0) Chime.Issue(added, issues.size) else null
     }
 
     /**

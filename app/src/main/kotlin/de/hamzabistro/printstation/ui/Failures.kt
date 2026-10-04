@@ -7,6 +7,8 @@ import de.hamzabistro.printstation.core.DeliveryPausedException
 import de.hamzabistro.printstation.core.InvalidHoursException
 import de.hamzabistro.printstation.core.InvalidSettingException
 import de.hamzabistro.printstation.core.InvalidSpecialDayException
+import de.hamzabistro.printstation.core.IssueActionException
+import de.hamzabistro.printstation.core.IssueError
 import de.hamzabistro.printstation.core.KitchenFullException
 import de.hamzabistro.printstation.core.MenuEditError
 import de.hamzabistro.printstation.core.MenuEditException
@@ -34,6 +36,7 @@ fun failureText(context: Context, e: Exception): String =
         is KitchenFullException -> context.getString(R.string.kitchen_full)
         is MenuEditException -> menuEditText(context, e)
         is ReportRangeException -> context.getString(R.string.report_range_invalid)
+        is IssueActionException -> issueText(context, e.reason)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
@@ -50,6 +53,18 @@ suspend fun <T> attempt(context: Context, onFailure: (String) -> Unit, block: su
         onFailure(failureText(context, e))
         null
     }
+
+/** Why a problem report could not be answered (HB461–HB463, P0002). */
+private fun issueText(context: Context, reason: IssueError): String =
+    context.getString(
+        when (reason) {
+            IssueError.ALREADY_RESOLVED -> R.string.issue_error_resolved
+            IssueError.NOT_FOUND -> R.string.issue_error_gone
+            IssueError.INVALID_AMOUNT -> R.string.issue_voucher_invalid
+            IssueError.NOTE_TOO_LONG -> R.string.issue_error_note
+            IssueError.NO_EMAIL -> R.string.issue_error_no_email
+        }
+    )
 
 /**
  * The menu editor's refusals (HB450–HB454), in the words the server's API

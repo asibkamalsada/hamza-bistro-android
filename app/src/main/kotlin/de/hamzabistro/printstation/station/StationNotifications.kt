@@ -16,6 +16,7 @@ import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StationStatus
 import de.hamzabistro.printstation.ui.Format
+import de.hamzabistro.printstation.ui.ISSUES_FOCUS
 import de.hamzabistro.printstation.ui.MainActivity
 import java.text.DateFormat
 import java.util.Date
@@ -37,6 +38,9 @@ object StationNotifications {
 
     /** Below [ORDER_IDS]: clearOrders() would take it off with the accepted order's own. */
     private const val UNPRINTED_ID = 6
+
+    /** "Neue Reklamation": below [ORDER_IDS] as well, it is about no queued order. */
+    private const val ISSUE_ID = 7
     private const val ORDER_IDS = 1_000
 
     private const val CHANNEL_RUNNING = "station"
@@ -247,6 +251,15 @@ object StationNotifications {
                 // "#57 ist fertig – Georg-Schwarz-Str. 12 · 2 Bestellungen warten",
                 // in the order's own place: it goes once the bag is on its way.
                 // Over the lock screen without the street ([packedPublic]).
+                // "Neue Reklamation · 2 offen": nobody's name or order on the
+                // lock screen; the list is a tap away.
+                is Chime.Issue ->
+                    Shown(
+                        ISSUE_ID,
+                        context.resources.getQuantityString(R.plurals.chime_issue, chime.added, chime.added),
+                        context.resources.getQuantityString(R.plurals.chime_issue_open, chime.open, chime.open),
+                        ISSUES_FOCUS,
+                    )
                 is Chime.Packed ->
                     Shown(
                         ORDER_IDS + (chime.order.orderNumber % 100_000).toInt(),
@@ -295,6 +308,11 @@ object StationNotifications {
     /** The street a driver reads once the phone is unlocked: the street line, without postcode and town. */
     private fun packedStreet(order: StaffOrder): String =
         order.street?.trim()?.takeIf { it.isNotEmpty() } ?: order.address.substringBefore(',').trim()
+
+    /** Takes "Neue Reklamation" off: nothing is open any more. */
+    fun clearIssues(context: Context) {
+        runCatching { context.getSystemService(NotificationManager::class.java).cancel(ISSUE_ID) }
+    }
 
     /** Takes the notifications off for orders nobody needs to act on any more. */
     fun clearOrders(context: Context, keep: Collection<StaffOrder>) {

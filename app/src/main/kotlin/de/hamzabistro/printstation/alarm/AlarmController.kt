@@ -5,6 +5,7 @@ import de.hamzabistro.printstation.AppGraph
 import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.Chime
 import de.hamzabistro.printstation.core.Eta
+import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.Problem
 import de.hamzabistro.printstation.core.QueueState
@@ -57,11 +58,14 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
                 Inputs(q, (station as? StationState.Running)?.status?.problem, prefs, busy + pending.keys)
             }
         try {
-            combine(inputs, graph.alarmPoke, ticks, printingSince()) { now, _, _, since -> now to since }
-                .collect { (now, since) -> act(now, since) }
+            combine(inputs, graph.alarmPoke, ticks, printingSince(), graph.liveIssues) { now, _, _, since, issues ->
+                    Triple(now, since, issues)
+                }
+                .collect { (now, since, issues) -> act(now, since, issues) }
         } finally {
             graph.alarmPlayer.stopLoop()
             StationNotifications.cancelAlarm(context)
+            StationNotifications.clearIssues(context)
             graph.alarm.value = AlarmDecision()
             shown = emptySet()
         }
@@ -89,7 +93,7 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         }
     }
 
-    private fun act(inputs: Inputs, printingSince: Instant?) {
+    private fun act(inputs: Inputs, printingSince: Instant?, issues: IssuesState) {
         val queue = inputs.queue
         val prefs = inputs.prefs
         val orders = if (queue.loaded && !queue.notAllowed) queue.orders.filterNot { it.id in inputs.handled } else null
@@ -97,7 +101,7 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
         // precisely and sooner; it does not also chime about the same ticket.
         val elsewhere = printingSince.takeUnless { graph.settings.enabled }
         val decision =
-            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarmForDevice, Instant.now(), elsewhere) {
+            graph.alarmPolicy.decide(orders, queue.failingSince != null, inputs.printer, prefs.alarmForDevice, Instant.now(), elsewhere, issues.ids.takeIf { issues.available == true }) {
                 Eta.estimate(it, queue.prep)
             }
         graph.alarm.value = decision
@@ -124,6 +128,9 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
                 else -> graph.alarmPlayer.chime(prefs.sound, prefs.fullVolume, prefs.vibrate)
             }
         }
+
+        // Every report answered, here or elsewhere: "Neue Reklamation" goes.
+        if (issues.available == true && issues.count == 0) StationNotifications.clearIssues(context)
 
         // An order answered anywhere takes its notification with it; a
         // pre-order keeps its "jetzt kochen", and a packed bag its "ist

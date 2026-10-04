@@ -726,4 +726,41 @@
     <string name="travel_by_ring_hint">\"Open route\" on the Driver tab picks bike or car by the rings on the trip: bike to the inner two, car as soon as one stop is further out. This setting counts only where no ring is known.</string>
     <string name="driver_device">Driver\'s phone: open the queue on \"Driver\"</string>
     <string name="driver_device_hint">The bags in the kitchen to take along in one tap, the stops in the order they are ridden, and one route for all of them.</string>
+    <!-- Problem reports, hamza-bistro-web#88 -->
+    <string name="issues_title">Complaints</string>
+    <string name="issues_empty">No open complaints.</string>
+    <string name="issues_needs_update">The shop\'s database has no problem reports yet.</string>
+    <string name="issue_kind_missing">Something is missing</string>
+    <string name="issue_kind_wrong">Wrong dish</string>
+    <string name="issue_kind_cold_late">Cold / too late</string>
+    <string name="issue_kind_other">Something else</string>
+    <string name="issue_reported_at">reported %1$s</string>
+    <string name="issue_missing_lines">Missing: %1$s</string>
+    <string name="issue_call">Call</string>
+    <string name="issue_voucher">Send voucher</string>
+    <string name="issue_voucher_missing">Missing items (%1$s)</string>
+    <string name="issue_voucher_other">Other amount</string>
+    <string name="issue_voucher_other_go">Use this amount</string>
+    <string name="issue_voucher_invalid">Enter an amount between 0.01 and 100 euros.</string>
+    <string name="issue_voucher_confirm">Email a %1$s voucher for order #%2$d?</string>
+    <string name="issue_voucher_send">Send</string>
+    <string name="issue_voucher_sent">Voucher %1$s sent.</string>
+    <string name="issue_done">Done</string>
+    <string name="issue_done_note">Note for the customer (optional)</string>
+    <string name="issue_had_report">Complaint</string>
+    <string name="issue_error_resolved">Already done – reload</string>
+    <string name="issue_error_gone">This complaint is gone – reload</string>
+    <string name="issue_error_note">The note can be at most 300 characters.</string>
+    <string name="issue_error_no_email">Email address already deleted – no voucher possible</string>
+    <string name="ok">OK</string>
+    <plurals name="chime_issue">
+        <item quantity="one">New complaint</item>
+        <item quantity="other">%1$d new complaints</item>
+    </plurals>
+    <plurals name="chime_issue_open">
+        <item quantity="one">%1$d open</item>
+        <item quantity="other">%1$d open</item>
+    </plurals>
+    <string name="alarm_issues">New complaint: chime when a customer reports a problem with an order</string>
+    <string name="alarm_issues_hint">Once per report. On by itself on the kitchen tablet; off where \"Driver\'s phone\" is switched on.</string>
 </resources>

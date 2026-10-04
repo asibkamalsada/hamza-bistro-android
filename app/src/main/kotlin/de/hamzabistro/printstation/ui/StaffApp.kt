@@ -2,10 +2,12 @@ package de.hamzabistro.printstation.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 
 /** Where a staff account is in the app. Everything but the queue goes back to the queue. */
@@ -14,6 +16,9 @@ enum class StaffScreen {
 
     /** "Letzte Bestellungen" and today's takings. */
     HISTORY,
+
+    /** "Reklamationen": the customers' open problem reports, answered with a voucher or not. */
+    ISSUES,
 
     /** The Kassensturz: per driver, cash and card for a day. */
     CASH_UP,
@@ -40,9 +45,18 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
     var screen by rememberSaveable { mutableStateOf(StaffScreen.QUEUE) }
     val back = { screen = StaffScreen.QUEUE }
     if (screen != StaffScreen.QUEUE) BackHandler(onBack = back)
+    // "Neue Reklamation" tapped: the list, not the queue.
+    val asked by focus.collectAsStateWithLifecycle()
+    LaunchedEffect(asked) {
+        if (asked == ISSUES_FOCUS) {
+            screen = StaffScreen.ISSUES
+            onFocused()
+        }
+    }
     when (screen) {
         StaffScreen.QUEUE -> QueueScreen(staff, focus, onFocused, onOpen = { screen = it })
         StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
+        StaffScreen.ISSUES -> IssuesScreen(onBack = back)
         StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
         StaffScreen.REPORT -> ReportScreen(onBack = back)
         StaffScreen.MENU -> MenuScreen(onBack = back)
@@ -50,3 +64,6 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
         StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
     }
 }
+
+/** What a notification asks to focus to open "Reklamationen" rather than an order. */
+const val ISSUES_FOCUS = "#issues"

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import de.hamzabistro.printstation.AppGraph
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.core.AlarmDecision
+import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.OrderStatus
@@ -141,6 +142,13 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
                 state.copy(alarm = alarm, now = now, canPrint = graph.settings.printer != null, shop = shop, addressFailing = address)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StaffState())
+
+    /**
+     * The open problem reports, for the badge on "Mehr → Reklamationen"
+     * (hamza-bistro-web#88); not available on a database without them.
+     */
+    val issues: StateFlow<IssuesState> =
+        graph.liveIssues.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IssuesState())
 
     private val kitchenRead = MutableStateFlow<List<KitchenSlot>?>(null)
 
