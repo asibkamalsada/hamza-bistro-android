@@ -52,6 +52,7 @@ class ReportTest {
             reasonUnreachable = "Nicht erreichbar",
             reasonAddress = "Adresse unklar",
             reasonTimeout = "automatisch abgelehnt",
+            reasonNoShow = "Nicht angetroffen",
             reasonNone = "ohne Grund",
             minutes = "{n} Min.",
             empty = "Im Zeitraum wurde nichts geliefert.",
@@ -317,7 +318,8 @@ class ReportTest {
         assertEquals("Personal · Adresse unklar", ReportText.cancellation(ReportCancellation("staff", "address"), words))
         assertEquals("Personal · Nicht erreichbar", ReportText.cancellation(ReportCancellation("staff", "unreachable"), words))
         // Something newer than the app reads as the database spells it.
-        assertEquals("System · no_show", ReportText.cancellation(ReportCancellation("system", "no_show"), words))
+        assertEquals("Personal · Nicht angetroffen", ReportText.cancellation(ReportCancellation("staff", "no_show"), words))
+        assertEquals("System · lost_in_space", ReportText.cancellation(ReportCancellation("system", "lost_in_space"), words))
         assertEquals("ohne Grund", ReportText.cancellation(ReportCancellation(null, null), words))
     }
 

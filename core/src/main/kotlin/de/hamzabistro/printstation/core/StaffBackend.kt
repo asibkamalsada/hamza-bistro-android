@@ -45,6 +45,15 @@ interface StaffBackend {
      */
     suspend fun delayOpen(minutes: Int): Int
 
+    /**
+     * "Zähler zurücksetzen": the "nicht angetroffen" count of the account
+     * behind [order] back to 0 (reset_no_shows). Answers the count it had.
+     * Throws [NoShowAccountGoneException] when retention has already cleared
+     * who placed it, [NotAllowedException] for an account that is not staff,
+     * and [NeedsServerUpdateException] on a database without no-shows.
+     */
+    suspend fun resetNoShows(order: StaffOrder): Int
+
     /** Minutes per dish, for the suggested ETA. */
     suspend fun prepMinutes(): Map<Long, Int>
 
@@ -72,19 +81,30 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         return staff
     }
 
-    /** Whether the database has orders.kitchen_slot: until it says otherwise, yes. */
-    @Volatile private var kitchenSlots = true
+    /**
+     * What the queue reads, newest columns first: each one a database turns
+     * out not to have yet is dropped for good, oldest last.
+     * [StaffOrder.NO_SHOW_COLUMNS] (20261004030000_no_shows), then
+     * [StaffOrder.QUEUE_COLUMNS] (20261003160000_kitchen_capacity: no backlog
+     * to wait for, so the estimate of before), then [StaffOrder.COLUMNS].
+     */
+    @Volatile private var columns = 0
 
-    override suspend fun openOrders(): List<StaffOrder> =
-        try {
-            openOrders(if (kitchenSlots) StaffOrder.QUEUE_COLUMNS else StaffOrder.COLUMNS)
-        } catch (e: BackendException) {
-            // The site's database without 20261003160000_kitchen_capacity:
-            // no backlog to wait for, so the estimate of before.
-            if (!kitchenSlots || !e.missingColumn) throw e
-            kitchenSlots = false
-            openOrders(StaffOrder.COLUMNS)
+    override suspend fun openOrders(): List<StaffOrder> {
+        while (true) {
+            val level = columns
+            try {
+                return openOrders(QUEUE_SELECTS[level])
+            } catch (e: BackendException) {
+                if (!e.missingColumn || level == QUEUE_SELECTS.lastIndex) throw e
+                // Without kitchen_slot, older than no_shows_before, it has
+                // neither: straight to the oldest. Another read may have
+                // stepped down meanwhile; never back up.
+                val next = if (e.message.orEmpty().contains("kitchen_slot")) QUEUE_SELECTS.lastIndex else level + 1
+                if (columns < next) columns = next
+            }
         }
+    }
 
     private suspend fun openOrders(columns: String): List<StaffOrder> =
         orders(columns) {
@@ -125,6 +145,9 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
                     // The database refusing a step that is not one /orders
                     // offers: the order is somewhere else by now.
                     if (error is BackendException && error.code == "HB412") throw OrderMovedException()
+                    // A "nicht angetroffen" the rule does not allow (#83): no
+                    // longer on its way, a pickup, or already cancelled.
+                    if (error is BackendException && error.code == "HB466") throw OrderMovedException()
                     if (error is BackendException && error.code == "HB438") throw PaymentLockedException()
                     throw error
                 }
@@ -178,6 +201,18 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         return json.decodeFromString(DelayedRow.serializer(), body).delayed
     }
 
+    override suspend fun resetNoShows(order: StaffOrder): Int {
+        val body =
+            try {
+                rest.rpc("reset_no_shows", buildJsonObject { put("p_order_id", order.id) })
+            } catch (e: BackendException) {
+                if (e.code == "P0002") throw NoShowAccountGoneException()
+                if (e.missingFunction) throw NeedsServerUpdateException(NoShows.MIGRATION)
+                throw e
+            }
+        return body.trim().toIntOrNull() ?: 0
+    }
+
     override suspend fun prepMinutes(): Map<Long, Int> {
         val url = rest.endpoint("rest/v1/menu_items").addQueryParameter("select", "id,prep_minutes").build()
         return rest.call({ it.url(url).get() }) { response ->
@@ -225,7 +260,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
             is OrderStep.Cancel -> {
                 val reason = step.reason
                 if (reason == null) put("cancel_reason", JsonNull)
-                else put("cancel_reason", json.encodeToJsonElement(CancelReason.serializer(), reason))
+                else put("cancel_reason", json.encodeToJsonElement(CancelReasonSerializer, reason))
             }
             else -> Unit
         }
@@ -241,6 +276,9 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     private companion object {
         /** More open orders than this at once is not an evening that exists. */
         const val QUEUE_LIMIT = 100
+
+        /** What the queue reads, newest database first: see [columns]. */
+        val QUEUE_SELECTS = listOf(StaffOrder.NO_SHOW_COLUMNS, StaffOrder.QUEUE_COLUMNS, StaffOrder.COLUMNS)
     }
 }
 

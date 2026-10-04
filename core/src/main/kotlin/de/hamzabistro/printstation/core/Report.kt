@@ -92,7 +92,7 @@ data class ReportHour(
 data class ReportCancellation(
     /** "customer", "staff" or "system". */
     @SerialName("cancelled_by") val cancelledBy: String? = null,
-    /** "busy", "sold_out", "unreachable", "address", "timeout", or null for none given. */
+    /** "busy", "sold_out", "unreachable", "address", "timeout", "no_show", or null for none given. */
     val reason: String? = null,
     val orders: Int = 0,
     val value: Double = 0.0,
@@ -415,6 +415,8 @@ data class ReportWords(
     val reasonAddress: String,
     /** "automatisch abgelehnt", the auto-decline's own. */
     val reasonTimeout: String,
+    /** "Nicht angetroffen" (hamza-bistro-web#83). */
+    val reasonNoShow: String,
     val reasonNone: String,
     /** "{n} Min.". */
     val minutes: String,
@@ -471,6 +473,7 @@ object ReportText {
                 "sold_out" -> words.reasonSoldOut
                 "unreachable" -> words.reasonUnreachable
                 "address" -> words.reasonAddress
+                "no_show" -> words.reasonNoShow
                 null -> if (row.cancelledBy == "customer") null else words.reasonNone
                 else -> row.reason
             }

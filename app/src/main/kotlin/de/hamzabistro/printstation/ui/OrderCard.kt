@@ -50,6 +50,7 @@ import de.hamzabistro.printstation.core.AutoDecline
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.DeclineUrgency
 import de.hamzabistro.printstation.core.Eta
+import de.hamzabistro.printstation.core.NoShows
 import de.hamzabistro.printstation.core.OrderRating
 import de.hamzabistro.printstation.core.OrderRatings
 import de.hamzabistro.printstation.core.OrderStatus
@@ -77,6 +78,15 @@ interface OrderActions {
 
     fun cancel(order: StaffOrder, reason: CancelReason?)
 
+    /**
+     * "Nicht angetroffen", confirmed: cancelled as no_show, through the undo
+     * window like any step (hamza-bistro-web#83).
+     */
+    fun noShow(order: StaffOrder) = cancel(order, CancelReason.NO_SHOW)
+
+    /** "Zähler zurücksetzen": the account's no-shows back to 0; [done] hears how it went. */
+    fun resetNoShows(order: StaffOrder, done: (NoShowReset) -> Unit)
+
     /** "+10 Min." on an accepted order. */
     fun delay(order: StaffOrder, minutes: Int)
 
@@ -93,6 +103,15 @@ interface OrderActions {
     fun call(phone: String)
 
     fun route(order: StaffOrder)
+}
+
+/** How "Zähler zurücksetzen" went. */
+sealed interface NoShowReset {
+    /** Back to 0; [before] is the count the account had. */
+    data class Done(val before: Int) : NoShowReset
+
+    /** It did not go through, said in words. */
+    data class Failed(val reason: String) : NoShowReset
 }
 
 /** How a time line reads: in time, close, or late. */
@@ -206,6 +225,8 @@ fun reasonLabel(context: Context, reason: CancelReason?): String =
             CancelReason.UNREACHABLE -> R.string.reason_unreachable
             CancelReason.ADDRESS -> R.string.reason_address
             CancelReason.TIMEOUT -> R.string.reason_timeout
+            CancelReason.NO_SHOW -> R.string.reason_no_show
+            CancelReason.UNKNOWN -> R.string.reason_unknown
             null -> R.string.reason_none
         }
     )
@@ -233,7 +254,11 @@ fun stepLabel(context: Context, order: StaffOrder, step: OrderStep): String =
             step.payment?.let { "$done · ${paymentLabel(context, it)}" } ?: done
         }
         is OrderStep.Cancel ->
-            context.getString(if (order.status == OrderStatus.NEW) R.string.pending_declined else R.string.pending_cancelled)
+            when {
+                step.reason == CancelReason.NO_SHOW -> context.getString(R.string.reason_no_show)
+                order.status == OrderStatus.NEW -> context.getString(R.string.pending_declined)
+                else -> context.getString(R.string.pending_cancelled)
+            }
         is OrderStep.Delay -> context.getString(R.string.pending_delayed, step.minutes)
         OrderStep.Pack -> context.getString(R.string.step_packed)
         OrderStep.Unpack -> context.getString(R.string.step_unpack)
@@ -377,6 +402,8 @@ fun OrderCard(
                 Text(stringResource(R.string.cancel_reason_shown, reasonLabel(context, order.cancelReason)), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
+            if (!compact && NoShows.canReset(order)) ResetNoShows(order, actions)
+
             if (order.status == OrderStatus.CONFIRMED) PrintLine(order, now)
 
             if (order.status.open && !readOnly) {
@@ -443,6 +470,10 @@ private fun Contact(order: StaffOrder, actions: OrderActions) {
         if (!order.returningCustomer && order.status == OrderStatus.NEW) {
             Text(stringResource(R.string.new_customer), color = toneColor(Tone.SOON), fontWeight = FontWeight.SemiBold)
         }
+        // A delivery to this account has failed before (#83): like the first-order flag.
+        NoShows.flag(order)?.let {
+            Text(stringResource(R.string.no_shows_before, it), color = toneColor(Tone.SOON), fontWeight = FontWeight.SemiBold)
+        }
         if (!order.pickup) {
             Text(
                 StaffQueue.addressLine(order),
@@ -485,6 +516,7 @@ private fun Actions(
 ) {
     val context = LocalContext.current
     var declining by rememberSaveable(order.id) { mutableStateOf(false) }
+    var noShowAsking by rememberSaveable(order.id) { mutableStateOf(false) }
 
     if (pending != null) {
         // Tapped, not yet sent. The bar runs down over the undo window.
@@ -529,6 +561,11 @@ private fun Actions(
                 TextButton(onClick = { declining = false }) { Text(stringResource(R.string.cancel_back)) }
             }
         }
+        return
+    }
+
+    if (noShowAsking) {
+        NoShowConfirm(order, actions) { noShowAsking = false }
         return
     }
 
@@ -594,6 +631,7 @@ private fun Actions(
                 DelayButtons(order, actions)
             }
         }
+        if (NoShows.canMark(order)) NoShowButton { noShowAsking = true }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (canPrint) TextButton(onClick = { actions.print(order) }) { Text(stringResource(R.string.print_ticket)) }
             TextButton(
@@ -619,4 +657,72 @@ private fun DelayButtons(order: StaffOrder, actions: OrderActions) {
             }
         }
     }
+}
+
+/** "Nicht angetroffen", next to Geliefert: the first tap only asks ([NoShowConfirm]). */
+@Composable
+internal fun NoShowButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) {
+        Text(stringResource(R.string.no_show))
+    }
+}
+
+/**
+ * "Angerufen und ein paar Minuten gewartet?": asked once, because it counts
+ * against the account, with the call a tap away. "Ja" goes through the undo
+ * window like any step.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun NoShowConfirm(order: StaffOrder, actions: OrderActions, onClose: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(R.string.no_show_confirm, order.orderNumber), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    onClose()
+                    actions.noShow(order)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+            ) {
+                Text(stringResource(R.string.no_show_yes))
+            }
+            if (order.phone.isNotBlank()) {
+                OutlinedButton(onClick = { actions.call(order.phone) }) { Text(stringResource(R.string.driver_call)) }
+            }
+            TextButton(onClick = onClose) { Text(stringResource(R.string.cancel_back)) }
+        }
+    }
+}
+
+/** "Zähler zurücksetzen" on a flagged order or the no-show itself, and how it went. */
+@Composable
+private fun ResetNoShows(order: StaffOrder, actions: OrderActions) {
+    var result by remember(order.id) { mutableStateOf<NoShowReset?>(null) }
+    var resetting by remember(order.id) { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (val shown = result) {
+            is NoShowReset.Done ->
+                Text(stringResource(R.string.no_shows_reset_done, shown.before), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else ->
+                TextButton(
+                    onClick = {
+                        resetting = true
+                        actions.resetNoShows(order) {
+                            resetting = false
+                            result = it
+                        }
+                    },
+                    enabled = !resetting,
+                ) {
+                    Text(stringResource(R.string.no_shows_reset))
+                }
+        }
+    }
+    (result as? NoShowReset.Failed)?.let { Text(it.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 }

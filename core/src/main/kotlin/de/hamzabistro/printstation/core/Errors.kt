@@ -86,6 +86,20 @@ class NotPackableException : Exception("the order is no longer an accepted deliv
 class PackingUnavailableException : Exception("the database has no order_packed")
 
 /**
+ * reset_no_shows() could not find the account behind the order (P0002):
+ * retention has already cleared who placed it, 30 days on.
+ */
+class NoShowAccountGoneException : Exception("no account is known for this order any more")
+
+/**
+ * The database took no delivery from this account: two deliveries to it
+ * ended "nicht angetroffen" (HB465, hamza-bistro-web#83). Collection goes
+ * through. The app places no orders; it is mapped so it reads in words if
+ * it ever does.
+ */
+class NoShowDeliveryException(message: String) : Exception(message)
+
+/**
  * The database refused a shop setting: auto-decline minutes outside 3–60
  * (HB433 from set_auto_decline_minutes), or busy mode's minutes or length
  * (HB434).

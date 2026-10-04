@@ -515,6 +515,8 @@ internal class Actions(private val context: Context, private val viewModel: Staf
 
     override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
 
+    override fun resetNoShows(order: StaffOrder, done: (NoShowReset) -> Unit) = viewModel.resetNoShows(order, done)
+
     override fun delay(order: StaffOrder, minutes: Int) = viewModel.delay(order, minutes)
 
     override fun pack(order: StaffOrder) = viewModel.pack(order)

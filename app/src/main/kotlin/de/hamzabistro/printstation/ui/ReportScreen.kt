@@ -195,6 +195,7 @@ private fun reportWords(context: Context, range: ReportRange): ReportWords =
         reasonUnreachable = context.getString(R.string.reason_unreachable),
         reasonAddress = context.getString(R.string.reason_address),
         reasonTimeout = context.getString(R.string.report_reason_timeout),
+        reasonNoShow = context.getString(R.string.reason_no_show),
         reasonNone = context.getString(R.string.reason_none),
         minutes = context.getString(R.string.report_minutes),
         empty = context.getString(R.string.report_empty),

@@ -265,6 +265,22 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     fun cancel(order: StaffOrder, reason: CancelReason?) = graph.steps.take(order, OrderStep.Cancel(reason))
 
     /**
+     * "Zähler zurücksetzen" (reset_no_shows, hamza-bistro-web#83): straight
+     * away, no undo window — it tells nobody, and a reset is put right by
+     * the next no-show. [done] hears how it went, on the main thread.
+     */
+    fun resetNoShows(order: StaffOrder, done: (NoShowReset) -> Unit) {
+        viewModelScope.launch {
+            val before =
+                attempt(app, { done(NoShowReset.Failed(it)) }) {
+                    graph.staff.resetNoShows(order)
+                } ?: return@launch
+            done(NoShowReset.Done(before))
+            graph.queue.refresh()
+        }
+    }
+
+    /**
      * "+10 Min.": the promise later, on every device, on /my-orders and in
      * Telegram, and an email to a customer who asked for updates — so it
      * waits out the undo window like a step.

@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.OrderStep
+import de.hamzabistro.printstation.core.NoShows
 import de.hamzabistro.printstation.core.Payment
 import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.Ring
@@ -167,6 +169,7 @@ private fun StopCard(index: Int, count: Int, order: StaffOrder, state: StaffStat
     val context = LocalContext.current
     val pending = state.pending[order.id]
     val busy = order.id in state.busy
+    var noShowAsking by rememberSaveable(order.id) { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${index + 1}.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -176,6 +179,7 @@ private fun StopCard(index: Int, count: Int, order: StaffOrder, state: StaffStat
                 when {
                     pending != null -> PendingLine(order, pending, actions)
                     busy -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    noShowAsking -> NoShowConfirm(order, actions) { noShowAsking = false }
                     else ->
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             if (order.phone.isNotBlank()) {
@@ -188,6 +192,7 @@ private fun StopCard(index: Int, count: Int, order: StaffOrder, state: StaffStat
                             } else {
                                 Button(onClick = { actions.moveOn(order) }) { Text(stepLabel(context, order, OrderStep.Done())) }
                             }
+                            if (NoShows.canMark(order)) NoShowButton { noShowAsking = true }
                         }
                 }
             }

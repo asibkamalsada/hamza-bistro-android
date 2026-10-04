@@ -41,28 +41,64 @@ enum class OrderStatus {
 }
 
 /**
- * Why an order was called off — the four buttons /orders offers, and the
- * database's own [TIMEOUT]: all that orders_cancel_reason_check allows. The
- * customer's email says it.
+ * Why an order was called off — the four buttons /orders offers, the
+ * database's own [TIMEOUT] and the driver's [NO_SHOW]: all that
+ * orders_cancel_reason_check allows. The customer's email says it.
+ *
+ * Read leniently ([CancelReasonSerializer]): a reason a newer database has
+ * and this app does not know yet reads as [UNKNOWN], so one order can never
+ * keep the whole queue or history from loading.
  */
-@Serializable
-enum class CancelReason {
-    @SerialName("busy") BUSY,
-    @SerialName("sold_out") SOLD_OUT,
-    @SerialName("unreachable") UNREACHABLE,
-    @SerialName("address") ADDRESS,
+@Serializable(with = CancelReasonSerializer::class)
+enum class CancelReason(
+    /** As cancel_reason spells it; null for [UNKNOWN], which is never sent. */
+    val wire: String?,
+) {
+    BUSY("busy"),
+    SOLD_OUT("sold_out"),
+    UNREACHABLE("unreachable"),
+    ADDRESS("address"),
 
     /**
      * Nobody answered in time, and the database declined it
      * (20261002150000_auto_decline.sql). Read, never sent: the database
      * refuses it from anybody but its own job.
      */
-    @SerialName("timeout") TIMEOUT;
+    TIMEOUT("timeout"),
+
+    /**
+     * "Nicht angetroffen": nobody opened, or the order was refused at the
+     * door (20261004030000_no_shows.sql, hamza-bistro-web#83). Counts against
+     * the account. Sent only from the button on an Unterwegs delivery, never
+     * one of the reasons to choose from.
+     */
+    NO_SHOW("no_show"),
+
+    /** A reason this app does not know yet. Read, never sent. */
+    UNKNOWN(null);
 
     companion object {
-        /** What a person may give as the reason: the buttons, never [TIMEOUT]. */
+        /** What a person may give as the reason: the buttons, never [TIMEOUT], [NO_SHOW] or [UNKNOWN]. */
         val CHOSEN: List<CancelReason> = listOf(BUSY, SOLD_OUT, UNREACHABLE, ADDRESS)
+
+        /** The reason [wire] names; [UNKNOWN] for one this app does not know. */
+        fun of(wire: String): CancelReason = entries.firstOrNull { it.wire == wire } ?: UNKNOWN
     }
+}
+
+/**
+ * cancel_reason as text, leniently: any string the database sends reads as
+ * a [CancelReason], one this app does not know as [CancelReason.UNKNOWN]
+ * (the old strict enum failed the whole list on "no_show"). Null stays null,
+ * by the nullable field around it.
+ */
+object CancelReasonSerializer : KSerializer<CancelReason> {
+    override val descriptor = PrimitiveSerialDescriptor("CancelReason", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): CancelReason = CancelReason.of(decoder.decodeString())
+
+    override fun serialize(encoder: Encoder, value: CancelReason) =
+        encoder.encodeString(requireNotNull(value.wire) { "an unknown cancel reason is never sent" })
 }
 
 /** One line of an order as it was placed: what, how many, with what, at what price. */
@@ -174,6 +210,13 @@ data class StaffOrder(
      * it.
      */
     @SerialName("kitchen_slot") @Serializable(with = InstantSerializer::class) val kitchenSlot: Instant? = null,
+    /**
+     * How many deliveries to the account had ended "nicht angetroffen" when
+     * this order came in (20261004030000_no_shows.sql, hamza-bistro-web#83).
+     * Null on a database without the column — which has no no-shows to
+     * mark either, so the button stays away ([NoShows]).
+     */
+    @SerialName("no_shows_before") val noShowsBefore: Int? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -205,6 +248,12 @@ data class StaffOrder(
          * [COLUMNS] alone, and the minutes are those of before.
          */
         const val QUEUE_COLUMNS = "$COLUMNS,kitchen_slot"
+
+        /**
+         * [QUEUE_COLUMNS] and the account's no-shows (hamza-bistro-web#83),
+         * which came later: a database without them reads [QUEUE_COLUMNS].
+         */
+        const val NO_SHOW_COLUMNS = "$QUEUE_COLUMNS,no_shows_before"
     }
 }
 
@@ -271,6 +320,31 @@ sealed interface OrderStep {
     data object Unpack : OrderStep {
         override val to: OrderStatus? = null
     }
+}
+
+/**
+ * "Nicht angetroffen" as staff see it (hamza-bistro-web#83): the button on
+ * the card, the flag on a new order, and who may reset the count — the
+ * rules of canNoShow() and canResetNoShows() on the site's orders page.
+ */
+object NoShows {
+    /**
+     * Whether "Nicht angetroffen" is offered: a delivery on its way, the
+     * driver at the door. Not on a database without no-shows, where
+     * [StaffOrder.noShowsBefore] is null.
+     */
+    fun canMark(order: StaffOrder): Boolean =
+        order.status == OrderStatus.ON_THE_WAY && !order.pickup && order.noShowsBefore != null
+
+    /** "1× nicht angetroffen" on a card still in play: the count, or null for no flag. */
+    fun flag(order: StaffOrder): Int? = order.noShowsBefore?.takeIf { it > 0 && order.status.open }
+
+    /** Whether "Zähler zurücksetzen" is offered: on a flagged order, or on the no-show itself. */
+    fun canReset(order: StaffOrder): Boolean =
+        (order.noShowsBefore ?: 0) > 0 || (order.status == OrderStatus.CANCELLED && order.cancelReason == CancelReason.NO_SHOW)
+
+    /** The server update that brought no-shows, for a database without reset_no_shows(). */
+    const val MIGRATION = "20261004030000_no_shows"
 }
 
 /**
