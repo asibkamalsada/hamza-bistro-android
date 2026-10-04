@@ -342,8 +342,8 @@ data class IssuesState(
 )
 
 /**
- * Keeps the number of open reports in view, for the badge on "Mehr →
- * Reklamationen" and for the chime: Realtime on order_issues says within a
+ * Keeps the number of open reports in view, for the badge on ☰ and on
+ * "Reklamationen" and for the chime: Realtime on order_issues says within a
  * second that one came in or was answered elsewhere, and a slow poll
  * underneath catches a socket that died without saying so. A report is
  * never as urgent as a new order, hence the minute.

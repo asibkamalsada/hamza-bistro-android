@@ -340,7 +340,8 @@
     <string name="please_wait">Bitte warten …</string>
     <string name="remove">Entfernen</string>
     <string name="settings_reset">Einstellungen dieses Geräts zurücksetzen</string>
-    <string name="more_menu">Mehr</string>
+    <string name="menu_open">Menü öffnen</string>
+    <string name="drawer_device">Gerät: %1$s</string>
     <string name="problem_not_staff">Dieses Konto darf das nicht: Es steht nicht (mehr) auf der Personalliste.</string>
     <string name="address_failing_banner">Die Adressprüfung funktioniert gerade nicht richtig – Details in den Einstellungen.</string>
 

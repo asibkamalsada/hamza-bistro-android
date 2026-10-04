@@ -172,8 +172,9 @@ is switched on in the settings
 
 The website still has `/orders`, `/orders/settings`, `/orders/hours` and
 `/menu-admin`, but links to none of them any more: they are a fallback,
-reached by typing the address. Everything they do is here, behind the
-queue's top bar (**Mehr** on a phone):
+reached by typing the address. Everything they do is here, in the drawer
+that **☰** at the top left of the queue opens (or a swipe from the left
+edge):
 
 - **Letzte Bestellungen** — the last 50 orders whatever became of them,
   and what today's delivered orders came to, for the call about yesterday's

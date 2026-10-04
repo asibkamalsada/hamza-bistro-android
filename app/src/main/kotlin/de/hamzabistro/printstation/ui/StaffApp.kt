@@ -1,14 +1,20 @@
 package de.hamzabistro.printstation.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.hamzabistro.printstation.BuildConfig
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 /** Where a staff account is in the app. Everything but the queue goes back to the queue. */
 enum class StaffScreen {
@@ -41,11 +47,14 @@ enum class StaffScreen {
 
 /**
  * A staff account's app: the queue, and from it everything the website's
- * staff pages had — the history, the menu, the delivery hours, the settings.
+ * staff pages had — the history, the menu, the delivery hours, the settings —
+ * in the drawer that ☰ on the queue opens.
  */
 @Composable
 fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String?>, onFocused: () -> Unit) {
     var screen by rememberSaveable { mutableStateOf(StaffScreen.QUEUE) }
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     val back = { screen = StaffScreen.QUEUE }
     if (screen != StaffScreen.QUEUE) BackHandler(onBack = back)
     // "Neue Reklamation" tapped: the list, not the queue; "Schlechte
@@ -59,18 +68,27 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                 else -> return@LaunchedEffect
             }
         screen = target
+        // From the notification shade, the drawer may still be open.
+        drawer.snapTo(DrawerValue.Closed)
         onFocused()
     }
-    when (screen) {
-        StaffScreen.QUEUE -> QueueScreen(staff, focus, onFocused, onOpen = { screen = it })
-        StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
-        StaffScreen.ISSUES -> IssuesScreen(onBack = back)
-        StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
-        StaffScreen.REPORT -> ReportScreen(onBack = back)
-        StaffScreen.MENU -> MenuScreen(onBack = back)
-        StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
-        StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
-        StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
+    val issues by staff.issues.collectAsStateWithLifecycle()
+    val account = main.state.collectAsStateWithLifecycle().value.account
+    val label = staff.state.collectAsStateWithLifecycle().value.prefs.label
+    val header = remember(account, label) { DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME) }
+    StaffDrawer(drawer, enabled = screen == StaffScreen.QUEUE, issues, header, onOpen = { screen = it }) {
+        when (screen) {
+            StaffScreen.QUEUE ->
+                QueueScreen(staff, focus, onFocused, onOpen = { screen = it }, onMenu = { scope.launch { drawer.open() } })
+            StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
+            StaffScreen.ISSUES -> IssuesScreen(onBack = back)
+            StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
+            StaffScreen.REPORT -> ReportScreen(onBack = back)
+            StaffScreen.MENU -> MenuScreen(onBack = back)
+            StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
+            StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
+            StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
+        }
     }
 }
 
