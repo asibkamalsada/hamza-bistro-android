@@ -9,11 +9,13 @@ import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.Driver
+import de.hamzabistro.printstation.core.FailedEmail
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.Kitchen
 import de.hamzabistro.printstation.core.KitchenSlot
+import de.hamzabistro.printstation.core.OpsHealth
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.Payment
 import de.hamzabistro.printstation.core.PaymentMethod
@@ -32,6 +34,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +47,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Everything the queue screen draws. */
@@ -72,6 +76,14 @@ data class StaffState(
     val delayableAll: List<StaffOrder>
         get() = StaffQueue.delayableAll(queue.orders, StaffQueue.DELAY_ALL_MINUTES, now)
 }
+
+/** The monitoring's lines above the queue; both null while all is well, or not known. */
+data class OpsAlerts(
+    /** "Die E-Mail zu #57 ging nicht raus …": red, and a tap opens the order. */
+    val failedEmail: FailedEmail? = null,
+    /** "Benachrichtigungen gestört": since when notify-order has failed. Amber. */
+    val notifyFailingSince: Instant? = null,
+)
 
 /** What happened that the screen should say once. */
 sealed interface StaffEvent {
@@ -172,6 +184,44 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
             throw e
         } catch (e: Exception) {
             graph.logger.warn("Reading the kitchen's load failed: ${e.javaClass.simpleName}")
+        }
+    }
+
+    private val opsRead = MutableStateFlow(OpsAlerts())
+
+    /**
+     * The two monitoring lines above the queue (hamza-bistro-web#92): a
+     * customer email that failed on its retry too, and notify-order failing.
+     * Read again whenever the queue is; nothing on a database without them.
+     */
+    val ops: StateFlow<OpsAlerts> =
+        merge(
+            flow<Nothing> { graph.queue.state.map { it.lastLoad }.distinctUntilChanged().collect { readOps() } },
+            opsRead,
+        )
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OpsAlerts())
+
+    /** Each on its own, and a failure keeps what was last read, as the kitchen's line does. */
+    private suspend fun readOps() = coroutineScope {
+        launch {
+            try {
+                val failed = graph.ops.failedEmail()
+                opsRead.update { it.copy(failedEmail = failed) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                graph.logger.warn("Reading the failed emails failed: ${e.javaClass.simpleName}")
+            }
+        }
+        launch {
+            try {
+                val since = OpsHealth.notifyFailingSince(graph.ops.status())
+                opsRead.update { it.copy(notifyFailingSince = since) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                graph.logger.warn("Reading the ops status failed: ${e.javaClass.simpleName}")
+            }
         }
     }
 

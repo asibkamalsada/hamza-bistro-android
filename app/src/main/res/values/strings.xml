@@ -772,4 +772,25 @@
     </plurals>
     <string name="alarm_bad_ratings">Bad rating: chime when a customer gives one or two stars and says why</string>
     <string name="alarm_bad_ratings_hint">Once per rating. On by itself on the kitchen tablet; off where \"Driver\'s phone\" is switched on. The lock screen shows only the stars.</string>
+    <string name="ops_email_failed">The email for #%1$d did not go out, not even on the second try (%2$s): %3$s. Call the customer if it matters.</string>
+    <string name="ops_notify_failing">Notifications disrupted since %1$s: new orders may not reach the phones or Telegram. This app still rings.</string>
+    <string name="ops_heading">Monitoring</string>
+    <string name="ops_hint">When each part that can fail quietly last worked. If one stops, the heartbeat tells the owner (healthchecks.io).</string>
+    <string name="ops_notify_order">Order alerts (notify-order)</string>
+    <string name="ops_notify_customer">Customer emails (notify-customer)</string>
+    <string name="ops_telegram_bot">Telegram buttons (telegram-bot)</string>
+    <string name="ops_cron_reminders">Reminders and auto-decline</string>
+    <string name="ops_cron_email_retry">Email retry</string>
+    <string name="ops_cron_retention">Deleting data after 30 days</string>
+    <string name="ops_cron_geocodes">Clearing the address cache</string>
+    <string name="ops_cron_history">Trimming the job history</string>
+    <string name="ops_cron_daily_summary">Daily summary</string>
+    <string name="ops_heartbeat">Heartbeat (healthchecks.io)</string>
+    <string name="ops_ok">OK %1$s</string>
+    <string name="ops_ok_last_error">OK %1$s — last error %2$s</string>
+    <string name="ops_failing">Error %1$s: %2$s</string>
+    <string name="ops_stale">Not running — last OK %1$s</string>
+    <string name="ops_stale_never">Not running — never OK yet</string>
+    <string name="ops_never">Nothing recorded yet</string>
+    <string name="ops_heartbeat_off">Not set up</string>
 </resources>

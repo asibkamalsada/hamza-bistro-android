@@ -29,6 +29,9 @@ import de.hamzabistro.printstation.core.AddressProbe
 import de.hamzabistro.printstation.core.AddressVerdict
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.AppDevice
+import de.hamzabistro.printstation.core.OpsHealth
+import de.hamzabistro.printstation.core.OpsRow
+import de.hamzabistro.printstation.core.OpsVerdict
 import de.hamzabistro.printstation.core.PrintStationRow
 import de.hamzabistro.printstation.core.PushDevice
 import java.time.Instant
@@ -45,6 +48,8 @@ data class HealthState(
     val pushDevices: List<PushDevice>? = null,
     val stations: List<PrintStationRow> = emptyList(),
     val address: AddressCheckHealth? = null,
+    /** "Überwachung" (hamza-bistro-web#92): null until read, and on a database without it. */
+    val ops: List<OpsRow>? = null,
     val probing: Boolean = false,
     val probe: Message? = null,
     /** What removing a device last said, when it failed. */
@@ -75,6 +80,7 @@ class HealthViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { attempt(app, {}) { devices.pushDevices() }?.let { list -> _state.update { it.copy(pushDevices = list) } } }
         viewModelScope.launch { attempt(app, {}) { devices.printStations(thisDevice) }?.let { list -> _state.update { it.copy(stations = list) } } }
         viewModelScope.launch { attempt(app, {}) { devices.addressHealth() }?.let { health -> _state.update { it.copy(address = health) } } }
+        viewModelScope.launch { attempt(app, {}) { graph.ops.overview() }?.let { rows -> _state.update { it.copy(ops = rows) } } }
     }
 
     /** Lost, wiped or given away: it cannot end its own shift. One still on shift is back within a minute. */
@@ -138,6 +144,7 @@ fun HealthSections() {
     WhoHears(state, health)
     PrintStations(state, health)
     AddressCheck(state, health)
+    Monitoring(state)
 }
 
 @Composable
@@ -247,6 +254,52 @@ private fun AddressCheck(state: HealthState, health: HealthViewModel) {
         state.probe?.let { Text(it.text, color = if (it.error) MaterialTheme.colorScheme.error else Color.Unspecified) }
     }
 }
+
+/**
+ * "Überwachung", as on the site's /orders/settings: one line per part of the
+ * shop that fails quietly — the functions, the pg_cron jobs, the heartbeat.
+ * Left out on a database without it.
+ */
+@Composable
+private fun Monitoring(state: HealthState) {
+    val rows = state.ops?.takeIf { it.isNotEmpty() } ?: return
+    val context = LocalContext.current
+    Section(stringResource(R.string.ops_heading)) {
+        Hint(stringResource(R.string.ops_hint))
+        for (row in OpsHealth.sorted(rows)) {
+            val verdict = OpsHealth.verdict(row)
+            Listed(name = opsLabel(context, row.source), whose = null, lines = listOf(opsText(context, verdict) to verdict.ok), onRemove = null)
+        }
+    }
+}
+
+/** The site's name for a source; one this app does not know shows as itself. */
+private fun opsLabel(context: Context, source: String): String =
+    when (source) {
+        "notify-order" -> R.string.ops_notify_order
+        "notify-customer" -> R.string.ops_notify_customer
+        "telegram-bot" -> R.string.ops_telegram_bot
+        "cron:reminders" -> R.string.ops_cron_reminders
+        "cron:email-retry" -> R.string.ops_cron_email_retry
+        "cron:retention" -> R.string.ops_cron_retention
+        "cron:geocodes" -> R.string.ops_cron_geocodes
+        "cron:history" -> R.string.ops_cron_history
+        "cron:daily-summary" -> R.string.ops_cron_daily_summary
+        "heartbeat" -> R.string.ops_heartbeat
+        else -> null
+    }?.let(context::getString) ?: source
+
+/** "OK 03.10., 18:32", "Fehler …: …", "Läuft nicht — …", on a Leipzig clock. */
+private fun opsText(context: Context, verdict: OpsVerdict): String =
+    when (verdict) {
+        is OpsVerdict.Ok ->
+            verdict.lastError?.let { context.getString(R.string.ops_ok_last_error, stamp(verdict.at), stamp(it)) }
+                ?: context.getString(R.string.ops_ok, stamp(verdict.at))
+        is OpsVerdict.Failing -> context.getString(R.string.ops_failing, stamp(verdict.at), verdict.error)
+        is OpsVerdict.Stale -> verdict.lastOk?.let { context.getString(R.string.ops_stale, stamp(it)) } ?: context.getString(R.string.ops_stale_never)
+        OpsVerdict.Never -> context.getString(R.string.ops_never)
+        OpsVerdict.NotSetUp -> context.getString(R.string.ops_heartbeat_off)
+    }
 
 /** One device in a list: its name and whose, a line or two, each good or not, and a way to take it off. */
 @Composable

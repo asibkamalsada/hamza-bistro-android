@@ -772,4 +772,25 @@
     </plurals>
     <string name="alarm_bad_ratings">Schlechte Bewertung: Bescheid, wenn ein Kunde ein oder zwei Sterne gibt und sagt, warum</string>
     <string name="alarm_bad_ratings_hint">Einmal pro Bewertung. Auf dem Küchen-Tablet von selbst an; aus, wo \"Fahrer-Handy\" eingeschaltet ist. Auf dem Sperrbildschirm nur die Sterne.</string>
+    <string name="ops_email_failed">Die E-Mail zu #%1$d ging nicht raus, auch nicht beim zweiten Versuch (%2$s): %3$s. Wenn es wichtig ist: Kunden anrufen.</string>
+    <string name="ops_notify_failing">Benachrichtigungen gestört seit %1$s: neue Bestellungen erreichen Handys und Telegram vielleicht nicht. Diese App klingelt weiter.</string>
+    <string name="ops_heading">Überwachung</string>
+    <string name="ops_hint">Wann jeder Teil, der leise ausfallen kann, zuletzt funktioniert hat. Fällt einer aus, meldet der Heartbeat es dem Inhaber (healthchecks.io).</string>
+    <string name="ops_notify_order">Bestell-Alarm (notify-order)</string>
+    <string name="ops_notify_customer">Kunden-E-Mails (notify-customer)</string>
+    <string name="ops_telegram_bot">Telegram-Tasten (telegram-bot)</string>
+    <string name="ops_cron_reminders">Erinnerungen und Auto-Ablehnung</string>
+    <string name="ops_cron_email_retry">E-Mail-Wiederholung</string>
+    <string name="ops_cron_retention">Löschen nach 30 Tagen</string>
+    <string name="ops_cron_geocodes">Adress-Cache leeren</string>
+    <string name="ops_cron_history">Job-Verlauf kürzen</string>
+    <string name="ops_cron_daily_summary">Tageszusammenfassung</string>
+    <string name="ops_heartbeat">Heartbeat (healthchecks.io)</string>
+    <string name="ops_ok">OK %1$s</string>
+    <string name="ops_ok_last_error">OK %1$s — letzter Fehler %2$s</string>
+    <string name="ops_failing">Fehler %1$s: %2$s</string>
+    <string name="ops_stale">Läuft nicht — zuletzt OK %1$s</string>
+    <string name="ops_stale_never">Läuft nicht — noch nie OK</string>
+    <string name="ops_never">Noch nichts aufgezeichnet</string>
+    <string name="ops_heartbeat_off">Nicht eingerichtet</string>
 </resources>
