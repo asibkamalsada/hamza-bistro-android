@@ -75,7 +75,8 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
     val issues by staff.issues.collectAsStateWithLifecycle()
     val account = main.state.collectAsStateWithLifecycle().value.account
     val label = staff.state.collectAsStateWithLifecycle().value.prefs.label
-    val header = remember(account, label) { DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME) }
+    val update = staff.update.collectAsStateWithLifecycle().value.available
+    val header = remember(account, label, update) { DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME, update) }
     StaffDrawer(drawer, enabled = screen == StaffScreen.QUEUE, issues, header, onOpen = { screen = it }) {
         when (screen) {
             StaffScreen.QUEUE ->

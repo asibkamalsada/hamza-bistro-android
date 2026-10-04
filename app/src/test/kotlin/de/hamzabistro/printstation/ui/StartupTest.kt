@@ -11,8 +11,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModel
 import androidx.test.core.app.ApplicationProvider
 import de.hamzabistro.printstation.core.IssuesState
@@ -61,15 +63,29 @@ class StartupTest {
         compose.setContent { AppTheme { StaffApp(staff, main, focus, onFocused = {}) } }
         compose.waitForIdle()
         // ☰ opens the drawer (android#38); a notification tapped closes it again.
-        compose.onNodeWithContentDescription("Open menu").performClick()
+        // A newer release on GitHub, if the check reached it, sits in the
+        // drawer's header and names itself on ☰ (android#40).
+        compose.onNodeWithContentDescription("Open menu", substring = true).performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Recent orders").assertIsDisplayed()
-        compose.onNodeWithText("Settings").assertIsDisplayed()
+        compose.onNodeWithText("Recent orders").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Settings").performScrollTo().assertIsDisplayed()
         // The queue, then the two screens a notification opens.
         for (asked in listOf(ISSUES_FOCUS, HISTORY_FOCUS)) {
             focus.value = asked
             compose.waitForIdle()
         }
+    }
+
+    @Test
+    fun theQueueStripOpensItsSheet() {
+        val staff = StaffViewModel(app)
+        val main = MainViewModel(app)
+        compose.setContent { AppTheme { StaffApp(staff, main, MutableStateFlow(null), onFocused = {}) } }
+        compose.waitForIdle()
+        // The status strip (android#40), on the real view model: the sheet with the notices opens.
+        compose.onNodeWithTag(STRIP_TAG).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Notices").assertExists()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
