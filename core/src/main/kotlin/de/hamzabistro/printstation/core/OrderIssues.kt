@@ -4,6 +4,7 @@ import java.math.BigDecimal
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
@@ -351,7 +352,7 @@ class IssueWatch(
     private val backend: IssuesBackend,
     private val logger: Logger,
     private val poll: Duration = 60.seconds,
-    private val missingPoll: Duration = 15 * 60.seconds,
+    private val missingPoll: Duration = 15.minutes,
     private val debounce: Duration = 400.milliseconds,
 ) {
     private val _state = MutableStateFlow(IssuesState())

@@ -726,4 +726,41 @@
     <string name="travel_by_ring_hint">„Route öffnen“ unter „Fahrer“ wählt Fahrrad oder Auto nach den Ringen der Fahrt: Fahrrad für die inneren zwei, Auto, sobald ein Stopp weiter draußen liegt. Diese Einstellung gilt nur, wo kein Ring bekannt ist.</string>
     <string name="driver_device">Fahrer-Handy: die Liste öffnet mit „Fahrer“</string>
     <string name="driver_device_hint">Die Tüten aus der Küche mit einem Tipp mitnehmen, die Stopps in der Reihenfolge der Fahrt, und eine Route für alle.</string>
+    <!-- Reklamationen, hamza-bistro-web#88 -->
+    <string name="issues_title">Reklamationen</string>
+    <string name="issues_empty">Keine offenen Reklamationen.</string>
+    <string name="issues_needs_update">Die Datenbank des Ladens kennt noch keine Reklamationen.</string>
+    <string name="issue_kind_missing">Etwas fehlt</string>
+    <string name="issue_kind_wrong">Falsches Gericht</string>
+    <string name="issue_kind_cold_late">Kalt / zu spät</string>
+    <string name="issue_kind_other">Anderes</string>
+    <string name="issue_reported_at">gemeldet %1$s</string>
+    <string name="issue_missing_lines">Fehlt: %1$s</string>
+    <string name="issue_call">Anrufen</string>
+    <string name="issue_voucher">Gutschein senden</string>
+    <string name="issue_voucher_missing">Fehlendes (%1$s)</string>
+    <string name="issue_voucher_other">Anderer Betrag</string>
+    <string name="issue_voucher_other_go">Diesen Betrag</string>
+    <string name="issue_voucher_invalid">Gib einen Betrag zwischen 0,01 und 100 Euro ein.</string>
+    <string name="issue_voucher_confirm">Gutschein über %1$s zu Bestellung #%2$d mailen?</string>
+    <string name="issue_voucher_send">Senden</string>
+    <string name="issue_voucher_sent">Gutschein %1$s gesendet.</string>
+    <string name="issue_done">Erledigt</string>
+    <string name="issue_done_note">Notiz für den Kunden (optional)</string>
+    <string name="issue_had_report">Reklamation</string>
+    <string name="issue_error_resolved">Schon erledigt – neu laden</string>
+    <string name="issue_error_gone">Diese Reklamation gibt es nicht mehr – neu laden</string>
+    <string name="issue_error_note">Die Notiz darf höchstens 300 Zeichen haben.</string>
+    <string name="issue_error_no_email">E-Mail-Adresse schon gelöscht – Gutschein nicht möglich</string>
+    <string name="ok">OK</string>
+    <plurals name="chime_issue">
+        <item quantity="one">Neue Reklamation</item>
+        <item quantity="other">%1$d neue Reklamationen</item>
+    </plurals>
+    <plurals name="chime_issue_open">
+        <item quantity="one">%1$d offen</item>
+        <item quantity="other">%1$d offen</item>
+    </plurals>
+    <string name="alarm_issues">Neue Reklamation: Bescheid, wenn ein Kunde ein Problem mit einer Bestellung meldet</string>
+    <string name="alarm_issues_hint">Einmal pro Meldung. Auf dem Küchen-Tablet von selbst an; aus, wo \"Fahrer-Handy\" eingeschaltet ist.</string>
 </resources>
