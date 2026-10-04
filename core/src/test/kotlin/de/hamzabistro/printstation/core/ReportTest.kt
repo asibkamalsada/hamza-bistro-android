@@ -5,6 +5,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
@@ -155,6 +156,67 @@ class ReportTest {
         assertEquals(ReportAmount(1, 1.0), r.discounts.pickup)
         assertEquals(ReportAmount(1, 21.01), r.payments.cash)
         assertEquals(ReportAmount(1, 9.0), r.payments.unknown)
+    }
+
+    /** The issue's answer with the ratings section of 20261004020000_report_ratings.sql. */
+    private fun withRatings(ratings: String): Report =
+        json.decodeFromString(Report.serializer(), answer.trimEnd().removeSuffix("}") + ""","ratings": $ratings}""")
+
+    @Test
+    fun `reads the ratings by name`() {
+        val r =
+            withRatings(
+                """{
+                  "recent_comments": [
+                    { "at": "2026-10-03T22:30:00+00:00", "comment": "Etwas spät", "stars": 3 },
+                    { "stars": 5, "comment": "  ", "at": "2026-10-02T18:00:00.123456+00:00" },
+                    { "stars": 1, "comment": null, "at": null }
+                  ],
+                  "rated_share": 0.8, "average": 3.5, "count": 4,
+                  "by_stars": { "5": 1, "4": 1, "3": 1, "2": 1, "1": 0 }
+                }"""
+            ).ratings!!
+        assertEquals(4, r.count)
+        assertEquals(3.5, r.average)
+        assertEquals(0.8, r.ratedShare)
+        assertEquals(listOf(0, 1, 1, 1, 1), (1..5).map(r::withStars))
+        assertTrue(r.any)
+        assertEquals(3, r.recentComments.size)
+        // Given at half past midnight in Leipzig: the next day there.
+        assertEquals(day("2026-10-04"), r.recentComments[0].date)
+        assertEquals(day("2026-10-02"), r.recentComments[1].date)
+        assertNull(r.recentComments[2].date)
+        assertEquals(listOf("Etwas spät"), r.comments.map { it.text })
+        assertEquals("★★★★☆", ReportText.stars(r.average!!))
+        assertEquals("★★★☆☆", ReportText.stars(3.49))
+        assertEquals("3,5", ReportText.tenth(r.average))
+        assertEquals("80 %", ReportText.percent(r.ratedShare))
+    }
+
+    @Test
+    fun `no ratings section from an older server, or nothing rated yet`() {
+        assertNull(report.ratings)
+        assertNull(withRatings("null").ratings)
+        val none =
+            withRatings(
+                """{"count": 0, "average": null, "rated_share": 0.0,
+                    "by_stars": {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}, "recent_comments": []}"""
+            ).ratings!!
+        assertFalse(none.any)
+        assertEquals(0, none.withStars(5))
+        // Nothing delivered: no share either.
+        val nothing = withRatings("""{"count": 0, "average": null, "rated_share": null, "by_stars": {}, "recent_comments": []}""").ratings!!
+        assertFalse(nothing.any)
+        assertEquals(0, nothing.withStars(3))
+        assertEquals(emptyList(), nothing.comments)
+        // A section cut short reads with its defaults.
+        val bare = withRatings("{}").ratings!!
+        assertFalse(bare.any)
+        assertEquals(ReportRatings(), bare)
+        // Stars of orders from before the range's comments were cleared: no comments, still an average.
+        val cleared = withRatings("""{"count": 2, "average": 4.5, "rated_share": 0.5, "by_stars": {"4": 1, "5": 1}, "recent_comments": []}""").ratings!!
+        assertTrue(cleared.any)
+        assertEquals(emptyList(), cleared.comments)
     }
 
     @Test
