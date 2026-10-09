@@ -17,6 +17,7 @@ import android.os.VibratorManager
 import de.hamzabistro.printstation.station.AlarmSound
 import kotlin.math.PI
 import kotlin.math.exp
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -44,48 +45,108 @@ class AlarmPlayer(context: Context) {
     private var ringtone: Ringtone? = null
     private var restoreVolume: Int? = null
 
-    /** Whether the loop is sounding. */
+    /** What the loop sounds like, and how long it rings and pauses; no pause: it rings without a break. */
+    private var loopSound = AlarmSound.BEEPS
+    private var loopVibration: LongArray? = null
+    private var ringMs = 0L
+    private var pauseMs = 0L
+
+    /** In the loop's pause: quiet, with [toRing] on its way. */
+    private var resting = false
+    private val toRest = Runnable { rest() }
+    private val toRing = Runnable { ringNow() }
+
+    /** Whether the loop is on — ringing, or in its pause. */
     @Volatile
     var looping = false
         private set
 
-    /** Starts the loop, or leaves it running when it already is. */
+    /**
+     * Starts the loop, or leaves it running when it already is. With
+     * [pauseSeconds], it rings for about [ringSeconds] — whole rounds of the
+     * sound, so it does not stop mid-beep — then is quiet for [pauseSeconds],
+     * and so on: time to answer the order without it in your ears.
+     */
     @Synchronized
-    fun startLoop(sound: AlarmSound, full: Boolean, vibrate: Boolean) {
+    fun startLoop(sound: AlarmSound, full: Boolean, vibrate: Boolean, ringSeconds: Int = 0, pauseSeconds: Int = 0) {
         if (looping) return
         looping = true
         if (full) raiseVolume()
-        if (sound == AlarmSound.DEVICE) {
-            ringtone = deviceTone()?.apply {
-                isLooping = true
-                play()
-            }
-            // A device without an alarm tone still rings.
-            if (ringtone == null) track = play(AlarmSound.BEEPS, loop = true)
-        } else {
-            track = play(sound, loop = true)
-        }
-        if (vibrate) vibrate(LOOP_VIBRATION, repeat = 0)
+        loopSound = sound
+        loopVibration = if (vibrate) LOOP_VIBRATION else null
+        ringMs = ringSeconds * 1_000L
+        pauseMs = pauseSeconds * 1_000L
+        ring()
     }
 
     @Synchronized
     fun stopLoop() {
         if (!looping) return
         looping = false
+        resting = false
+        main.removeCallbacks(toRest)
+        main.removeCallbacks(toRing)
+        hush()
+        restoreVolume()
+    }
+
+    /** Out of the loop's pause at once — an order joined. Nothing while it rings, or is off. */
+    @Synchronized
+    fun ringNow() {
+        if (resting) ring()
+    }
+
+    /** One stretch of the loop: for good without a pause, or [ringMs] of it and then the pause. */
+    private fun ring() {
+        resting = false
+        main.removeCallbacks(toRing)
+        var length = ringMs
+        if (loopSound == AlarmSound.DEVICE) {
+            ringtone = deviceTone()?.apply {
+                isLooping = true
+                play()
+            }
+        }
+        // A device without an alarm tone still rings.
+        if (ringtone == null) {
+            val (tones, round) = pattern(if (loopSound == AlarmSound.DEVICE) AlarmSound.BEEPS else loopSound)
+            val samples = synthesise(tones, round, loop = true)
+            if (pauseMs > 0) {
+                val rounds = (ringMs / (round * 1_000)).roundToInt().coerceAtLeast(1)
+                track = play(samples, repeat = rounds - 1)
+                length = rounds * samples.size * 1_000L / RATE
+            } else {
+                track = play(samples, repeat = -1)
+            }
+        }
+        loopVibration?.let { vibrate(it, repeat = 0) }
+        if (pauseMs > 0) main.postDelayed(toRest, length)
+    }
+
+    @Synchronized
+    private fun rest() {
+        if (!looping) return
+        hush()
+        resting = true
+        main.postDelayed(toRing, pauseMs)
+    }
+
+    /** The loop's sound and vibration off; the loop itself may go on. */
+    private fun hush() {
         track?.release()
         track = null
         ringtone?.stop()
         ringtone = null
         vibrator.cancel()
-        restoreVolume()
     }
 
-    /** The sound once — a pre-order to start, a printer that stopped. Not while the loop rings. */
+    /** The sound once — a pre-order to start, a printer that stopped. Not while the loop is on. */
     @Synchronized
     fun chime(sound: AlarmSound, full: Boolean, vibrate: Boolean) {
         if (looping) return
         if (full) raiseVolume()
-        val once = play(if (sound == AlarmSound.DEVICE) AlarmSound.BELL else sound, loop = false) ?: return
+        val (tones, round) = pattern(if (sound == AlarmSound.DEVICE) AlarmSound.BELL else sound)
+        val once = play(synthesise(tones, round, loop = false), repeat = 0) ?: return
         if (vibrate) vibrate(CHIME_VIBRATION, repeat = -1)
         main.postDelayed(
             {
@@ -100,15 +161,17 @@ class AlarmPlayer(context: Context) {
 
     /**
      * Two minutes before an order is declined unanswered: a sound none of
-     * the alarm's own is, once — over the loop when it rings — and a harder
+     * the alarm's own is, once — over the loop when it rings, and the loop
+     * out of its pause, since this is the last chance — and a harder
      * vibration, kept up while the loop goes on.
      */
     @Synchronized
     fun escalate(full: Boolean, vibrate: Boolean) {
         if (full) raiseVolume()
         val (tones, round) = URGENT
-        val once = play(synthesise(tones, round, loop = false), loop = false)
-        if (vibrate) vibrate(URGENT_VIBRATION, repeat = if (looping) 0 else -1)
+        val once = play(synthesise(tones, round, loop = false), repeat = 0)
+        if (vibrate && looping) loopVibration = URGENT_VIBRATION
+        if (resting) ringNow() else if (vibrate) vibrate(URGENT_VIBRATION, repeat = if (looping) 0 else -1)
         main.postDelayed(
             {
                 synchronized(this) {
@@ -120,12 +183,8 @@ class AlarmPlayer(context: Context) {
         )
     }
 
-    private fun play(sound: AlarmSound, loop: Boolean): AudioTrack? {
-        val (tones, round) = pattern(sound)
-        return play(synthesise(tones, round, loop), loop)
-    }
-
-    private fun play(samples: ShortArray, loop: Boolean): AudioTrack? {
+    /** [samples] played, then [repeat] more times; -1: until released. */
+    private fun play(samples: ShortArray, repeat: Int): AudioTrack? {
         return try {
             AudioTrack.Builder()
                 .setAudioAttributes(ALARM)
@@ -141,7 +200,7 @@ class AlarmPlayer(context: Context) {
                 .build()
                 .apply {
                     write(samples, 0, samples.size)
-                    if (loop) setLoopPoints(0, samples.size, -1)
+                    if (repeat != 0) setLoopPoints(0, samples.size, repeat)
                     play()
                 }
         } catch (e: Exception) {
