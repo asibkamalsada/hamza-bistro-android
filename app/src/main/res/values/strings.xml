@@ -44,14 +44,14 @@
         <item quantity="one">+ %1$d more waiting</item>
         <item quantity="other">+ %1$d more waiting</item>
     </plurals>
-    <string name="alarm_silence">Silence</string>
+    <string name="alarm_silence">Silence on this device</string>
     <string name="alarm_open">Open</string>
     <string name="alarm_heading">New order</string>
     <string name="alarm_heading_preorder">New pre-order</string>
-    <string name="alarm_silence_until">Silence until %1$s</string>
+    <string name="alarm_silence_until">Silence on this device until %1$s</string>
     <string name="alarm_open_queue">To the queue</string>
     <string name="alarm_privacy">Name, phone and address are in the app, behind the lock screen.</string>
-    <string name="silenced_until">Alarm silenced until %1$s — whatever still waits then rings again.</string>
+    <string name="silenced_until">Alarm silenced on this device until %1$s — whatever still waits then rings again.</string>
 
     <string name="chime_cook_now">Pre-order #%1$d: start cooking</string>
     <string name="chime_cook_now_text">Due %1$s · %2$s</string>
