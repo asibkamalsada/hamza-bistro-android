@@ -308,9 +308,9 @@ decides, every few seconds and on every change of the queue:
   pre-order still waiting in the hour before its time, the same windows as
   the server's reminders. Accepted or declined anywhere, it stops
   everywhere, because it leaves the queue every device reads.
-- **"Stumm"** silences what is ringing for a minute (settable); an order
-  still waiting after that rings again, and one that arrives meanwhile rings
-  at once.
+- **"Stumm auf diesem Gerät"** silences what is ringing on this device
+  only, for a minute (settable); an order still waiting after that rings
+  again, and one that arrives meanwhile rings at once.
 - **Per device**: ring in a loop, say so once like a message, or nothing;
   the sound (beeps, bell, siren — the site's three, synthesised — or the
   device's own alarm tone); full volume while ringing; vibration; a night
