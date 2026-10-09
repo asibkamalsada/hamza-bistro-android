@@ -47,6 +47,13 @@ data class DevicePrefs(
     /** Turns the alarm volume all the way up while it rings, and back after. */
     val fullVolume: Boolean = true,
     val vibrate: Boolean = true,
+    /**
+     * Seconds of quiet between rings of the loop, to answer the order in
+     * without the noise; 0: it rings without a break.
+     */
+    val pauseSeconds: Int = 25,
+    /** Seconds the loop rings before each of its pauses. */
+    val ringSeconds: Int = 5,
     /** The minutes offered as buttons when accepting, besides the estimate. */
     val etaLadder: List<Int> = Eta.LADDER,
     /** Seconds between tapping a step and sending it, during which it can be taken back. */
@@ -141,6 +148,8 @@ class StationSettings(context: Context) {
             sound = enumOr(prefs.getString(SOUND, null), d.sound)!!,
             fullVolume = prefs.getBoolean(FULL_VOLUME, d.fullVolume),
             vibrate = prefs.getBoolean(VIBRATE, d.vibrate),
+            pauseSeconds = prefs.getInt(PAUSE, d.pauseSeconds).takeIf { it in PAUSE_CHOICES } ?: d.pauseSeconds,
+            ringSeconds = prefs.getInt(RING, d.ringSeconds).takeIf { it in RING_CHOICES } ?: d.ringSeconds,
             etaLadder =
                 prefs.getString(ETA_LADDER, null)
                     ?.split(',')
@@ -176,6 +185,8 @@ class StationSettings(context: Context) {
             .putString(SOUND, p.sound.name)
             .putBoolean(FULL_VOLUME, p.fullVolume)
             .putBoolean(VIBRATE, p.vibrate)
+            .putInt(PAUSE, p.pauseSeconds)
+            .putInt(RING, p.ringSeconds)
             .putString(ETA_LADDER, p.etaLadder.joinToString(","))
             .putInt(UNDO, p.undoSeconds)
             .putString(NAV_APP, p.navApp.name)
@@ -197,6 +208,8 @@ class StationSettings(context: Context) {
 
     companion object {
         val SILENCE_CHOICES = listOf(30, 60, 120)
+        val PAUSE_CHOICES = listOf(0, 10, 25, 60)
+        val RING_CHOICES = listOf(3, 5, 10, 20)
         val UNDO_CHOICES = listOf(0, 5, 10)
 
         private const val STATION_ID = "station_id"
@@ -221,6 +234,8 @@ class StationSettings(context: Context) {
         private const val SOUND = "sound"
         private const val FULL_VOLUME = "full_volume"
         private const val VIBRATE = "vibrate"
+        private const val PAUSE = "alarm_pause_seconds"
+        private const val RING = "alarm_ring_seconds"
         private const val ETA_LADDER = "eta_ladder"
         private const val UNDO = "undo_seconds"
         private const val NAV_APP = "nav_app"

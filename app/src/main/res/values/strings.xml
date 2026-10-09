@@ -241,6 +241,10 @@
     <string name="alarm_test">Listen</string>
     <string name="alarm_full_volume">Full volume while it rings (and back afterwards)</string>
     <string name="alarm_vibrate">Vibrate</string>
+    <string name="alarm_pause">Pause between rings</string>
+    <string name="alarm_pause_none">None</string>
+    <string name="alarm_ring_for">Rings for, each time</string>
+    <string name="alarm_pause_hint">Time to answer without it ringing in your ears: it rings, goes quiet, rings again — until somebody answers. A new order rings at once.</string>
     <string name="alarm_silence_for">\"Silence\" lasts</string>
     <string name="alarm_quiet">Night window</string>
     <string name="alarm_quiet_hint">In the night window nothing rings; an order arrives as a silent notification — a pre-order placed at one in the morning, say. A pre-order still waiting then rings in the hour before its time.</string>

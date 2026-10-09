@@ -313,9 +313,11 @@ decides, every few seconds and on every change of the queue:
   at once.
 - **Per device**: ring in a loop, say so once like a message, or nothing;
   the sound (beeps, bell, siren — the site's three, synthesised — or the
-  device's own alarm tone); full volume while ringing; vibration; a night
-  window (22:00–09:00 to start with) in which an order is a silent
-  notification instead.
+  device's own alarm tone); full volume while ringing; vibration; a pause
+  between rings (5 s ringing, 25 s quiet to start with, or none), to answer
+  in without the noise, which a new order or the escalation below cuts
+  short; a night window (22:00–09:00 to start with) in which an order is a
+  silent notification instead.
 - **The tablet's chimes**, once each: an accepted pre-order that has to go
   on now; this device's printer not printing a ticket (after half a
   minute, again every three while it lasts — the server's push about it

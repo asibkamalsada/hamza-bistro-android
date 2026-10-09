@@ -241,6 +241,10 @@
     <string name="alarm_test">Probehören</string>
     <string name="alarm_full_volume">Beim Klingeln volle Lautstärke (danach zurück)</string>
     <string name="alarm_vibrate">Vibrieren</string>
+    <string name="alarm_pause">Pause zwischen dem Klingeln</string>
+    <string name="alarm_pause_none">Keine</string>
+    <string name="alarm_ring_for">Klingelt jeweils</string>
+    <string name="alarm_pause_hint">Zeit zum Annehmen, ohne dass es einem in den Ohren klingelt: es klingelt, ist still, klingelt wieder – bis jemand antwortet. Eine neue Bestellung klingelt sofort.</string>
     <string name="alarm_silence_for">„Stumm“ hält</string>
     <string name="alarm_quiet">Nachtruhe</string>
     <string name="alarm_quiet_hint">In der Nachtruhe klingelt nichts; eine Bestellung kommt als stille Benachrichtigung an – etwa eine Vorbestellung um ein Uhr nachts. Eine Vorbestellung, die dann noch wartet, klingelt in der Stunde vor ihrer Zeit.</string>

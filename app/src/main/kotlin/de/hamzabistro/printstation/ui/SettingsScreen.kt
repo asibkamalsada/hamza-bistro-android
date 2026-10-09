@@ -145,6 +145,18 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                 OutlinedButton(onClick = staff::testSound) { Text(stringResource(R.string.alarm_test)) }
                 SwitchRow(stringResource(R.string.alarm_full_volume), prefs.fullVolume) { on -> staff.updatePrefs { it.copy(fullVolume = on) } }
                 SwitchRow(stringResource(R.string.alarm_vibrate), prefs.vibrate) { on -> staff.updatePrefs { it.copy(vibrate = on) } }
+                Text(stringResource(R.string.alarm_pause), style = MaterialTheme.typography.labelLarge)
+                Chips(StationSettings.PAUSE_CHOICES, prefs.pauseSeconds, { pauseName(context, it) }) { seconds ->
+                    staff.updatePrefs { it.copy(pauseSeconds = seconds) }
+                }
+                // How long each ring is only matters between pauses.
+                if (prefs.pauseSeconds > 0) {
+                    Text(stringResource(R.string.alarm_ring_for), style = MaterialTheme.typography.labelLarge)
+                    Chips(StationSettings.RING_CHOICES, prefs.ringSeconds, { secondsName(context, it) }) { seconds ->
+                        staff.updatePrefs { it.copy(ringSeconds = seconds) }
+                    }
+                }
+                Text(stringResource(R.string.alarm_pause_hint), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.alarm_silence_for), style = MaterialTheme.typography.labelLarge)
                 Chips(StationSettings.SILENCE_CHOICES, prefs.alarm.silenceSeconds, { secondsName(context, it) }) { seconds ->
                     staff.updatePrefs { it.copy(alarm = it.alarm.copy(silenceSeconds = seconds)) }
@@ -293,6 +305,9 @@ private fun soundName(context: Context, sound: AlarmSound) =
 
 private fun secondsName(context: Context, seconds: Int) =
     if (seconds % 60 == 0) context.getString(R.string.minutes_n, seconds / 60) else context.getString(R.string.seconds_n, seconds)
+
+private fun pauseName(context: Context, seconds: Int) =
+    if (seconds == 0) context.getString(R.string.alarm_pause_none) else secondsName(context, seconds)
 
 private fun undoName(context: Context, seconds: Int) =
     if (seconds == 0) context.getString(R.string.undo_none) else context.getString(R.string.seconds_n, seconds)
