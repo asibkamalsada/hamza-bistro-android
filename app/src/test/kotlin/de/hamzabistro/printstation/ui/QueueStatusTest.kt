@@ -136,7 +136,7 @@ class QueueStatusTest {
             text in
                 listOf(
                     "The alarm is limited — missing: Notifications",
-                    "Alarm silenced until 18:15",
+                    "Alarm silenced on this device until 18:15",
                     "not (or no longer) on the staff list",
                     "address check is not working",
                     "No connection to the shop since 18:00",
