@@ -316,8 +316,11 @@ decides, every few seconds and on every change of the queue:
   device's own alarm tone); full volume while ringing; vibration; a pause
   between rings (5 s ringing, 25 s quiet to start with, or none), to answer
   in without the noise, which a new order or the escalation below cuts
-  short; a night window (22:00–09:00 to start with) in which an order is a
-  silent notification instead.
+  short — **loud at the beginning**: a new order first rings without a
+  break (30 s to start with; 15 s, 1 min or not at all), to be heard over
+  the kitchen, and only then falls into ringing and pausing, and another
+  new order starts that over; a night window (22:00–09:00 to start with)
+  in which an order is a silent notification instead.
 - **The tablet's chimes**, once each: an accepted pre-order that has to go
   on now; this device's printer not printing a ticket (after half a
   minute, again every three while it lasts — the server's push about it
@@ -519,17 +522,27 @@ In hamza-bistro-web:
    open it and allow installing from that source when Android asks. A newer
    release installs the same way, over the old one — and over the old
    **Druckstation**, keeping its sign-in, printer and printing.
-2. Open **Hamza Team** and sign in (wait for the captcha's tick first).
-3. **Schicht beginnen**, and allow notifications.
-4. Under **Einstellungen → Damit es klingelt**, fix whatever is listed:
-   notifications, "Vollbild über dem Sperrbildschirm" (Android 14 and
-   later), and **Hintergrundbetrieb erlauben**. On Samsung and Xiaomi also
+2. Open **Hamza Team**. The first screen, **Gerät einrichten**, asks for
+   everything at once, one after the other: notifications and "Geräte in
+   der Nähe" (the printer's Bluetooth) in Android's own dialog, then
+   **Hintergrundbetrieb**, then "Vollbild über dem Sperrbildschirm"
+   (Android 14 and later, a settings page: switch it on and go back). Allow
+   everything; once it is, the app goes on by itself. **Trotzdem weiter**
+   skips what is still missing — it comes back at the next start for as
+   long as the alarm lacks something (Bluetooth alone, on a driver's phone
+   without a printer, does not bring it back), and the same can be fixed
+   under **Einstellungen → Damit es klingelt**. On Samsung and Xiaomi also
    follow [dontkillmyapp.com](https://dontkillmyapp.com) for the model
    (Samsung: _Settings → Battery → Background usage limits → Never
    sleeping apps_, add Hamza Team; Xiaomi: _Autostart_ on and _Battery
    saver → No restrictions_), or those makers stop the app anyway.
-5. Give the device a name ("Tablet", "Fahrer 1"), choose how it rings, and
-   press **Probehören**.
+3. Sign in (wait for the captcha's tick first). A staff account starts the
+   shift with it: the device rings from then on, with nothing to switch.
+4. The alarm starts loud — "Laut klingeln", at full volume, without a
+   break for the first 30 seconds of each new order — so a reinstalled
+   tablet needs nothing changed to be heard.
+5. Give the device a name ("Tablet", "Fahrer 1"), choose how it rings if
+   it should ring otherwise, and press **Probehören**.
 6. Check under **Einstellungen → Wer von Bestellungen erfährt** (on this
    device or another): the device is there, "im Dienst seit …".
 7. On a phone that had the installed `/orders` with pushes on, switch the
@@ -577,7 +590,7 @@ for a print account nothing changes on screen.
 
 To make the shop's tablet the place orders are accepted: **Abmelden** (which
 switches printing off and takes the station off the website's list),
-sign in with the tablet's staff account, **Schicht beginnen**, and under
+sign in with the tablet's staff account (which starts the shift), and under
 **Einstellungen → Bondrucker** switch **Jede angenommene Bestellung
 drucken** on again — the printer stays chosen. The print account is then
 no longer needed; delete its row in `print_accounts` (or the account).

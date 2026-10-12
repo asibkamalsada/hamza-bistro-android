@@ -54,6 +54,12 @@ data class DevicePrefs(
     val pauseSeconds: Int = 25,
     /** Seconds the loop rings before each of its pauses. */
     val ringSeconds: Int = 5,
+    /**
+     * Seconds a new order rings without a break before the pauses start:
+     * loud at the beginning, to be heard over the kitchen; 0: it pauses
+     * after its first [ringSeconds].
+     */
+    val loudSeconds: Int = 30,
     /** The minutes offered as buttons when accepting, besides the estimate. */
     val etaLadder: List<Int> = Eta.LADDER,
     /** Seconds between tapping a step and sending it, during which it can be taken back. */
@@ -104,6 +110,16 @@ class StationSettings(context: Context) {
         get() = prefs.getBoolean(BAG_SLIP, false)
         set(value) = prefs.edit().putBoolean(BAG_SLIP, value).apply()
 
+    /**
+     * Whether the start-up screen has asked for everything the alarm and
+     * the printer need, on this install. After that it comes back only for
+     * what the alarm cannot do without. The device's, kept through a
+     * sign-out; gone with the app, so a reinstall asks again.
+     */
+    var permissionsAsked: Boolean
+        get() = prefs.getBoolean(PERMISSIONS_ASKED, false)
+        set(value) = prefs.edit().putBoolean(PERMISSIONS_ASKED, value).apply()
+
     val printer: ChosenPrinter?
         get() =
             prefs.getString(PRINTER_ADDRESS, null)?.let {
@@ -150,6 +166,7 @@ class StationSettings(context: Context) {
             vibrate = prefs.getBoolean(VIBRATE, d.vibrate),
             pauseSeconds = prefs.getInt(PAUSE, d.pauseSeconds).takeIf { it in PAUSE_CHOICES } ?: d.pauseSeconds,
             ringSeconds = prefs.getInt(RING, d.ringSeconds).takeIf { it in RING_CHOICES } ?: d.ringSeconds,
+            loudSeconds = prefs.getInt(LOUD, d.loudSeconds).takeIf { it in LOUD_CHOICES } ?: d.loudSeconds,
             etaLadder =
                 prefs.getString(ETA_LADDER, null)
                     ?.split(',')
@@ -187,6 +204,7 @@ class StationSettings(context: Context) {
             .putBoolean(VIBRATE, p.vibrate)
             .putInt(PAUSE, p.pauseSeconds)
             .putInt(RING, p.ringSeconds)
+            .putInt(LOUD, p.loudSeconds)
             .putString(ETA_LADDER, p.etaLadder.joinToString(","))
             .putInt(UNDO, p.undoSeconds)
             .putString(NAV_APP, p.navApp.name)
@@ -210,11 +228,13 @@ class StationSettings(context: Context) {
         val SILENCE_CHOICES = listOf(30, 60, 120)
         val PAUSE_CHOICES = listOf(0, 10, 25, 60)
         val RING_CHOICES = listOf(3, 5, 10, 20)
+        val LOUD_CHOICES = listOf(0, 15, 30, 60)
         val UNDO_CHOICES = listOf(0, 5, 10)
 
         private const val STATION_ID = "station_id"
         private const val ENABLED = "enabled"
         private const val BAG_SLIP = "bag_slip"
+        private const val PERMISSIONS_ASKED = "permissions_asked"
         private const val PRINTER_ADDRESS = "printer_address"
         private const val PRINTER_NAME = "printer_name"
         private const val ROLE = "role"
@@ -236,6 +256,7 @@ class StationSettings(context: Context) {
         private const val VIBRATE = "vibrate"
         private const val PAUSE = "alarm_pause_seconds"
         private const val RING = "alarm_ring_seconds"
+        private const val LOUD = "alarm_loud_seconds"
         private const val ETA_LADDER = "eta_ladder"
         private const val UNDO = "undo_seconds"
         private const val NAV_APP = "nav_app"

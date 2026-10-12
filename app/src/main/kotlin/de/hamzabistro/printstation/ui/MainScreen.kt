@@ -1,13 +1,9 @@
 package de.hamzabistro.printstation.ui
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -254,16 +250,9 @@ fun BackgroundSection(state: UiState) {
     }
 }
 
-/**
- * Android's own dialog that takes the app out of battery optimisation — what
- * dontkillmyapp.com asks for on every make of phone. An app on Google Play
- * may not ask this way; one installed from an APK for a single job may.
- */
-@SuppressLint("BatteryLife")
+/** Android's own dialog that takes the app out of battery optimisation ([batteryDialog]). */
 fun Context.askToIgnoreBatteryOptimisation() {
-    startActivity(
-        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
-    )
+    startActivity(batteryDialog(this))
 }
 
 private fun Context.granted(permission: String) =

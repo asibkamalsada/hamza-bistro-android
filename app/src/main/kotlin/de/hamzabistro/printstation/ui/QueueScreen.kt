@@ -1,14 +1,12 @@
 package de.hamzabistro.printstation.ui
 
 import android.Manifest
-import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.PowerManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +62,7 @@ import de.hamzabistro.printstation.core.QueueGroup
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.queue.StepFailure
+import de.hamzabistro.printstation.station.Role
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.delay
@@ -340,18 +339,16 @@ private fun LazyListScope.cards(orders: List<StaffOrder>, state: StaffState, act
 }
 
 /** The permissions an alarm needs that this device has not given, as names to show. */
-fun missingForAlarm(context: Context): List<Int> {
-    val missing = mutableListOf<Int>()
-    val notifications = context.getSystemService(NotificationManager::class.java)
-    if (!notifications.areNotificationsEnabled()) missing += R.string.need_notifications
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !notifications.canUseFullScreenIntent()) {
-        missing += R.string.need_full_screen
+fun missingForAlarm(context: Context): List<Int> =
+    Setup.missing(context, Role.STAFF).mapNotNull {
+        when (it) {
+            Need.NOTIFICATIONS -> R.string.need_notifications
+            Need.FULL_SCREEN -> R.string.need_full_screen
+            Need.BACKGROUND -> R.string.need_background
+            // The printer's, not the alarm's.
+            Need.NEARBY -> null
+        }
     }
-    if (!context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)) {
-        missing += R.string.need_background
-    }
-    return missing
-}
 
 fun needsNotificationPermission(context: Context): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
