@@ -3,6 +3,7 @@ package de.hamzabistro.printstation.ui
 import android.content.Context
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.Ride
 import de.hamzabistro.printstation.core.StaffOrder
 import java.text.NumberFormat
 import java.time.Instant
@@ -31,6 +32,17 @@ object Format {
     /** "23,40 €" — in German whatever the device's language, as on the ticket. */
     fun euro(amount: Double): String =
         NumberFormat.getCurrencyInstance(Locale.GERMANY).apply { currency = Currency.getInstance("EUR") }.format(amount)
+
+    /**
+     * "🚲 2,8 km · 11 Min. Fahrt" under the address: how far the door is, for
+     * whoever accepts the order to add the kitchen to. "ca." and
+     * "geschätzt" when no router worked it out.
+     */
+    fun ride(context: Context, ride: Ride): String {
+        val km = ride.km ?: return context.getString(R.string.ride_minutes_only, ride.minutes)
+        val distance = String.format(context.resources.configuration.locales[0], "%.1f", km)
+        return context.getString(if (ride.estimated) R.string.ride_estimated else R.string.ride_routed, distance, ride.minutes)
+    }
 
     /** "2× Döner, 1× Cola", for a notification. */
     fun dishes(order: StaffOrder): String = order.items.joinToString(", ") { "${it.qty}× ${it.name}" }

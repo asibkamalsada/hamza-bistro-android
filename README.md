@@ -86,6 +86,10 @@ rules, ported to Kotlin with the site's own test cases
   customer's email says it;
 - "fällig 18:32 · noch 12 Min.", red once late; "kochen ab 18:05" on a
   pre-order;
+- "🚲 2,8 km · 11 Min. Fahrt" under a delivery's address, so whoever accepts
+  only adds the kitchen: routed by the shop's own Valhalla, or "ca. …
+  (geschätzt)" from the straight line and the ring when it was not
+  ([`20261012100000_order_route.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261012100000_order_route.sql));
 - every step waits out the undo window (5 s by default) and only lands if
   the order is still where this device saw it;
 - **+10 Min.** and **+20 Min.** on every accepted card, for a kitchen or a

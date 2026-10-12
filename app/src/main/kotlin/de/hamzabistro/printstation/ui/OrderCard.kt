@@ -504,6 +504,8 @@ private fun Contact(order: StaffOrder, actions: OrderActions) {
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable { actions.route(order) },
             )
+            // How far: whoever accepts adds the kitchen to it.
+            order.ride?.let { Text(Format.ride(LocalContext.current, it), style = MaterialTheme.typography.bodyMedium) }
             StaffQueue.doorNote(order)?.let { Note(stringResource(R.string.door_note), it, MaterialTheme.colorScheme.surfaceVariant) }
             if (order.unverifiedAddress) {
                 Text(stringResource(R.string.unverified_address), color = toneColor(Tone.SOON), fontWeight = FontWeight.SemiBold)
