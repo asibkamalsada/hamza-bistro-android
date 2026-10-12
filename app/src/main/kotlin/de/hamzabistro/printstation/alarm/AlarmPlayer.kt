@@ -51,9 +51,6 @@ class AlarmPlayer(context: Context) {
     private var ringMs = 0L
     private var pauseMs = 0L
 
-    /** How long the loop rings before its first pause, and again when an order joins. */
-    private var loudMs = 0L
-
     /** In the loop's pause: quiet, with [toRing] on its way. */
     private var resting = false
     private val toRest = Runnable { rest() }
@@ -65,32 +62,21 @@ class AlarmPlayer(context: Context) {
         private set
 
     /**
-     * Starts the loop, or leaves it running when it already is; true when it
-     * started now. With [pauseSeconds], it rings for about [ringSeconds] —
-     * whole rounds of the sound, so it does not stop mid-beep — then is
-     * quiet for [pauseSeconds], and so on: time to answer the order without
-     * it in your ears. Loud at the beginning: the first stretch rings for
-     * [loudSeconds] when that is longer, to be heard over the kitchen.
+     * Starts the loop, or leaves it running when it already is. With
+     * [pauseSeconds], it rings for about [ringSeconds] — whole rounds of the
+     * sound, so it does not stop mid-beep — then is quiet for [pauseSeconds],
+     * and so on: time to answer the order without it in your ears.
      */
     @Synchronized
-    fun startLoop(
-        sound: AlarmSound,
-        full: Boolean,
-        vibrate: Boolean,
-        ringSeconds: Int = 0,
-        pauseSeconds: Int = 0,
-        loudSeconds: Int = 0,
-    ): Boolean {
-        if (looping) return false
+    fun startLoop(sound: AlarmSound, full: Boolean, vibrate: Boolean, ringSeconds: Int = 0, pauseSeconds: Int = 0) {
+        if (looping) return
         looping = true
         if (full) raiseVolume()
         loopSound = sound
         loopVibration = if (vibrate) LOOP_VIBRATION else null
         ringMs = ringSeconds * 1_000L
         pauseMs = pauseSeconds * 1_000L
-        loudMs = maxOf(loudSeconds * 1_000L, ringMs)
-        ring(loudMs)
-        return true
+        ring()
     }
 
     @Synchronized
@@ -104,30 +90,17 @@ class AlarmPlayer(context: Context) {
         restoreVolume()
     }
 
-    /** Out of the loop's pause at once, for one stretch. Nothing while it rings, or is off. */
+    /** Out of the loop's pause at once — an order joined. Nothing while it rings, or is off. */
     @Synchronized
-    private fun ringNow() {
-        if (resting) ring(ringMs)
+    fun ringNow() {
+        if (resting) ring()
     }
 
-    /**
-     * An order joined the ones ringing: loud from the beginning again — out
-     * of the pause, or the stretch it is in started over, as long as the
-     * loop's first. Nothing without a pause: then it never stops anyway.
-     */
-    @Synchronized
-    fun joined() {
-        if (!looping || pauseMs == 0L) return
-        main.removeCallbacks(toRest)
-        hush()
-        ring(loudMs)
-    }
-
-    /** One stretch of the loop: for good without a pause, or about [stretch] ms of it and then the pause. */
-    private fun ring(stretch: Long) {
+    /** One stretch of the loop: for good without a pause, or [ringMs] of it and then the pause. */
+    private fun ring() {
         resting = false
         main.removeCallbacks(toRing)
-        var length = stretch
+        var length = ringMs
         if (loopSound == AlarmSound.DEVICE) {
             ringtone = deviceTone()?.apply {
                 isLooping = true
@@ -139,7 +112,7 @@ class AlarmPlayer(context: Context) {
             val (tones, round) = pattern(if (loopSound == AlarmSound.DEVICE) AlarmSound.BEEPS else loopSound)
             val samples = synthesise(tones, round, loop = true)
             if (pauseMs > 0) {
-                val rounds = (stretch / (round * 1_000)).roundToInt().coerceAtLeast(1)
+                val rounds = (ringMs / (round * 1_000)).roundToInt().coerceAtLeast(1)
                 track = play(samples, repeat = rounds - 1)
                 length = rounds * samples.size * 1_000L / RATE
             } else {

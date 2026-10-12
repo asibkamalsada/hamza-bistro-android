@@ -121,15 +121,13 @@ class AlarmController(private val context: Context, private val graph: AppGraph)
 
         val ringing = decision.ringing.map { it.id }.toSet()
         if (ringing.isNotEmpty()) {
-            val started =
-                graph.alarmPlayer.startLoop(prefs.sound, prefs.fullVolume, prefs.vibrate, prefs.ringSeconds, prefs.pauseSeconds, prefs.loudSeconds)
+            graph.alarmPlayer.startLoop(prefs.sound, prefs.fullVolume, prefs.vibrate, prefs.ringSeconds, prefs.pauseSeconds)
             // Up again, over whatever is on the screen, when an order joined
-            // — and ringing at once, loud from the beginning again, not after
-            // the loop's pause.
+            // — and ringing at once, not after the loop's pause.
             if (ringing != shown) {
                 val joined = !shown.containsAll(ringing)
                 StationNotifications.alarm(context, decision.ringing, alert = joined)
-                if (joined && !started) graph.alarmPlayer.joined()
+                if (joined) graph.alarmPlayer.ringNow()
             }
         } else {
             graph.alarmPlayer.stopLoop()
