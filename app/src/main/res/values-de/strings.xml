@@ -167,6 +167,9 @@
     <string name="new_customer">Neuer Kunde — kurz anrufen</string>
     <string name="door_note">An der Tür</string>
     <string name="unverified_address">Adresse nicht geprüft – beim Anruf bestätigen</string>
+    <string name="ride_routed">🚲 %1$s km · %2$d Min. Fahrt</string>
+    <string name="ride_estimated">🚲 ca. %1$s km · ca. %2$d Min. Fahrt (geschätzt)</string>
+    <string name="ride_minutes_only">🚲 ca. %1$d Min. Fahrt (geschätzt)</string>
     <string name="cancel_reason_shown">Grund: %1$s</string>
     <string name="ticket_printed">Bon gedruckt %1$s</string>
     <string name="ticket_not_printed">Bon noch nicht gedruckt</string>

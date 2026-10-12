@@ -167,6 +167,9 @@
     <string name="new_customer">New customer — worth a quick call</string>
     <string name="door_note">At the door</string>
     <string name="unverified_address">Address not verified — confirm it on the call</string>
+    <string name="ride_routed">🚲 %1$s km · %2$d min ride</string>
+    <string name="ride_estimated">🚲 about %1$s km · about %2$d min ride (estimated)</string>
+    <string name="ride_minutes_only">🚲 about %1$d min ride (estimated)</string>
     <string name="cancel_reason_shown">Reason: %1$s</string>
     <string name="ticket_printed">Ticket printed %1$s</string>
     <string name="ticket_not_printed">Ticket not printed yet</string>

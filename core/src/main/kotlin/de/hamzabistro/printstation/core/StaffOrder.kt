@@ -236,6 +236,16 @@ data class StaffOrder(
      */
     val lat: Double? = null,
     val lon: Double? = null,
+    /**
+     * How far the door is (20261012100000_order_route.sql in
+     * hamza-bistro-web): road km, riding minutes, and "routed" when the
+     * shop's own router worked them out or "estimated" from the straight
+     * line and the ring. Null on a pickup, an order from before the columns,
+     * and on a database without them. Read it as [ride].
+     */
+    @SerialName("route_km") val routeKm: Double? = null,
+    @SerialName("ride_minutes") val rideMinutes: Int? = null,
+    @SerialName("route_source") val routeSource: String? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -263,6 +273,15 @@ data class StaffOrder(
     /** Where the stop is, or null when the order has no coordinate. */
     val point: GeoPoint?
         get() = if (lat != null && lon != null) GeoPoint(lat, lon) else null
+
+    /** The ride to the door, or null for a pickup or an order without one — rideOf() of the site's route.ts. */
+    val ride: Ride?
+        get() =
+            if (pickup || routeSource == null || rideMinutes == null) {
+                null
+            } else {
+                Ride(routeKm, rideMinutes, estimated = routeSource != Ride.ROUTED)
+            }
 
     /** Ordered from an address the map could not place: the price came from the postcode. */
     val unverifiedAddress: Boolean
@@ -303,6 +322,13 @@ data class StaffOrder(
          * them reads [SOURCE_COLUMNS].
          */
         const val POINT_COLUMNS = "$SOURCE_COLUMNS,lat,lon"
+
+        /**
+         * [POINT_COLUMNS] and how far each door is
+         * (20261012100000_order_route.sql): what the open queue reads first.
+         * A database without them reads [POINT_COLUMNS].
+         */
+        const val ROUTE_COLUMNS = "$POINT_COLUMNS,route_km,ride_minutes,route_source"
 
         /** What "Letzte Bestellungen" reads first; [COLUMNS] on a database without [SOURCE_FIELDS]. */
         const val HISTORY_COLUMNS = "$COLUMNS,$SOURCE_FIELDS"
