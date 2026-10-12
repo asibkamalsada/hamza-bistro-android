@@ -48,7 +48,10 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     val state by main.state.collectAsStateWithLifecycle()
+                    val setup by main.setup.collectAsStateWithLifecycle()
                     when {
+                        // After an install, before the sign-in: everything the alarm and the printer need.
+                        setup -> SetupScreen(state.role, onDone = main::setupDone)
                         state.account == null || state.role == Role.PRINTER -> MainScreen(main)
                         state.role == Role.STAFF -> StaffApp(staff, main, focus, onFocused = { focus.value = null })
                         // Finding out what this account is.

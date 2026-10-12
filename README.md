@@ -519,20 +519,27 @@ In hamza-bistro-web:
    open it and allow installing from that source when Android asks. A newer
    release installs the same way, over the old one — and over the old
    **Druckstation**, keeping its sign-in, printer and printing.
-2. Open **Hamza Team** and sign in (wait for the captcha's tick first).
-3. **Schicht beginnen**, and allow notifications.
-4. Under **Einstellungen → Damit es klingelt**, fix whatever is listed:
-   notifications, "Vollbild über dem Sperrbildschirm" (Android 14 and
-   later), and **Hintergrundbetrieb erlauben**. On Samsung and Xiaomi also
+2. Open **Hamza Team**. The first screen, **Gerät einrichten**, asks for
+   everything at once, one after the other: notifications and "Geräte in
+   der Nähe" (the printer's Bluetooth) in Android's own dialog, then
+   **Hintergrundbetrieb**, then "Vollbild über dem Sperrbildschirm"
+   (Android 14 and later, a settings page: switch it on and go back). Allow
+   everything; once it is, the app goes on by itself. **Trotzdem weiter**
+   skips what is still missing — it comes back at the next start for as
+   long as the alarm lacks something (Bluetooth alone, on a driver's phone
+   without a printer, does not bring it back), and the same can be fixed
+   under **Einstellungen → Damit es klingelt**. On Samsung and Xiaomi also
    follow [dontkillmyapp.com](https://dontkillmyapp.com) for the model
    (Samsung: _Settings → Battery → Background usage limits → Never
    sleeping apps_, add Hamza Team; Xiaomi: _Autostart_ on and _Battery
    saver → No restrictions_), or those makers stop the app anyway.
-5. Give the device a name ("Tablet", "Fahrer 1"), choose how it rings, and
+3. Sign in (wait for the captcha's tick first). A staff account starts the
+   shift with it: the device rings from then on, with nothing to switch.
+4. Give the device a name ("Tablet", "Fahrer 1"), choose how it rings, and
    press **Probehören**.
-6. Check under **Einstellungen → Wer von Bestellungen erfährt** (on this
+5. Check under **Einstellungen → Wer von Bestellungen erfährt** (on this
    device or another): the device is there, "im Dienst seit …".
-7. On a phone that had the installed `/orders` with pushes on, switch the
+6. On a phone that had the installed `/orders` with pushes on, switch the
    pushes off there ("Dieses Gerät" on `/orders/settings`), or it hears
    about every order twice.
 
@@ -577,7 +584,7 @@ for a print account nothing changes on screen.
 
 To make the shop's tablet the place orders are accepted: **Abmelden** (which
 switches printing off and takes the station off the website's list),
-sign in with the tablet's staff account, **Schicht beginnen**, and under
+sign in with the tablet's staff account (which starts the shift), and under
 **Einstellungen → Bondrucker** switch **Jede angenommene Bestellung
 drucken** on again — the printer stays chosen. The print account is then
 no longer needed; delete its row in `print_accounts` (or the account).

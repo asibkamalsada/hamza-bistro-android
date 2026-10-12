@@ -104,6 +104,16 @@ class StationSettings(context: Context) {
         get() = prefs.getBoolean(BAG_SLIP, false)
         set(value) = prefs.edit().putBoolean(BAG_SLIP, value).apply()
 
+    /**
+     * Whether the start-up screen has asked for everything the alarm and
+     * the printer need, on this install. After that it comes back only for
+     * what the alarm cannot do without. The device's, kept through a
+     * sign-out; gone with the app, so a reinstall asks again.
+     */
+    var permissionsAsked: Boolean
+        get() = prefs.getBoolean(PERMISSIONS_ASKED, false)
+        set(value) = prefs.edit().putBoolean(PERMISSIONS_ASKED, value).apply()
+
     val printer: ChosenPrinter?
         get() =
             prefs.getString(PRINTER_ADDRESS, null)?.let {
@@ -215,6 +225,7 @@ class StationSettings(context: Context) {
         private const val STATION_ID = "station_id"
         private const val ENABLED = "enabled"
         private const val BAG_SLIP = "bag_slip"
+        private const val PERMISSIONS_ASKED = "permissions_asked"
         private const val PRINTER_ADDRESS = "printer_address"
         private const val PRINTER_NAME = "printer_name"
         private const val ROLE = "role"

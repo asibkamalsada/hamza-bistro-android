@@ -75,6 +75,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    private val _setup = MutableStateFlow(Setup.due(application, graph.settings))
+
+    /** The start-up screen that asks for the permissions comes first: decided once, as the app opens. */
+    val setup: StateFlow<Boolean> = _setup.asStateFlow()
+
+    /** Everything allowed, or "Trotzdem weiter": on to the app, and asked again only for what the alarm needs. */
+    fun setupDone() {
+        graph.settings.permissionsAsked = true
+        _setup.value = false
+    }
+
     val captchaSiteKey: String = BuildConfig.TURNSTILE_SITE_KEY
     val captchaOrigin: String = BuildConfig.TURNSTILE_ORIGIN
 
@@ -134,7 +145,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             graph.sessions.signIn(email, password, captchaToken)
             when {
                 graph.staff.isStaff() -> {
-                    graph.settings.update { it.copy(role = Role.STAFF) }
+                    // Signed in to work: the shift starts with it, so a tablet
+                    // set up again rings without anybody looking for a switch.
+                    graph.settings.update { it.copy(role = Role.STAFF, onShift = true) }
+                    ShiftService.update(app)
                     info(R.string.signed_in_staff)
                 }
                 graph.backend.canPrint() -> {

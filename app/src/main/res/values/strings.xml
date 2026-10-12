@@ -80,7 +80,7 @@
     <string name="sign_in">Sign in</string>
     <string name="sign_out">Sign out</string>
     <string name="signed_in">Signed in.</string>
-    <string name="signed_in_staff">Signed in. \"Start shift\" to have this device ring for new orders.</string>
+    <string name="signed_in_staff">Signed in. The shift has started: this device rings for new orders.</string>
     <string name="signed_out">Signed out. Nothing rings or prints on this device any more.</string>
     <string name="signed_in_as">Signed in as %1$s</string>
     <string name="sign_in_wrong">Wrong email or password.</string>
@@ -265,6 +265,22 @@
     <string name="fix_notifications">Allow notifications</string>
     <string name="fix_full_screen">Allow full screen</string>
     <string name="ringing_dnd_hint">The alarm uses the alarm stream: it rings on silent and through Do Not Disturb, as long as alarms are allowed there (the default).</string>
+
+    <!-- The start-up screen after an install (Setup.kt). -->
+    <string name="setup_title">Set up this device</string>
+    <string name="setup_intro">So that this device rings for every new order — locked, on silent, with the screen off — and prints, Android has to allow a few things. They are asked for one after the other: please allow everything.</string>
+    <string name="setup_notifications">Notifications</string>
+    <string name="setup_notifications_hint">The alarm over the lock screen, \"Silence\", and the messages when a ticket did not print.</string>
+    <string name="setup_nearby">Nearby devices</string>
+    <string name="setup_nearby_hint">Bluetooth, for the receipt printer. A driver\'s phone can do without.</string>
+    <string name="setup_background">Background running</string>
+    <string name="setup_background_hint">So that Android does not stop the app to save battery — then nothing would ring or print.</string>
+    <string name="setup_full_screen">Full screen over the lock screen</string>
+    <string name="setup_full_screen_hint">The alarm comes up like an incoming call, with the accept buttons. Switch it on in the page that opens, then go back.</string>
+    <string name="setup_allow">Allow</string>
+    <string name="setup_allowed">✓ Allowed</string>
+    <string name="setup_missing">Without these the alarm may stay silent. They can also be allowed later, under Settings → So that it rings.</string>
+    <string name="setup_continue_anyway">Continue anyway</string>
 
     <string name="section_accept">Accepting</string>
     <string name="eta_ladder">Minute buttons beside the suggestion</string>
