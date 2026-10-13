@@ -507,13 +507,23 @@ private fun BigStreetChoices(streets: List<StreetSuggestion>, onPick: (StreetSug
             Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(street.fullStreet, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    // With a house the list has: its own postcode, and the ring it is in.
+                    val ring = street.ringZone?.let { ringWord(it) }
                     Text(
-                        listOfNotNull(street.entry.postcodes.joinToString(", "), street.entry.district).joinToString(" · "),
+                        listOfNotNull(street.postcodes.joinToString(", "), street.entry.district, ring).joinToString(" · "),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // Said, and no more than that: the number may be misheard, or the house new.
+                    if (street.houseUnlisted) {
+                        Text(
+                            stringResource(R.string.new_order_house_unlisted, street.houseNumber.orEmpty()),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = toneColor(Tone.SOON),
+                        )
+                    }
                 }
-                when (street.entry.delivery) {
+                when (street.delivery) {
                     StreetDelivery.OUTSIDE ->
                         Text("✗ " + stringResource(R.string.new_order_street_outside), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     StreetDelivery.PARTLY -> Text(stringResource(R.string.new_order_street_partly), color = toneColor(Tone.SOON))

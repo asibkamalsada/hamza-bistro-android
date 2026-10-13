@@ -1,105 +1,135 @@
 #!/usr/bin/env node
 
 /**
- * Generates the compact street list asset for Leipzig.
- * Queries the public Overpass API for named streets, address postcodes, and Ortsteile,
- * checks each street against the bistro's delivery area ('edge' polygon),
- * and writes the result to core/src/main/resources/de/hamzabistro/printstation/core/streets.json.
+ * Writes Leipzig's streets, and the house numbers along them, for "Neue
+ * Bestellung": core/src/main/resources/de/hamzabistro/printstation/core/streets.json.
  *
- * Usage:
+ * From OpenStreetMap, with one Overpass query: the named streets, every
+ * address that has a house number, and the districts. Each street gets its
+ * postcodes (the commonest first), the district most of it is in, and
+ * whether it lies inside the delivery area; each house number its own
+ * postcode and delivery ring, since a long street has several of both.
+ *
  *   node tools/streets/generate.mjs
+ *   node tools/streets/generate.mjs --area ../hamza-bistro-web/src/app/delivery-area.ts
+ *
+ * The rings are the website's (src/app/delivery-area.ts), copied into
+ * delivery-area.json beside this script. With --area the copy is taken
+ * again first: do that whenever the delivery area changes, then commit both
+ * files. StreetDirectoryTest checks the result.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const here = path.dirname(fileURLToPath(import.meta.url));
+const AREA_FILE = path.join(here, 'delivery-area.json');
+const TARGET = path.resolve(here, '../../core/src/main/resources/de/hamzabistro/printstation/core/streets.json');
 
-// Endpoints in order of preference: primary overpass-api.de, then lz4/z mirrors
+// The main instance, its mirrors, then two other public ones: any one of them is often busy.
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://lz4.overpass-api.de/api/interpreter',
   'https://z.overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
 ];
-
+const ROUNDS = 3;
+const PAUSE_SECONDS = 30;
 const USER_AGENT = 'HamzaBistroStreetPicker/1.0 (kontakt@hamzabistro.de)';
 const TIMEOUT_SECONDS = 180;
 
-/**
- * Outer boundary of the delivery area: a copy of EDGE_AREA_POLYGON in
- * hamza-bistro-web/src/app/delivery-area.ts. When that changes, copy it
- * here again and regenerate. GeoJSON [lon, lat] pairs.
- */
-const EDGE_RING = [
-  [12.32858, 51.39364], [12.30733, 51.38878], [12.31682, 51.38253], [12.30826, 51.37921],
-  [12.28865, 51.38153], [12.29687, 51.37653], [12.29058, 51.37331], [12.27309, 51.37953],
-  [12.28558, 51.36739], [12.25258, 51.37304], [12.24447, 51.36341], [12.26471, 51.36353],
-  [12.23972, 51.35553], [12.24258, 51.34833], [12.22434, 51.35053], [12.25187, 51.33853],
-  [12.24343, 51.33438], [12.25173, 51.32838], [12.24153, 51.32748], [12.25171, 51.3234],
-  [12.23132, 51.30953], [12.25169, 51.31763], [12.25328, 51.29553], [12.26158, 51.29407],
-  [12.28458, 51.3027],  [12.29045, 51.28453], [12.31058, 51.27122], [12.31343, 51.27968],
-  [12.33512, 51.28599], [12.33358, 51.29267], [12.36163, 51.28653], [12.36754, 51.28853],
-  [12.36058, 51.29968], [12.37058, 51.29152], [12.37958, 51.30081], [12.38675, 51.29436],
-  [12.3904,  51.30871], [12.41678, 51.31653], [12.4093,  51.32381], [12.42058, 51.32549],
-  [12.4256,  51.34453], [12.41519, 51.34853], [12.41276, 51.37553], [12.35358, 51.38316],
-  [12.35558, 51.3753],  [12.34345, 51.38039], [12.343,   51.39095], [12.33558, 51.38218],
-  [12.32858, 51.39364],
+/** The rings from the inside out, and the letter each house number carries for its own. */
+const ZONES = [
+  ['inner', 'i'],
+  ['near', 'n'],
+  ['far', 'f'],
+  ['edge', 'e'],
 ];
+const OUTSIDE = 'x';
 
-/** Ray casting point-in-polygon test, matching hamza-bistro-web's containsPoint. */
+// ---------------------------------------------------------------------------
+// The delivery area
+// ---------------------------------------------------------------------------
+
+/** INNER_, NEAR_, FAR_ and EDGE_AREA_POLYGON out of the website's delivery-area.ts, as [lon, lat] pairs. */
+function ringsFromWebsite(file) {
+  const source = fs.readFileSync(file, 'utf8');
+  const rings = {};
+  for (const [zone] of ZONES) {
+    const declared = new RegExp(`export const ${zone.toUpperCase()}_AREA_POLYGON[^=]*=\\s*\\[([\\s\\S]*?)\\n\\];`).exec(source);
+    if (!declared) throw new Error(`${file} has no ${zone.toUpperCase()}_AREA_POLYGON`);
+    rings[zone] = [...declared[1].matchAll(/\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\]/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    if (rings[zone].length < 4) throw new Error(`${zone}: only ${rings[zone].length} points read`);
+  }
+  return rings;
+}
+
+function loadRings() {
+  const at = process.argv.indexOf('--area');
+  if (at >= 0) {
+    const file = process.argv[at + 1];
+    if (!file) throw new Error('--area needs the path of delivery-area.ts');
+    const rings = ringsFromWebsite(file);
+    fs.writeFileSync(AREA_FILE, JSON.stringify(rings) + '\n', 'utf8');
+    console.log(`Copied the rings from ${file}: ${ZONES.map(([z]) => `${z} ${rings[z].length}`).join(', ')} points`);
+  }
+  return JSON.parse(fs.readFileSync(AREA_FILE, 'utf8'));
+}
+
+/** Ray casting, as the website's containsPoint does it. */
 function pointInPolygon(lon, lat, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [lonI, latI] = ring[i];
     const [lonJ, latJ] = ring[j];
-    const straddles = (latI > lat) !== (latJ > lat);
-    if (!straddles) continue;
+    if (latI > lat === latJ > lat) continue;
     const lonAtLat = lonI + ((lat - latI) / (latJ - latI)) * (lonJ - lonI);
     if (lon < lonAtLat) inside = !inside;
   }
   return inside;
 }
 
-function distSq(lat1, lon1, lat2, lon2) {
-  const dLat = lat1 - lat2;
-  const dLon = lon1 - lon2;
-  return dLat * dLat + dLon * dLon;
+/** The ring a point is in, by its letter: the innermost that holds it, as zoneForLocation has it. */
+function zoneOf(lon, lat, rings) {
+  for (const [zone, letter] of ZONES) if (pointInPolygon(lon, lat, rings[zone])) return letter;
+  return OUTSIDE;
 }
+
+// ---------------------------------------------------------------------------
+// OpenStreetMap
+// ---------------------------------------------------------------------------
 
 async function queryOverpass(ql) {
   let lastError;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      console.log(`Querying Overpass at ${endpoint}...`);
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': USER_AGENT,
-        },
-        body: 'data=' + encodeURIComponent(ql),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        console.warn(`Endpoint ${endpoint} returned HTTP ${res.status}: ${text.slice(0, 120)}`);
-        continue;
+  for (let round = 1; round <= ROUNDS; round++) {
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+      try {
+        console.log(`Asking ${endpoint} ...`);
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
+          body: 'data=' + encodeURIComponent(ql),
+        });
+        if (!res.ok) {
+          console.warn(`  HTTP ${res.status}`);
+          continue;
+        }
+        return await res.json();
+      } catch (err) {
+        console.warn(`  ${err.message}`);
+        lastError = err;
       }
-      return await res.json();
-    } catch (err) {
-      console.warn(`Endpoint ${endpoint} failed: ${err.message}`);
-      lastError = err;
     }
+    // All busy at once happens; a moment later one of them is not.
+    if (round < ROUNDS) await new Promise((resolve) => setTimeout(resolve, PAUSE_SECONDS * 1000));
   }
-  throw lastError || new Error('All Overpass endpoints failed');
+  throw lastError || new Error('No Overpass instance answered');
 }
 
-/**
- * Whitelist of highway types that represent real, named streets.
- * Excludes service roads, parking aisles, emergency routes, footways, tracks, etc.
- */
-const HIGHWAY_WHITELIST = new Set([
+/** The kinds of way that are a street somebody lives on: no service lanes, footpaths or tracks. */
+const HIGHWAYS = new Set([
   'residential',
   'living_street',
   'pedestrian',
@@ -114,238 +144,231 @@ const HIGHWAY_WHITELIST = new Set([
   'trunk_link',
 ]);
 
-function isValidStreetName(name) {
+/** A name that is a street's: not one ending in a house number, a bus stop's note or a car park's lane. */
+function isStreetName(name) {
   if (!name || name.trim().length < 2) return false;
-  const trimmed = name.trim();
-  // Reject names ending in a digit (e.g. "Hammerstraße8", "Pötzschker Weg 2 - 4", "Straße B01/B02", "Gewerbehof - Mockauer Straße 15")
-  if (/\d$/.test(trimmed)) return false;
-  // Reject names containing ':' or '(' or ')' (e.g. "Modul 15: Wasserdurchfahrt", "Permoser-/Torgauer Straße (SEV)")
-  if (/[:()]/.test(trimmed)) return false;
-  // Reject names starting or ending with quotes (e.g. '„Stadtplatz Gohlis“')
-  if (/^[„"'«»]/.test(trimmed) || /[“"'«»]$/.test(trimmed)) return false;
-  // Reject parking and service entries
-  if (/^(Parkhaus|Tiefgarage|Parkplatz|Alarmausfahrt|Aufstellfläche|Feuerwehrausfahrt)\b/i.test(trimmed)) return false;
+  const n = name.trim();
+  if (/\d$/.test(n)) return false;
+  if (/[:()]/.test(n)) return false;
+  if (/^[„"'«»]/.test(n) || /[“"'«»]$/.test(n)) return false;
+  if (/^(Parkhaus|Tiefgarage|Parkplatz|Alarmausfahrt|Aufstellfläche|Feuerwehrausfahrt)\b/i.test(n)) return false;
   return true;
 }
 
-function isValidPostcode(pc) {
-  if (!pc) return false;
-  // Keep only 04xxx postcodes; Leipzig city postcodes strictly match 04103..04357 (041xx, 042xx, 043xx).
-  // Drops foreign postcodes like 04758 (Oschatz).
-  return /^04[123]\d{2}$/.test(pc.trim());
+/** Leipzig's own postcodes, 04103 to 04357: one from the next town on a boundary street is not ours. */
+function isPostcode(pc) {
+  return !!pc && /^04[123]\d{2}$/.test(pc.trim());
 }
 
-async function main() {
-  const startTime = Date.now();
+/**
+ * The house numbers one address stands for, as they are typed: "9", "9a",
+ * and for a building that spans several ("12-16", "3;5", "7a-7c") each of
+ * them. Nothing for what is no house number ("Halle 3", "o. Nr.").
+ */
+function houseNumbers(raw) {
+  const numbers = new Set();
+  for (const part of raw.toLowerCase().replace(/\s+/g, '').split(/[;,/]/)) {
+    const one = /^(\d{1,4})([a-z]?)$/.exec(part);
+    if (one) {
+      numbers.add(one[1] + one[2]);
+      continue;
+    }
+    const range = /^(\d{1,4})([a-z]?)[-–](\d{1,4})([a-z]?)$/.exec(part);
+    if (!range) continue;
+    const [, a, aLetter, b, bLetter] = range;
+    const from = Number(a);
+    const to = Number(b);
+    numbers.add(a + aLetter);
+    numbers.add(b + bLetter);
+    if (from === to && aLetter && bLetter) {
+      // "7a-7c": the letters between.
+      for (let c = aLetter.charCodeAt(0); c <= bLetter.charCodeAt(0); c++) numbers.add(a + String.fromCharCode(c));
+    } else if (!aLetter && !bLetter && to > from && to - from <= 40) {
+      // "12-16" is one side of the street: 12, 14, 16. "12-15" is all four.
+      const step = (to - from) % 2 === 0 ? 2 : 1;
+      for (let n = from; n <= to; n += step) numbers.add(String(n));
+    }
+  }
+  return [...numbers];
+}
 
-  const overpassQuery = `
+/** House numbers in their order on the street: by number, then by letter. */
+function byHouseNumber(a, b) {
+  return parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b);
+}
+
+/** "1 2 3 4 4a 6 7 8" as "1-4 4a 6-8": a run of three whole numbers or more is written as its ends. */
+function compress(numbers) {
+  const sorted = [...numbers].sort(byHouseNumber);
+  const out = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    if (/^\d+$/.test(sorted[i])) {
+      while (j + 1 < sorted.length && /^\d+$/.test(sorted[j + 1]) && Number(sorted[j + 1]) === Number(sorted[j]) + 1) j++;
+    }
+    if (j - i >= 2) out.push(`${sorted[i]}-${sorted[j]}`);
+    else for (let k = i; k <= j; k++) out.push(sorted[k]);
+    i = j + 1;
+  }
+  return out.join(' ');
+}
+
+function nearest(lat, lon, places) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const place of places) {
+    const d = (lat - place.lat) ** 2 + (lon - place.lon) ** 2;
+    if (d < bestDistance) {
+      bestDistance = d;
+      best = place;
+    }
+  }
+  return best;
+}
+
+function commonest(counts) {
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([key]) => key);
+}
+
+// ---------------------------------------------------------------------------
+
+async function main() {
+  const rings = loadRings();
+  const started = Date.now();
+  const data = await queryOverpass(`
     [out:json][timeout:${TIMEOUT_SECONDS}];
     area["name"="Leipzig"]["boundary"="administrative"]["admin_level"="6"]->.leipzig;
     (
       way["highway"]["name"](area.leipzig);
+      nwr["addr:street"]["addr:housenumber"](area.leipzig);
       nwr["addr:street"]["addr:postcode"](area.leipzig);
       node["place"~"^(suburb|quarter)$"](area.leipzig);
     );
     out tags center;
-  `;
+  `);
+  console.log(`${data.elements?.length || 0} elements in ${Math.round((Date.now() - started) / 1000)} s`);
 
-  const data = await queryOverpass(overpassQuery);
-  console.log(`Received ${data.elements?.length || 0} elements in ${Date.now() - startTime} ms`);
-
-  // 1. Collect Ortsteile / Suburbs, address points, and address counts
   const suburbs = [];
-  const addressPoints = [];
-  const addressCounts = new Map(); // lowercase name -> count of addr:street uses
-  const highwayNames = new Set(); // lowercase name -> true if seen on a whitelisted highway
+  const addressesWithPostcode = [];
+  const usesAsAddress = new Map(); // street key -> how many addresses name it
+  const isHighway = new Set(); // street keys seen on a real street
+  const at = (el) => ({ lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon });
 
   for (const el of data.elements) {
-    if (el.tags?.place && (el.tags.place === 'suburb' || el.tags.place === 'quarter')) {
-      const name = el.tags.name?.trim();
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
-      if (name && lat && lon) suburbs.push({ name, lat, lon });
+    const tags = el.tags || {};
+    const { lat, lon } = at(el);
+    if ((tags.place === 'suburb' || tags.place === 'quarter') && tags.name && lat && lon) suburbs.push({ name: tags.name.trim(), lat, lon });
+    if (isPostcode(tags['addr:postcode']) && lat && lon) addressesWithPostcode.push({ pc: tags['addr:postcode'].trim(), lat, lon });
+    // Counted with a postcode only: the paths of an allotment garden have plot numbers, and none.
+    if (tags['addr:street'] && tags['addr:postcode'] && isStreetName(tags['addr:street'])) {
+      const key = tags['addr:street'].trim().toLowerCase();
+      usesAsAddress.set(key, (usesAsAddress.get(key) || 0) + 1);
     }
-
-    const pc = el.tags?.['addr:postcode']?.trim();
-    if (isValidPostcode(pc)) {
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
-      if (lat && lon) addressPoints.push({ pc, lat, lon });
-    }
-
-    if (el.tags?.['addr:street']) {
-      const name = el.tags['addr:street'].trim();
-      if (isValidStreetName(name)) {
-        const key = name.toLowerCase();
-        addressCounts.set(key, (addressCounts.get(key) || 0) + 1);
-      }
-    }
-
-    if (el.tags?.highway && el.tags?.name) {
-      if (HIGHWAY_WHITELIST.has(el.tags.highway)) {
-        const name = el.tags.name.trim();
-        if (isValidStreetName(name)) {
-          highwayNames.add(name.toLowerCase());
-        }
-      }
-    }
+    if (tags.highway && HIGHWAYS.has(tags.highway) && isStreetName(tags.name)) isHighway.add(tags.name.trim().toLowerCase());
   }
-  console.log(`Found ${suburbs.length} Ortsteile / suburbs, ${addressPoints.length} address points`);
+  console.log(`${suburbs.length} districts, ${addressesWithPostcode.length} addresses with a postcode`);
 
-  // 2. Aggregate streets deduplicating case-insensitively
-  const streets = new Map(); // lowercase name -> street object
-
-  function getOrCreate(name) {
+  // One street per name, whatever its case: "schwartzestraße" is Schwartzestraße.
+  const streets = new Map();
+  function street(name) {
     const key = name.toLowerCase();
-    if (!streets.has(key)) {
-      streets.set(key, {
-        name,
-        postcodes: new Map(),
-        suburbCounts: new Map(),
-        coords: [],
-      });
-    }
+    if (!streets.has(key)) streets.set(key, { name, postcodes: new Map(), suburbs: new Map(), points: [], houses: new Map() });
     const s = streets.get(key);
-    // Prefer capitalized canonical name (e.g. Schwartzestraße over schwartzestraße)
-    if (/^[a-zäöü]/.test(s.name) && /^[A-ZÄÖÜ]/.test(name)) {
-      s.name = name;
-    }
+    if (/^[a-zäöü]/.test(s.name) && /^[A-ZÄÖÜ]/.test(name)) s.name = name;
     return s;
   }
 
   for (const el of data.elements) {
-    // Whitelisted highway ways
-    if (el.tags?.highway && el.tags?.name) {
-      const hw = el.tags.highway;
-      if (!HIGHWAY_WHITELIST.has(hw)) continue;
-      const name = el.tags.name.trim();
-      if (!isValidStreetName(name)) continue;
+    const tags = el.tags || {};
+    const { lat, lon } = at(el);
 
-      const s = getOrCreate(name);
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
-      if (lat && lon) s.coords.push([lon, lat]);
-      const pc = el.tags['postal_code']?.trim();
-      if (isValidPostcode(pc)) {
-        s.postcodes.set(pc, (s.postcodes.get(pc) || 0) + 1);
-      }
+    if (tags.highway && HIGHWAYS.has(tags.highway) && isStreetName(tags.name)) {
+      const s = street(tags.name.trim());
+      if (lat && lon) s.points.push([lon, lat]);
+      if (isPostcode(tags.postal_code)) s.postcodes.set(tags.postal_code.trim(), (s.postcodes.get(tags.postal_code.trim()) || 0) + 1);
     }
 
-    // Addresses (nwr)
-    if (el.tags?.['addr:street']) {
-      const name = el.tags['addr:street'].trim();
-      if (!isValidStreetName(name)) continue;
-      const key = name.toLowerCase();
+    const named = tags['addr:street']?.trim();
+    if (!named || !isStreetName(named)) continue;
+    // A name only addresses carry, and only one of them: a typo, not a street.
+    if (!isHighway.has(named.toLowerCase()) && (usesAsAddress.get(named.toLowerCase()) || 0) < 2) continue;
 
-      // Require at least 2 uses for names that only come from addresses
-      if (!highwayNames.has(key) && (addressCounts.get(key) || 0) < 2) {
-        continue;
-      }
+    const s = street(named);
+    const pc = isPostcode(tags['addr:postcode']) ? tags['addr:postcode'].trim() : null;
+    if (pc) s.postcodes.set(pc, (s.postcodes.get(pc) || 0) + 1);
+    // The district from addresses that are filled in properly: one with a postcode names its own part of town more reliably.
+    const suburb = tags['addr:postcode'] ? tags['addr:suburb']?.trim() : null;
+    if (suburb) s.suburbs.set(suburb, (s.suburbs.get(suburb) || 0) + 1);
+    if (lat && lon) s.points.push([lon, lat]);
 
-      const s = getOrCreate(name);
-      const pc = el.tags['addr:postcode']?.trim();
-      if (isValidPostcode(pc)) {
-        s.postcodes.set(pc, (s.postcodes.get(pc) || 0) + 1);
-      }
-      const sub = el.tags['addr:suburb']?.trim();
-      if (sub) {
-        s.suburbCounts.set(sub, (s.suburbCounts.get(sub) || 0) + 1);
-      }
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
-      if (lat && lon) s.coords.push([lon, lat]);
+    if (!tags['addr:housenumber'] || !lat || !lon) continue;
+    for (const number of houseNumbers(tags['addr:housenumber'])) {
+      // The same number twice on one street name: another street of that name, in another postcode. Both are kept.
+      const houses = s.houses.get(number) || [];
+      houses.push({ pc, zone: zoneOf(lon, lat, rings), lat, lon });
+      s.houses.set(number, houses);
     }
   }
 
-  console.log(`Processed ${streets.size} unique streets after filtering and case-deduping`);
-
-  // 3. Build output entries
   const results = [];
-  for (const [key, s] of streets) {
-    let centerLat = 0, centerLon = 0;
-    if (s.coords.length > 0) {
-      for (const [lon, lat] of s.coords) {
-        centerLon += lon;
-        centerLat += lat;
-      }
-      centerLon /= s.coords.length;
-      centerLat /= s.coords.length;
+  let houseCount = 0;
+  let twice = 0;
+  for (const s of streets.values()) {
+    let lat = 0;
+    let lon = 0;
+    for (const [pLon, pLat] of s.points) {
+      lon += pLon / s.points.length;
+      lat += pLat / s.points.length;
     }
 
-    // Fall back to nearest addr:postcode if street has no postcode
-    if (s.postcodes.size === 0 && centerLat !== 0 && centerLon !== 0 && addressPoints.length > 0) {
-      let bestDist = Infinity;
-      let bestPc = null;
-      for (const ap of addressPoints) {
-        const d = distSq(centerLat, centerLon, ap.lat, ap.lon);
-        if (d < bestDist) {
-          bestDist = d;
-          bestPc = ap.pc;
-        }
-      }
-      if (bestPc) {
-        s.postcodes.set(bestPc, 1);
-      }
+    // A street nobody has put a postcode on takes the one of the address nearest to it.
+    if (s.postcodes.size === 0 && s.points.length > 0) {
+      const near = nearest(lat, lon, addressesWithPostcode);
+      if (near) s.postcodes.set(near.pc, 1);
     }
+    const postcodes = commonest(s.postcodes);
+    // The district its addresses name, or else the one whose centre is nearest to the street's.
+    const district = s.suburbs.size > 0 ? commonest(s.suburbs)[0] : s.points.length > 0 ? (nearest(lat, lon, suburbs)?.name ?? null) : null;
 
-    const postcodes = Array.from(s.postcodes.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([pc]) => pc);
+    const inside = s.points.filter(([pLon, pLat]) => pointInPolygon(pLon, pLat, rings.edge)).length;
+    const delivery = s.points.length > 0 && inside === s.points.length ? 'inside' : inside > 0 ? 'partly' : 'outside';
 
-    let district = null;
-    if (s.suburbCounts.size > 0) {
-      district = Array.from(s.suburbCounts.entries()).sort((a, b) => b[1] - a[1])[0][0];
-    } else if (centerLat !== 0 && suburbs.length > 0) {
-      let bestDist = Infinity;
-      let bestSub = null;
-      for (const sub of suburbs) {
-        const d = distSq(centerLat, centerLon, sub.lat, sub.lon);
-        if (d < bestDist) {
-          bestDist = d;
-          bestSub = sub.name;
-        }
+    // The house numbers, grouped by what is theirs alone: the postcode and the ring.
+    // None for a street nobody rides to: "keine Lieferung" says all there is to say about its houses.
+    const groups = new Map();
+    for (const [number, houses] of delivery === 'outside' ? [] : s.houses) {
+      const seen = new Set();
+      for (const house of houses) {
+        // No postcode on the address itself: the one nearest to it has the same, on all but a boundary.
+        const pc = house.pc || nearest(house.lat, house.lon, addressesWithPostcode)?.pc || postcodes[0];
+        if (!pc) continue;
+        const key = pc + house.zone;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (!groups.has(key)) groups.set(key, new Set());
+        groups.get(key).add(number);
       }
-      district = bestSub;
+      houseCount++;
+      if (new Set([...seen].map((key) => key.slice(0, 5))).size > 1) twice++;
     }
+    const houses = [...groups.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, numbers]) => `${key}:${compress(numbers)}`)
+      .join(';');
 
-    let delivery = 'outside';
-    if (s.coords.length > 0) {
-      let inCount = 0;
-      for (const [lon, lat] of s.coords) {
-        if (pointInPolygon(lon, lat, EDGE_RING)) inCount++;
-      }
-      if (inCount === s.coords.length) {
-        delivery = 'inside';
-      } else if (inCount > 0) {
-        delivery = 'partly';
-      } else {
-        delivery = 'outside';
-      }
-    }
-
-    results.push({
-      name: s.name,
-      postcodes,
-      district,
-      delivery,
-    });
+    results.push({ name: s.name, postcodes, district, delivery, ...(houses ? { houses } : {}) });
   }
 
-  // Sort alphabetically according to German locale
   results.sort((a, b) => a.name.localeCompare(b.name, 'de'));
-
-  const jsonContent = JSON.stringify(results);
-  const sizeKb = (Buffer.byteLength(jsonContent, 'utf8') / 1024).toFixed(1);
-  console.log(`Generated ${results.length} streets (${sizeKb} KB)`);
-
-  // Target path: keep ONE asset in core resources (loaded by StreetDirectory)
-  const target = path.resolve(__dirname, '../../core/src/main/resources/de/hamzabistro/printstation/core/streets.json');
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, jsonContent, 'utf8');
-  console.log(`Wrote ${target}`);
+  const json = JSON.stringify(results);
+  fs.mkdirSync(path.dirname(TARGET), { recursive: true });
+  fs.writeFileSync(TARGET, json, 'utf8');
+  const withHouses = results.filter((r) => r.houses).length;
+  console.log(`${results.length} streets, ${withHouses} of them with house numbers: ${houseCount} numbers, ${twice} of them in two postcodes`);
+  console.log(`${(Buffer.byteLength(json, 'utf8') / 1024).toFixed(0)} KB -> ${TARGET}`);
 }
 
 main().catch((err) => {
-  console.error('Generation failed:', err);
+  console.error('Not written:', err);
   process.exit(1);
 });

@@ -2,22 +2,51 @@ package de.hamzabistro.printstation.core
 
 import java.text.Normalizer
 
-/** A street offered for what was typed, with the house number typed after it. */
-data class StreetSuggestion(val entry: StreetEntry, val houseNumber: String? = null) {
+/**
+ * A street offered for what was typed, with the house number typed after
+ * it — and, where the list has that number on the street, the [house]: its
+ * own postcode and ring, which on a long street are not the street's.
+ */
+data class StreetSuggestion(val entry: StreetEntry, val houseNumber: String? = null, val house: House? = null) {
     /** What goes into the street field: the name as the city spells it, and the number. */
     val fullStreet: String
         get() = if (houseNumber == null) entry.name else "${entry.name} $houseNumber"
 
-    /** The postcode to fill in: the only one, or the one most of the street has. */
+    /** The postcodes to show: the house's own, or all the street has. */
+    val postcodes: List<String>
+        get() = house?.let { listOf(it.postcode) } ?: entry.postcodes
+
+    /** The postcode to fill in: the house's own, or else the one most of the street has. */
     val primaryPostcode: String?
-        get() = entry.postcodes.firstOrNull()
+        get() = postcodes.firstOrNull()
+
+    /** Whether the shop rides there: the house's own answer where the list has the house, else the street's. */
+    val delivery: StreetDelivery
+        get() =
+            when (house?.ring) {
+                null -> entry.delivery
+                DeliveryRing.OUTSIDE -> StreetDelivery.OUTSIDE
+                else -> StreetDelivery.INSIDE
+            }
+
+    /** The house's ring, by check-address's name for it; null without a house on the list, or for one nobody rides to. */
+    val ringZone: String?
+        get() = house?.ring?.takeUnless { it == DeliveryRing.OUTSIDE }?.zone
+
+    /**
+     * The list has this street's numbers, and the one typed is not among
+     * them: misheard, or a house OpenStreetMap does not have yet.
+     */
+    val houseUnlisted: Boolean
+        get() = houseNumber != null && house == null && entry.houses.isNotEmpty()
 }
 
 /**
  * Finds the street somebody on the phone meant from what was typed of it:
  * half a name, without its umlauts, hyphens or "Straße", spelled the way it
  * sounded ("karl herting 9" is Karl-Härting-Straße 9), or with a slip of
- * the finger. The house number typed after it is kept.
+ * the finger. The house number typed after it is kept, and looked up on the
+ * street: a house the list has brings its own postcode and ring.
  *
  * What was typed is taken, in this order, as
  *
@@ -56,8 +85,12 @@ class StreetMatcher(streets: List<StreetEntry>) {
         val found = mutableListOf<StreetSuggestion>()
         // "Straße des 18" is on its way to "Straße des 18. Oktober", not house number 18 of some "Straße des".
         if (number != null) found += rank(typed, misspelled = false).map { StreetSuggestion(it) }
-        found += rank(street, misspelled = true).map { StreetSuggestion(it, number) }
-        return found.distinctBy { it.entry.name }.take(limit)
+        for (entry in rank(street, misspelled = true)) {
+            // Two streets of one name, in two postcodes, both with this number: both are offered.
+            val houses = if (number == null) emptyList() else entry.houses(number)
+            if (houses.isEmpty()) found += StreetSuggestion(entry, number) else houses.forEach { found += StreetSuggestion(entry, number, it) }
+        }
+        return found.distinctBy { it.entry.name to it.house?.postcode }.take(limit)
     }
 
     private class Hit(val street: Indexed, val tier: Int, val slips: Int = 0, val soundsAlike: Boolean = true)

@@ -898,6 +898,7 @@
     <string name="new_order_street">Straße und Hausnummer</string>
     <string name="new_order_street_outside">keine Lieferung</string>
     <string name="new_order_street_partly">nur zum Teil im Liefergebiet</string>
+    <string name="new_order_house_unlisted">Nr. %1$s steht für diese Straße nicht in der Liste</string>
     <string name="new_order_street_unlisted">Keine Straße in Leipzig heißt oder klingt so: wird geprüft, wie getippt.</string>
     <string name="new_order_postal_code">PLZ</string>
     <string name="new_order_city">Ort</string>
