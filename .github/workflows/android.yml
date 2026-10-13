@@ -47,6 +47,13 @@ jobs:
       - name: Core tests
         run: ./gradlew :core:test
 
+      # The core once more, through the shrinker the release APK is made
+      # with, and what the app asks of it asked of the result: the tests
+      # above passed while the shrunk 0.2.159 could not find its street
+      # list, and closed on opening.
+      - name: Core, shrunk as the release is
+        run: ./gradlew :core:shrunkTest
+
       # Robolectric: the view models made and the staff screens drawn, as
       # right after sign-in — what closed the app in android#24.
       - name: App tests
@@ -93,6 +100,11 @@ jobs:
             echo "signed=true" >> "$GITHUB_OUTPUT"
             echo "version=$version" >> "$GITHUB_OUTPUT"
           fi
+
+      # In the APK itself, at the path the core reads it from: fails when
+      # it is not listed.
+      - name: Street list in the release APK
+        run: unzip -l app/build/outputs/apk/release/*.apk de/hamzabistro/printstation/core/streets.json
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
