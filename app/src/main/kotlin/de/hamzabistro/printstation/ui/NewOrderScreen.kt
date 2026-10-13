@@ -146,6 +146,8 @@ data class NewOrderState(
     val saved: PhoneOrderQuote? = null,
     /** Where "Telefon-Bestellung" is, step by step. */
     val step: CallStep = CallStep.NAME,
+    /** Telefon-Bestellung has set this order up as a phone delivery, once: what is chosen after stays chosen. */
+    val callStarted: Boolean = false,
     /** The link texted to the caller, when the address goes by SMS. */
     val link: RequestedLink? = null,
     val linking: Boolean = false,
@@ -156,9 +158,16 @@ data class NewOrderState(
     val waiting: Boolean = false,
     val savingWaiting: Boolean = false,
 ) {
-    /** The address goes by SMS and has not come yet: the order is saved to wait for it. */
+    /**
+     * The address goes by SMS and has not come yet — nor been typed after
+     * all: the order is saved to wait for it.
+     */
     val awaitingLink: Boolean
-        get() = link != null && linkAddressAt == null && draft.delivery
+        get() = link != null && linkAddressAt == null && draft.delivery && !PhoneOrders.addressComplete(draft)
+
+    /** Saved, or waiting on its link: the next call starts a new order. */
+    val finished: Boolean
+        get() = step == CallStep.DONE || saved != null || waiting
 
     /** The price shown is the one for what is on the screen now. */
     val priced: Boolean
@@ -465,6 +474,8 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     /** Opened from a call or the queue: a phone delivery, unless it was begun as something else. */
     fun startCall() {
         val now = _state.value
+        if (now.callStarted) return
+        _state.update { it.copy(callStarted = true) }
         if (now.draft.lines.isNotEmpty() || now.link != null || now.saved != null || now.waiting) return
         if (now.draft.source != OrderSource.PHONE || now.draft.fulfilment != Fulfilment.DELIVERY) {
             edit { it.copy(source = OrderSource.PHONE, fulfilment = Fulfilment.DELIVERY) }

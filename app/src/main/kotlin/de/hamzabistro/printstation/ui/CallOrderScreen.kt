@@ -144,10 +144,9 @@ fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderV
     val links by graph.liveAddressRequests.collectAsStateWithLifecycle(AddressRequestsState())
     val link = links.byId(state.link?.id)
     LaunchedEffect(link) { model.linkRead(link) }
-    LaunchedEffect(Unit) {
-        model.startCall()
-        model.loadMenu()
-    }
+    // Again after a reset underneath — a new call taken from the banner.
+    LaunchedEffect(state.callStarted) { model.startCall() }
+    LaunchedEffect(Unit) { model.loadMenu() }
     var discarding by remember { mutableStateOf(false) }
     val finish = {
         model.reset()

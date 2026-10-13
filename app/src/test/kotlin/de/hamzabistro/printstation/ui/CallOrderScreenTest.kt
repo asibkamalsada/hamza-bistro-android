@@ -17,9 +17,12 @@ import de.hamzabistro.printstation.core.MenuOption
 import de.hamzabistro.printstation.core.OptionGroup
 import de.hamzabistro.printstation.core.OrderMenu
 import de.hamzabistro.printstation.core.OrderSource
+import de.hamzabistro.printstation.core.PhoneOrderDraft
+import de.hamzabistro.printstation.core.RequestedLink
 import de.hamzabistro.printstation.core.Selection
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -89,6 +92,20 @@ class CallOrderScreenTest {
         assertEquals(Fulfilment.PICKUP, model.state.value.draft.fulfilment)
         compose.onNodeWithText("🛍 Picks it up at the shop").assertIsDisplayed()
         compose.onNodeWithText("Next ➜").assertIsEnabled()
+    }
+
+    @Test
+    fun anSmsSentWaitsForTheAddressUnlessItWasTypedAfterAll() {
+        val link = RequestedLink("r-1", "0123456789abcdef0123456789abcdef")
+        val texted = NewOrderState(draft = PhoneOrderDraft(fulfilment = Fulfilment.DELIVERY), link = link)
+        assertTrue(texted.awaitingLink)
+        // Spelled out after all: saved as typed, the link closed with it.
+        val typed = texted.copy(draft = texted.draft.copy(street = "Lützner Str. 9", postalCode = "04177"))
+        assertFalse(typed.awaitingLink)
+        // Arrived through the link: in the fields, priced as typed.
+        assertFalse(texted.copy(linkAddressAt = Instant.now()).awaitingLink)
+        // A pickup has no address to wait for.
+        assertFalse(texted.copy(draft = PhoneOrderDraft(fulfilment = Fulfilment.PICKUP)).awaitingLink)
     }
 
     // -----------------------------------------------------------------------

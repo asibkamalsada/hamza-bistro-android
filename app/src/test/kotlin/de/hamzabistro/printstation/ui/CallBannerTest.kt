@@ -76,6 +76,21 @@ class CallBannerTest {
     }
 
     @Test
+    fun aCallAfterAnOrderIsSavedStartsANewOne() {
+        order.edit { it.copy(phone = "0341 999999", name = "Vorher") }
+        order.goTo(CallStep.DONE)
+        banners(listOf(call("c-1", "+491761234567")), newOrderOpen = true)
+
+        compose.onNodeWithText("Take the order").performClick()
+        compose.waitForIdle()
+
+        assertEquals("0176 1234567", order.state.value.draft.phone)
+        assertEquals("", order.state.value.draft.name)
+        assertEquals(CallStep.NAME, order.state.value.step)
+        assertEquals(1, opened)
+    }
+
+    @Test
     fun aBannerIsPutAwayAndAnOldCallIsNotShown() {
         banners(listOf(call("new", "+491761234567"), call("old", "+4934112345678", secondsAgo = 200)))
         // More than three minutes ago: not that caller any more.

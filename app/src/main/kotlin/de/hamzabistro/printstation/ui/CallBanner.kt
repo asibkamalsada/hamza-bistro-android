@@ -83,7 +83,10 @@ internal fun CallBanners(
         }
     val shown = IncomingCalls.toShow(calls, dismissed, now)
     if (shown.isEmpty()) return
-    val phoneTyped = order.state.collectAsStateWithLifecycle().value.draft.phone.isNotBlank()
+    val underneath = order.state.collectAsStateWithLifecycle().value
+    val phoneTyped = underneath.draft.phone.isNotBlank()
+    // The order underneath is saved, or waits on its link: this call is a new one.
+    val fresh = !newOrderOpen || underneath.finished
     Column(modifier.statusBarsPadding().padding(12.dp).widthIn(max = 960.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         for (call in shown) {
             key(call.id) {
@@ -91,8 +94,9 @@ internal fun CallBanners(
                     call,
                     lastAddress,
                     // With a number typed in the order underneath, there is nothing to offer but putting the banner away.
-                    action = if (!newOrderOpen) R.string.call_take_order else if (!phoneTyped) R.string.call_take_number else null,
+                    action = if (fresh) R.string.call_take_order else if (!phoneTyped) R.string.call_take_number else null,
                     onAction = {
+                        if (underneath.finished) order.reset()
                         order.takeNumber(call.phone)
                         dismissed = dismissed + call.id
                         onNewOrder()
