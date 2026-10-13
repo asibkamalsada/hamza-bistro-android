@@ -892,6 +892,9 @@
     <string name="new_order_contact_optional">Optional when eaten in.</string>
     <string name="new_order_address">Delivery address</string>
     <string name="new_order_street">Street and number</string>
+    <string name="new_order_street_outside">no delivery</string>
+    <string name="new_order_street_partly">partly in the delivery area</string>
+    <string name="new_order_street_unlisted">No street in Leipzig is called that or sounds like it: checked as typed.</string>
     <string name="new_order_postal_code">Postcode</string>
     <string name="new_order_city">Town</string>
     <string name="new_order_door_note">For the door (optional)</string>

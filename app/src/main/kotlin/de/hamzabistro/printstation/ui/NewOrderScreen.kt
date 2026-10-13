@@ -39,6 +39,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -87,11 +88,16 @@ import de.hamzabistro.printstation.core.PhoneOrderException
 import de.hamzabistro.printstation.core.PhoneOrderQuote
 import de.hamzabistro.printstation.core.PhoneOrders
 import de.hamzabistro.printstation.core.Selection
+import de.hamzabistro.printstation.core.StreetDelivery
+import de.hamzabistro.printstation.core.StreetDirectory
+import de.hamzabistro.printstation.core.StreetMatcher
+import de.hamzabistro.printstation.core.StreetSuggestion
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,12 +105,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** What "Neue Bestellung" shows. */
 data class NewOrderState(
     val menu: OrderMenu? = null,
     val menuError: String? = null,
     val draft: PhoneOrderDraft = PhoneOrderDraft(),
+    /** Leipzig's streets like the one typed; [streetChoices] is what of them is offered. */
+    val streets: List<StreetSuggestion> = emptyList(),
+    /** Nothing like what is typed is on the list: a street outside Leipzig, or misheard beyond guessing. */
+    val streetUnlisted: Boolean = false,
     /** check-address's answer for [checkedAddress]. */
     val address: AddressCheck? = null,
     /** The address [address] is the answer for: street, postcode, town. */
@@ -126,14 +138,29 @@ data class NewOrderState(
     /** The price shown is the one for what is on the screen now. */
     val priced: Boolean
         get() = quote != null && quotedDraft == draft
+
+    /**
+     * The streets to pick from. None once the field is the first of them
+     * and the postcode one of its own: nothing is left to pick then.
+     */
+    val streetChoices: List<StreetSuggestion>
+        get() = if (streets.firstOrNull()?.let { it.fullStreet == draft.street.trim() && draft.postalCode in it.entry.postcodes } == true) emptyList() else streets
+
+    /** [address] is the answer for the address on the screen now, not for one typed over since. */
+    val addressChecked: Boolean
+        get() = checkedAddress == draft.addressKey()
 }
+
+/** What check-address is asked once for: street, postcode, town. */
+private fun PhoneOrderDraft.addressKey(): List<String> = listOf(street.trim(), postalCode.trim(), city.trim())
 
 /**
  * "Neue Bestellung" (#9): a phone or walk-in order typed in on the tablet,
  * priced by the database's own staff_place_order with a dry run, and saved
  * already accepted — straight into "In der Küche", where it prints like any
  * accepted order. A delivery's address goes through the site's own
- * check-address first, as the checkout's does.
+ * check-address first, as the checkout's does — while the caller is still
+ * on the line, and with Leipzig's streets offered as the street is typed.
  */
 class NewOrderViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
@@ -143,6 +170,16 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     val state: StateFlow<NewOrderState> = _state.asStateFlow()
 
     private var pricing: Job? = null
+    private var suggesting: Job? = null
+    private var addressCheck: Job? = null
+
+    /** The price and the check while typing both want the address checked: one asks, the other takes the answer. */
+    private val oneCheck = Mutex()
+
+    init {
+        // Reading and indexing Leipzig's streets takes a moment: done by the time a street is typed.
+        viewModelScope.launch(Dispatchers.Default) { StreetDirectory.matcher }
+    }
 
     /** On every visit, so what sold out since the last order shows; the menu last read stays up meanwhile. */
     fun loadMenu() {
@@ -155,9 +192,30 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     /** Any change to the order: the price shown is no longer it, and is worked out again after a pause in the typing. */
     fun edit(change: (PhoneOrderDraft) -> PhoneOrderDraft) {
+        val before = _state.value.draft
         _state.update { it.copy(draft = change(it.draft), error = null) }
+        val draft = _state.value.draft
+        if (draft.street != before.street) suggestStreets()
+        if (draft.delivery != before.delivery || draft.addressKey() != before.addressKey()) checkWhileTyping()
         reprice()
     }
+
+    /** Leipzig's streets like the one typed, searched off the main thread. */
+    private fun suggestStreets() {
+        suggesting?.cancel()
+        suggesting =
+            viewModelScope.launch(Dispatchers.Default) {
+                val street = _state.value.draft.street
+                val found = StreetDirectory.matcher.match(street)
+                val unlisted = found.isEmpty() && street.count(Char::isLetter) >= UNLISTED_FROM
+                // Typed on meanwhile: the next search answers.
+                _state.update { if (it.draft.street == street) it.copy(streets = found, streetUnlisted = unlisted) else it }
+            }
+    }
+
+    /** A street picked from the list: its name as the city spells it with the number typed, its postcode, and Leipzig. */
+    fun pickStreet(street: StreetSuggestion) =
+        edit { it.copy(street = street.fullStreet, postalCode = street.primaryPostcode ?: it.postalCode, city = PhoneOrders.DEFAULT_CITY) }
 
     fun add(line: BasketLine) =
         edit { draft ->
@@ -194,9 +252,28 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     fun ladder(): List<Int> = graph.settings.device.value.etaLadder
 
+    /** "Erneut prüfen": asked again at once, basket or none, and priced again with the answer. */
     fun checkAgain() {
         _state.update { it.copy(checkedAddress = null, address = null) }
-        reprice(atOnce = true)
+        addressCheck?.cancel()
+        addressCheck = viewModelScope.launch { if (checkAddress(_state.value.draft)) reprice(atOnce = true) }
+    }
+
+    /**
+     * check-address while the caller is still on the line: as soon as there
+     * is a door to check — a house number, five digits, a town — and the
+     * typing pauses, not only once the basket can be priced. So "dorthin
+     * liefern wir nicht" is said before the order is taken, not after.
+     */
+    private fun checkWhileTyping() {
+        addressCheck?.cancel()
+        val draft = _state.value.draft
+        if (!draft.delivery || !PhoneOrders.addressComplete(draft) || !StreetMatcher.hasHouseNumber(draft.street)) return
+        addressCheck =
+            viewModelScope.launch {
+                delay(PRICE_PAUSE_MS)
+                checkAddress(draft)
+            }
     }
 
     private fun reprice(atOnce: Boolean = false) {
@@ -206,7 +283,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 if (!atOnce) delay(PRICE_PAUSE_MS)
                 val draft = _state.value.draft
                 if (PhoneOrders.problems(draft, Instant.now()).isNotEmpty()) {
-                    _state.update { it.copy(quoting = false, checking = false) }
+                    _state.update { it.copy(quoting = false) }
                     return@launch
                 }
                 if (draft.delivery && !checkAddress(draft)) return@launch
@@ -226,18 +303,23 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     /** check-address for [draft]'s address, once per address typed; false when it could not be asked. */
     private suspend fun checkAddress(draft: PhoneOrderDraft): Boolean {
-        val key = listOf(draft.street.trim(), draft.postalCode.trim(), draft.city.trim())
-        if (_state.value.checkedAddress == key) return true
-        _state.update { it.copy(checking = true, addressError = null) }
-        return try {
-            val check = graph.phoneOrders.checkAddress(draft.street, draft.postalCode, draft.city)
-            _state.update { it.copy(checking = false, address = check, checkedAddress = key) }
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            _state.update { it.copy(checking = false, address = null, checkedAddress = null, addressError = failureText(app, e)) }
-            false
+        val key = draft.addressKey()
+        return oneCheck.withLock {
+            if (_state.value.checkedAddress == key) return@withLock true
+            _state.update { it.copy(checking = true, addressError = null) }
+            try {
+                val check = graph.phoneOrders.checkAddress(draft.street, draft.postalCode, draft.city)
+                _state.update { it.copy(address = check, checkedAddress = key) }
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(address = null, checkedAddress = null, addressError = failureText(app, e)) }
+                false
+            } finally {
+                // Also when typed over mid-check: whoever asks next says "checking" again.
+                _state.update { it.copy(checking = false) }
+            }
         }
     }
 
@@ -271,11 +353,16 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     /** "Noch eine Bestellung": an empty form, the menu kept. */
     fun reset() {
         pricing?.cancel()
+        suggesting?.cancel()
+        addressCheck?.cancel()
         _state.update { NewOrderState(menu = it.menu) }
     }
 
     private companion object {
         const val PRICE_PAUSE_MS = 600L
+
+        /** From this many letters on, a street the list has nothing like is said not to be on it. */
+        const val UNLISTED_FROM = 4
     }
 }
 
@@ -649,6 +736,11 @@ private fun AddressSection(state: NewOrderState, model: NewOrderViewModel) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        // Under the field they are for, above the postcode and the town they fill in.
+        StreetChoices(state.streetChoices, model::pickStreet)
+        if (state.streetUnlisted) {
+            Text(stringResource(R.string.new_order_street_unlisted), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = draft.postalCode,
@@ -680,7 +772,43 @@ private fun AddressSection(state: NewOrderState, model: NewOrderViewModel) {
                 Text(stringResource(R.string.new_order_address_failed, state.addressError), color = MaterialTheme.colorScheme.error)
                 OutlinedButton(onClick = model::checkAgain) { Text(stringResource(R.string.new_order_check_again)) }
             }
-            address != null -> AddressLine(address, model)
+            // Not the answer for the address typed before: this one is asked about in a moment.
+            address != null && state.addressChecked -> AddressLine(address, model)
+        }
+    }
+}
+
+/**
+ * Leipzig's streets like the one typed. A tap takes the name as the city
+ * spells it, its postcode and the town, so nobody spells "Zschochersche"
+ * and no caller is asked for a postcode.
+ */
+@Composable
+private fun StreetChoices(streets: List<StreetSuggestion>, onPick: (StreetSuggestion) -> Unit) {
+    for (street in streets) {
+        // Outlined: the section is a card itself, and a card on a card does not show.
+        OutlinedCard(Modifier.fillMaxWidth().clickable { onPick(street) }) {
+            Row(
+                Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(street.fullStreet, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        listOfNotNull(street.entry.postcodes.joinToString(", "), street.entry.district).joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                // From the list, so only roughly: check-address has the last word on the door.
+                when (street.entry.delivery) {
+                    StreetDelivery.OUTSIDE ->
+                        Text(stringResource(R.string.new_order_street_outside), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                    StreetDelivery.PARTLY -> Text(stringResource(R.string.new_order_street_partly), color = toneColor(Tone.SOON))
+                    StreetDelivery.INSIDE -> Unit
+                }
+            }
         }
     }
 }

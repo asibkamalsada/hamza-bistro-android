@@ -131,9 +131,20 @@ accepted order
   its order, a "single" group a required choice that starts on its first
   choice still on sale, a "multiple" one any number; sold out by an
   ingredient counts. A quantity and a note per dish (80 characters);
-- name and phone, needed for a delivery or a pickup; for a delivery the
-  address goes through the site's own `check-address`, as the signed-in
-  staff account, which shows the ring;
+- name and phone, needed for a delivery or a pickup;
+- for a delivery, the street is picked rather than spelled. As it is typed,
+  Leipzig's streets like it are offered — from half a name, without its
+  umlauts or "Straße", spelled the way it sounded ("karl herting 9" is
+  Karl-Härting-Straße 9) or a letter off — and a tap fills in the name as
+  the city spells it, the house number typed, the postcode and the town.
+  A street outside the delivery area says "keine Lieferung" before it is
+  picked. The list is built into the app
+  ([`StreetMatcher`](core/src/main/kotlin/de/hamzabistro/printstation/core/StreetMatcher.kt),
+  [the street list](#the-street-list)); a street that is not on it stays
+  as typed;
+- the address goes through the site's own `check-address`, as the
+  signed-in staff account, which shows the ring — as soon as there is a
+  house number and a postcode, while the caller is still on the line;
 - as soon as possible, with the minutes chosen as on an incoming order, or
   a time in the next seven days;
 - the price is the database's own, from a dry run of `staff_place_order`:
@@ -631,3 +642,21 @@ Locally, with the Android SDK: `./gradlew :core:test :app:lintDebug
 `./gradlew :app:assembleRelease`.
 
 Requirements: Android 12 or later; JDK 17+ to build.
+
+## The street list
+
+[`streets.json`](core/src/main/resources/de/hamzabistro/printstation/core/streets.json)
+is Leipzig's streets, about 3,000 of them: each with its postcodes (the
+commonest first), its district, and whether it lies inside, partly inside
+or outside the outermost delivery ring. "Neue Bestellung" offers them as a
+caller's street is typed.
+
+`node tools/streets/generate.mjs` writes it again from OpenStreetMap, with
+one Overpass query that takes about a minute. Run it after the delivery
+area changes — the ring in the script is a copy of `EDGE_AREA_POLYGON` in
+hamza-bistro-web's `src/app/delivery-area.ts` — or when a new street is
+missing, and commit the result; `StreetDirectoryTest` checks it.
+
+The data is © OpenStreetMap contributors, under the
+[Open Database License](https://www.openstreetmap.org/copyright).
+
