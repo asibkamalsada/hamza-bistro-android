@@ -32,16 +32,19 @@ class SupabasePrintBackendTest {
     }
 
     @Test
-    fun `reads the accepted, unprinted orders as the signed-in account`() = runBlocking<Unit> {
+    fun `reads the new and accepted, unprinted orders as the signed-in account`() = runBlocking<Unit> {
         signedIn()
-        test.reply(200, """[{"id":"a","order_number":57},{"id":"b","order_number":58}]""")
+        test.reply(
+            200,
+            """[{"id":"a","order_number":57,"status":"confirmed"},{"id":"b","order_number":58,"status":"new"}]""",
+        )
 
-        assertEquals(listOf(QueuedOrder("a", 57), QueuedOrder("b", 58)), backend.openOrders())
+        assertEquals(listOf(QueuedOrder("a", 57), QueuedOrder("b", 58, isNew = true)), backend.openOrders())
         test.server.takeRequest()
         val request = test.server.takeRequest()
         assertEquals("/rest/v1/orders", request.url.encodedPath)
-        assertEquals("id,order_number", request.url.queryParameter("select"))
-        assertEquals("eq.confirmed", request.url.queryParameter("status"))
+        assertEquals("id,order_number,status", request.url.queryParameter("select"))
+        assertEquals("in.(new,confirmed)", request.url.queryParameter("status"))
         assertEquals("is.null", request.url.queryParameter("printed_at"))
         assertEquals("Bearer access-1", request.headers["Authorization"])
         assertEquals("anon-key", request.headers["apikey"])

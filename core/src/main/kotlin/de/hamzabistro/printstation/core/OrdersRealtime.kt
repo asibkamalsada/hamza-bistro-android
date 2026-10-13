@@ -50,7 +50,7 @@ class OrdersRealtime(
      * was down. Reconnects for as long as it is collected; ends only with a
      * [SignedOutException].
      */
-    fun changes(what: Watch = Watch.ACCEPTED): Flow<Unit> = channelFlow {
+    fun changes(what: Watch = Watch.PRINTABLE): Flow<Unit> = channelFlow {
         var backoff = MIN_BACKOFF
         while (true) {
             val started = now()
@@ -221,8 +221,11 @@ class OrdersRealtime(
 
     /** Which orders — or which table's rows — a socket is about. */
     enum class Watch(val topic: String, val filter: String?, val table: String = "orders") {
-        /** What a print station prints; the rest is not its business. */
-        ACCEPTED("realtime:print-station", "status=eq.confirmed"),
+        /**
+         * What a print station prints — an order as it comes in, or accepted
+         * and not printed then; the rest is not its business.
+         */
+        PRINTABLE("realtime:print-station", "status=in.(new,confirmed)"),
 
         /** Every order, as the staff queue on /orders watches them. */
         ALL("realtime:staff-queue", null),

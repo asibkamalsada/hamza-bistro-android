@@ -10,8 +10,16 @@ import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Response
 
-/** An accepted order no station has printed. The ticket itself comes from [PrintBackend.ticket]. */
-data class QueuedOrder(val id: String, val number: Long)
+/**
+ * An order no station has printed: one just in, or one accepted that was not
+ * printed then. The ticket itself comes from [PrintBackend.ticket].
+ */
+data class QueuedOrder(
+    val id: String,
+    val number: Long,
+    /** Not accepted yet: it prints as it comes in (20261013150000_print_on_arrival.sql in hamza-bistro-web). */
+    val isNew: Boolean = false,
+)
 
 /**
  * What claim_print() answers — 20260930150000_order_printing.sql in
@@ -36,7 +44,7 @@ interface PrintBackend {
     /** Whether the signed-in account is staff or a print account. */
     suspend fun canPrint(): Boolean
 
-    /** Accepted orders not printed yet, in the order the kitchen cooks them. */
+    /** New and accepted orders not printed yet, in the order the kitchen cooks them. */
     suspend fun openOrders(): List<QueuedOrder>
 
     suspend fun claim(order: String): Claim
@@ -78,8 +86,9 @@ class SupabasePrintBackend internal constructor(
     override suspend fun openOrders(): List<QueuedOrder> {
         val url =
             rest.endpoint("rest/v1/orders")
-                .addQueryParameter("select", "id,order_number")
-                .addQueryParameter("status", "eq.confirmed")
+                .addQueryParameter("select", "id,order_number,status")
+                // As it comes in; accepted, for one that did not print then.
+                .addQueryParameter("status", "in.(new,confirmed)")
                 .addQueryParameter("printed_at", "is.null")
                 // As /orders lists them: right away first, then by when they came in.
                 .addQueryParameter("order", "scheduled_for.asc.nullsfirst,created_at.asc")
@@ -89,7 +98,7 @@ class SupabasePrintBackend internal constructor(
             val body = response.body.string()
             if (!response.isSuccessful) throw rest.rejected(response.code, body, "orders")
             json.decodeFromString(ListSerializer(OrderRow.serializer()), body).map {
-                QueuedOrder(it.id, it.orderNumber)
+                QueuedOrder(it.id, it.orderNumber, isNew = it.status == "new")
             }
         }
     }
@@ -184,7 +193,11 @@ class SupabasePrintBackend internal constructor(
     private suspend fun rpc(name: String, args: JsonObject): String = rest.rpc(name, args)
 
     @Serializable
-    private class OrderRow(val id: String, @SerialName("order_number") val orderNumber: Long)
+    private class OrderRow(
+        val id: String,
+        @SerialName("order_number") val orderNumber: Long,
+        val status: String = "confirmed",
+    )
 
     private companion object {
         /** More accepted and unprinted than this at once is not an evening that exists. */

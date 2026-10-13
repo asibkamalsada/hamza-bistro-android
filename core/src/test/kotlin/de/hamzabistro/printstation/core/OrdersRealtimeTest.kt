@@ -54,15 +54,15 @@ class OrdersRealtimeTest {
     }
 
     @Test
-    fun `joins with the account's token and says when an accepted order changed`() = runBlocking<Unit> {
+    fun `joins with the account's token and says when an order to print changed`() = runBlocking<Unit> {
         signedIn()
         realtimeServer { socket, ref ->
             socket.send(
-                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"phx_reply","ref":"$ref",""" +
+                """{"topic":"${OrdersRealtime.Watch.PRINTABLE.topic}","event":"phx_reply","ref":"$ref",""" +
                     """"payload":{"status":"ok","response":{"postgres_changes":[{"id":1}]}}}"""
             )
             socket.send(
-                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"postgres_changes","ref":null,""" +
+                """{"topic":"${OrdersRealtime.Watch.PRINTABLE.topic}","event":"postgres_changes","ref":null,""" +
                     """"payload":{"data":{"type":"UPDATE","record":{"customer_name":"not read"}},"ids":[1]}}"""
             )
         }
@@ -80,7 +80,7 @@ class OrdersRealtimeTest {
         assertEquals("access-1", payload.string("access_token"))
         val changes = payload["config"]!!.jsonObject["postgres_changes"]!!.jsonArray.single().jsonObject
         assertEquals("orders", changes.string("table"))
-        assertEquals("status=eq.confirmed", changes["filter"]!!.jsonPrimitive.content)
+        assertEquals("status=in.(new,confirmed)", changes["filter"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -111,13 +111,13 @@ class OrdersRealtimeTest {
         signedIn()
         realtimeServer { socket, ref ->
             socket.send(
-                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"phx_reply","ref":"$ref",""" +
+                """{"topic":"${OrdersRealtime.Watch.PRINTABLE.topic}","event":"phx_reply","ref":"$ref",""" +
                     """"payload":{"status":"error","response":{"reason":"Unauthorized"}}}"""
             )
         }
         realtimeServer { socket, ref ->
             socket.send(
-                """{"topic":"${OrdersRealtime.Watch.ACCEPTED.topic}","event":"phx_reply","ref":"$ref","payload":{"status":"ok","response":{}}}"""
+                """{"topic":"${OrdersRealtime.Watch.PRINTABLE.topic}","event":"phx_reply","ref":"$ref","payload":{"status":"ok","response":{}}}"""
             )
         }
         val realtime =
