@@ -235,6 +235,9 @@ class OrdersRealtime(
 
         /** The customers' ratings (hamza-bistro-web#89): a bad one with a comment chimes. */
         RATINGS("realtime:order-ratings", null, "order_ratings"),
+
+        /** The calls the shop's phone reports (hamza-bistro-web: 20261013120000_incoming_calls), for the tablet's banner. */
+        CALLS("realtime:incoming-calls", null, "incoming_calls"),
     }
 
     companion object {
