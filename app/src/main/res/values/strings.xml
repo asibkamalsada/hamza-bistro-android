@@ -753,7 +753,11 @@
     <string name="update_failing">Could not check for a newer version just now (no answer from GitHub). The app works as before.</string>
     <string name="update_check">Check now</string>
     <string name="update_changes">What\'s new:</string>
-    <string name="update_hint">\"Install\" downloads the APK in the browser; open it, and Android installs it over this version. The sign-in and the printer stay. The first time, Android asks whether the browser may install apps.</string>
+    <string name="update_fetching">Downloading…</string>
+    <string name="update_fetching_percent">Downloading… %1$d%%</string>
+    <string name="update_fetch_failed">The update could not be downloaded here.</string>
+    <string name="update_in_browser">Download in the browser</string>
+    <string name="update_hint">\"Install\" downloads the update here in the app and opens Android\'s installer, which puts it over this version. The sign-in and the printer stay. The first time, Android asks whether this app may install apps: allow it and go back.</string>
 
     <!-- The driver: several bags at once, one route (#8) -->
     <string name="queue_tab">Queue</string>

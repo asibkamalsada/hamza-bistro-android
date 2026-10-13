@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge as CountBadge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -25,21 +24,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AppRelease
+import de.hamzabistro.printstation.core.InstallState
 import de.hamzabistro.printstation.core.IssuesState
 import kotlinx.coroutines.launch
 
 /**
  * Who and what the drawer's header names: the account signed in, this
  * device, the build — and a newer build when there is one (android#40),
- * rather than a line above the queue.
+ * rather than a line above the queue, with how far fetching it is.
  */
-data class DrawerHeader(val account: String?, val device: String, val version: String, val update: AppRelease? = null)
+data class DrawerHeader(
+    val account: String?,
+    val device: String,
+    val version: String,
+    val update: AppRelease? = null,
+    val install: InstallState = InstallState.Idle,
+)
 
 /**
  * Where the queue leads, in a drawer from the left: opened with ☰ or a swipe
@@ -56,6 +61,7 @@ fun StaffDrawer(
     issues: IssuesState,
     header: DrawerHeader,
     onOpen: (StaffScreen) -> Unit,
+    onInstall: (AppRelease) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -67,7 +73,7 @@ fun StaffDrawer(
         drawerContent = {
             ModalDrawerSheet {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
-                    Header(header)
+                    Header(header, onInstall)
                     HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp))
                     for (entry in drawerEntries(issues)) {
                         val count = if (entry.screen == StaffScreen.ISSUES) issues.count else 0
@@ -110,7 +116,7 @@ fun MenuButton(open: Int, update: Boolean = false, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Header(header: DrawerHeader) {
+private fun Header(header: DrawerHeader, onInstall: (AppRelease) -> Unit) {
     Column(Modifier.padding(horizontal = 28.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.drawer_shop), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(4.dp))
@@ -119,12 +125,10 @@ private fun Header(header: DrawerHeader) {
         Text(stringResource(R.string.drawer_device, header.device), style = MaterialTheme.typography.bodySmall, color = muted)
         Text(stringResource(R.string.app_version, header.version), style = MaterialTheme.typography.bodySmall, color = muted)
         header.update?.let { release ->
-            val context = LocalContext.current
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.update_available, release.versionName), style = MaterialTheme.typography.titleSmall)
-            Button(onClick = { context.openDownload(release.downloadUrl) }, modifier = Modifier.padding(top = 4.dp)) {
-                Text(stringResource(R.string.update_install))
-            }
+            InstallButton(release, header.install, onInstall, Modifier.padding(top = 4.dp))
+            if (header.install is InstallState.Failed) InstallFailed(release)
         }
     }
 }

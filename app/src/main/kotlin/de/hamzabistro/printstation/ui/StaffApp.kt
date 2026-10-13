@@ -81,8 +81,12 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
     val prefs = staff.state.collectAsStateWithLifecycle().value.prefs
     val label = prefs.label
     val update = staff.update.collectAsStateWithLifecycle().value.available
-    val header = remember(account, label, update) { DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME, update) }
-    StaffDrawer(drawer, enabled = screen == StaffScreen.QUEUE, issues, header, onOpen = { screen = it }) {
+    val install by staff.installing.collectAsStateWithLifecycle()
+    val header =
+        remember(account, label, update, install) {
+            DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME, update, install)
+        }
+    StaffDrawer(drawer, enabled = screen == StaffScreen.QUEUE, issues, header, onOpen = { screen = it }, onInstall = { staff.install(it) }) {
         Box(Modifier.fillMaxSize()) {
             when (screen) {
                 StaffScreen.QUEUE ->

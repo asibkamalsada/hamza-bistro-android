@@ -34,6 +34,11 @@
          Play, and the one setting that keeps Samsung and Xiaomi from killing
          it. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- "Installieren" on a newer build: the app fetches the APK and hands it
+         to Android's installer, rather than to a browser. Android asks the
+         person first, once whether this app may install at all and then for
+         each update, and takes only an APK signed with this app's key. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Nothing leaves the device in a backup or a transfer to a new phone:
          the session is encrypted with a key that stays here anyway, and a
@@ -50,8 +55,9 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
 
-        <!-- The Auswertung's CSV files, handed to the share sheet read-only:
-             the cache's reports/ folder and nothing else. -->
+        <!-- The Auswertung's CSV files, handed to the share sheet, and a newer
+             build's APK, handed to Android's installer — read-only: the
+             cache's reports/ and updates/ folders and nothing else. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

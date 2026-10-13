@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import de.hamzabistro.printstation.AppGraph
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.core.AlarmDecision
+import de.hamzabistro.printstation.core.AppRelease
+import de.hamzabistro.printstation.core.InstallState
 import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.Driver
@@ -389,6 +391,14 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     /** Looks for a newer build unless it was looked for less than [maxAge] ago. Never fails. */
     fun checkForUpdate(maxAge: kotlin.time.Duration = kotlin.time.Duration.ZERO) {
         graph.scope.launch { graph.updates.check(maxAge) }
+    }
+
+    /** How far fetching the newer build is, for "Installieren" in the drawer and the settings. */
+    val installing: StateFlow<InstallState> = graph.installer.state
+
+    /** "Installieren": fetches [release]'s APK here and opens Android's installer over it. Never fails. */
+    fun install(release: AppRelease) {
+        graph.scope.launch { graph.installer.install(release) }
     }
 
     /**

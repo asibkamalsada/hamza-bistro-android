@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- What FileProvider may hand out: the Auswertung's CSV export (ReportScreen.kt), nothing else. -->
+<!-- What FileProvider may hand out: the Auswertung's CSV export (ReportScreen.kt) and the
+     newer build's APK for Android's installer (AndroidApkInstaller.kt), nothing else. -->
 <paths>
     <cache-path name="reports" path="reports/" />
+    <cache-path name="updates" path="updates/" />
 </paths>

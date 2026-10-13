@@ -1,6 +1,9 @@
 package de.hamzabistro.printstation.core
 
+import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -8,6 +11,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,10 +36,12 @@ data class AppRelease(
     val versionCode: Int,
     /** "0.2.57", as the tag has it without its "v". */
     val versionName: String,
-    /** The APK itself, or the release's page when it has none: https either way. */
+    /** For the browser: the APK itself, or the release's page when it has none. https either way. */
     val downloadUrl: String,
     /** The merged pull requests CI wrote into the notes, one line each. */
     val changes: List<String> = emptyList(),
+    /** The APK, for the app to fetch by itself; null when the release has none, only its page. */
+    val apkUrl: String? = null,
 )
 
 /** Reading the latest release; GitHub's answer, without the network. */
@@ -75,6 +81,7 @@ object AppReleases {
             versionName = tag.trim().removePrefix("v"),
             downloadUrl = download,
             changes = changes(release.string("body").orEmpty()),
+            apkUrl = apk,
         )
     }
 
@@ -199,5 +206,142 @@ class UpdateChecker(
 
         /** Opening the app looks again only after this long. */
         val ON_OPEN: Duration = 1.hours
+    }
+}
+
+/** Where a release's APK is fetched from, into a file on the device. */
+fun interface ApkSource {
+    /**
+     * Writes the APK at [url] to [target], telling [progress] how far it is
+     * from 0 to 1 — null when the server did not say how long it is.
+     * [target] is there only once it is whole. Throws when it could not be
+     * fetched.
+     */
+    suspend fun fetch(url: String, target: File, progress: (Float?) -> Unit)
+}
+
+/** [ApkSource] over HTTPS, as GitHub hands out a release's files: without an account. */
+class ApkDownload(
+    private val http: OkHttpClient,
+    private val userAgent: String,
+    private val maxBytes: Long = MAX_BYTES,
+) : ApkSource {
+    override suspend fun fetch(url: String, target: File, progress: (Float?) -> Unit) {
+        withContext(Dispatchers.IO) {
+            val address = url.toHttpUrlOrNull()?.takeIf { it.isHttps } ?: throw IOException("APK: not an https address")
+            // Beside the target until it is whole, so half an APK is never taken for one.
+            val part = File(target.path + ".part")
+            try {
+                http.newCall(Request.Builder().url(address).header("User-Agent", userAgent).build()).executeAsync().use { response ->
+                    if (!response.isSuccessful) throw IOException("APK: HTTP ${response.code}")
+                    val length = response.body.contentLength().takeIf { it > 0 }
+                    if (length != null && length > maxBytes) throw IOException("APK: too long")
+                    response.body.byteStream().use { input ->
+                        part.outputStream().use { output ->
+                            val chunk = ByteArray(CHUNK)
+                            var received = 0L
+                            while (true) {
+                                ensureActive()
+                                val read = input.read(chunk)
+                                if (read < 0) break
+                                received += read
+                                // Whatever the length header said, or did not say.
+                                if (received > maxBytes) throw IOException("APK: too long")
+                                output.write(chunk, 0, read)
+                                progress(length?.let { (received.toFloat() / it).coerceAtMost(1f) })
+                            }
+                        }
+                    }
+                }
+                Files.move(part.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally {
+                part.delete()
+            }
+        }
+    }
+
+    private companion object {
+        /** The APK is a few megabytes; far more is not it. */
+        const val MAX_BYTES = 200L * 1024 * 1024
+
+        const val CHUNK = 64 * 1024
+    }
+}
+
+/** How far fetching a newer build is, for the buttons that start it. */
+sealed interface InstallState {
+    /** Nothing on its way: "Installieren" starts it. */
+    data object Idle : InstallState
+
+    /** [progress] from 0 to 1; null when the server did not say how long the APK is. */
+    data class Fetching(val progress: Float?) : InstallState
+
+    /** It did not get as far as Android's installer; the browser is still there. */
+    data object Failed : InstallState
+}
+
+/** What only the device can do with a fetched APK. */
+interface ApkInstaller {
+    /** Whether [apk] is a build of the app running here, so that installing it can only replace it. */
+    fun isThisApp(apk: File): Boolean
+
+    /** Android's installer over [apk], which asks the person first. Throws when it cannot be shown. */
+    fun open(apk: File)
+}
+
+/**
+ * "Installieren" without a browser: fetches a release's APK into [dir] and
+ * hands it to Android's installer. Off the alarm's path like [UpdateChecker]
+ * — it never throws, and a failure only shows as [InstallState.Failed].
+ */
+class UpdateInstaller(
+    private val source: ApkSource,
+    /** Holds the one APK last fetched, and nothing else: it is emptied for the next. */
+    private val dir: File,
+    private val device: ApkInstaller,
+    private val logger: Logger,
+) {
+    private val _state = MutableStateFlow<InstallState>(InstallState.Idle)
+    val state: StateFlow<InstallState> = _state.asStateFlow()
+
+    private val lock = Mutex()
+
+    /**
+     * Fetches [release]'s APK — unless it is here already, from a tap before
+     * — and opens Android's installer over it. A tap while one is on its way
+     * does nothing.
+     */
+    suspend fun install(release: AppRelease) {
+        if (!lock.tryLock()) return
+        try {
+            _state.value = InstallState.Fetching(null)
+            device.open(withContext(Dispatchers.IO) { fetched(release) })
+            _state.value = InstallState.Idle
+        } catch (e: CancellationException) {
+            _state.value = InstallState.Idle
+            throw e
+        } catch (e: Exception) {
+            logger.warn("Fetching the newer build failed", e)
+            _state.value = InstallState.Failed
+        } finally {
+            lock.unlock()
+        }
+    }
+
+    private suspend fun fetched(release: AppRelease): File {
+        val url = release.apkUrl ?: throw IOException("the release has no APK")
+        // Named by the run number, not the tag: nothing a release says gets into a path.
+        val apk = File(dir, "hamza-team-${release.versionCode}.apk")
+        if (!apk.isFile) {
+            // The build before this one, or half of one: one APK at a time.
+            dir.deleteRecursively()
+            dir.mkdirs()
+            source.fetch(url, apk) { _state.value = InstallState.Fetching(it) }
+        }
+        if (!device.isThisApp(apk)) {
+            apk.delete()
+            throw IOException("not a build of this app")
+        }
+        return apk
     }
 }

@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,6 +24,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.core.AppRelease
 import de.hamzabistro.printstation.core.FailedEmail
+import de.hamzabistro.printstation.core.InstallState
 import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.Kitchen
 import de.hamzabistro.printstation.core.KitchenSlot
@@ -180,6 +186,34 @@ class QueueStatusTest {
         compose.onNodeWithText("Update available: 0.2.200").assertIsDisplayed()
         compose.onNodeWithText("Install").assertIsDisplayed()
         compose.onNodeWithContentDescription("Open menu — an update is available").assertExists()
+    }
+
+    @Test
+    fun installFetchesTheUpdateHereAndLeavesTheBrowserForWhenItFails() {
+        val release = AppRelease(versionCode = 200, versionName = "0.2.200", downloadUrl = "https://example.com/app.apk")
+        var install by mutableStateOf<InstallState>(InstallState.Idle)
+        val asked = mutableListOf<AppRelease>()
+        compose.setContent {
+            AppTheme {
+                val drawer = rememberDrawerState(DrawerValue.Open)
+                val header = DrawerHeader(null, "Tablet", "0.2.100", release, install)
+                StaffDrawer(drawer, enabled = true, IssuesState(), header, onOpen = {}, onInstall = { asked += it }) { Text("Queue") }
+            }
+        }
+        compose.onNodeWithText("Download in the browser").assertDoesNotExist()
+        compose.onNodeWithText("Install").performClick()
+        check(asked == listOf(release)) { asked.toString() }
+
+        // On its way: how far, and no second tap.
+        install = InstallState.Fetching(0.5f)
+        compose.onNodeWithText("Downloading… 50%").assertIsDisplayed().assertIsNotEnabled()
+        install = InstallState.Fetching(null)
+        compose.onNodeWithText("Downloading…").assertIsDisplayed().assertIsNotEnabled()
+
+        install = InstallState.Failed
+        compose.onNodeWithText("The update could not be downloaded here.").assertIsDisplayed()
+        compose.onNodeWithText("Download in the browser").assertIsDisplayed()
+        compose.onNodeWithText("Install").assertIsEnabled()
     }
 
     private class RecordingShop(val calls: MutableList<String>) : ShopActions {
