@@ -82,11 +82,13 @@ import de.hamzabistro.printstation.core.OptionGroup
 import de.hamzabistro.printstation.core.OptionRules
 import de.hamzabistro.printstation.core.OrderMenu
 import de.hamzabistro.printstation.core.OrderSource
+import de.hamzabistro.printstation.core.PhoneNumbers
 import de.hamzabistro.printstation.core.PhoneOrderDraft
 import de.hamzabistro.printstation.core.PhoneOrderError
 import de.hamzabistro.printstation.core.PhoneOrderException
 import de.hamzabistro.printstation.core.PhoneOrderQuote
 import de.hamzabistro.printstation.core.PhoneOrders
+import de.hamzabistro.printstation.core.RecentAddress
 import de.hamzabistro.printstation.core.Selection
 import de.hamzabistro.printstation.core.StreetDelivery
 import de.hamzabistro.printstation.core.StreetDirectory
@@ -117,6 +119,8 @@ data class NewOrderState(
     val streets: List<StreetSuggestion> = emptyList(),
     /** Nothing like what is typed is on the list: a street outside Leipzig, or misheard beyond guessing. */
     val streetUnlisted: Boolean = false,
+    /** Where the number in the phone field had deliveries before, the latest first; [recentChoices] is what of them is offered. */
+    val recentAddresses: List<RecentAddress> = emptyList(),
     /** check-address's answer for [checkedAddress]. */
     val address: AddressCheck? = null,
     /** The address [address] is the answer for: street, postcode, town. */
@@ -146,6 +150,10 @@ data class NewOrderState(
     val streetChoices: List<StreetSuggestion>
         get() = if (streets.firstOrNull()?.let { it.fullStreet == draft.street.trim() && draft.postalCode in it.entry.postcodes } == true) emptyList() else streets
 
+    /** The earlier addresses to pick from: not the one that is in the fields already. */
+    val recentChoices: List<RecentAddress>
+        get() = recentAddresses.filterNot { it.street == draft.street.trim() && it.postalCode == draft.postalCode && it.city == draft.city.trim() }
+
     /** [address] is the answer for the address on the screen now, not for one typed over since. */
     val addressChecked: Boolean
         get() = checkedAddress == draft.addressKey()
@@ -171,6 +179,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     private var pricing: Job? = null
     private var suggesting: Job? = null
+    private var remembering: Job? = null
     private var addressCheck: Job? = null
 
     /** The price and the check while typing both want the address checked: one asks, the other takes the answer. */
@@ -196,6 +205,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         _state.update { it.copy(draft = change(it.draft), error = null) }
         val draft = _state.value.draft
         if (draft.street != before.street) suggestStreets()
+        if (draft.phone != before.phone) recallAddresses()
         if (draft.delivery != before.delivery || draft.addressKey() != before.addressKey()) checkWhileTyping()
         reprice()
     }
@@ -212,6 +222,45 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 _state.update { if (it.draft.street == street) it.copy(streets = found, streetUnlisted = unlisted) else it }
             }
     }
+
+    /**
+     * The caller's number, from the banner: into the phone field while it is
+     * still empty — never over a number typed — and with it a phone order.
+     */
+    fun takeNumber(phone: String) {
+        if (_state.value.draft.phone.isNotBlank()) return
+        edit { it.copy(phone = PhoneNumbers.national(phone), source = OrderSource.PHONE) }
+    }
+
+    /**
+     * Where the number in the phone field had deliveries in the last 30
+     * days, asked once the typing pauses on a whole number. Offered, never
+     * filled in: the caller may have moved, or be ordering for somebody else.
+     */
+    private fun recallAddresses() {
+        remembering?.cancel()
+        _state.update { it.copy(recentAddresses = emptyList()) }
+        val phone = _state.value.draft.phone
+        if (!PhoneNumbers.complete(phone)) return
+        remembering =
+            viewModelScope.launch {
+                delay(PRICE_PAUSE_MS)
+                val found =
+                    try {
+                        graph.calls.recentAddresses(phone)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Offline, or not this account's to ask: the address is typed, as it always was.
+                        emptyList()
+                    }
+                _state.update { if (it.draft.phone == phone) it.copy(recentAddresses = found) else it }
+            }
+    }
+
+    /** An earlier address picked: street, postcode, town and the door note of the last delivery there. */
+    fun pickAddress(address: RecentAddress) =
+        edit { it.copy(street = address.street, postalCode = address.postalCode, city = address.city, addressNote = address.addressNote) }
 
     /** A street picked from the list: its name as the city spells it with the number typed, its postcode, and Leipzig. */
     fun pickStreet(street: StreetSuggestion) =
@@ -354,6 +403,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     fun reset() {
         pricing?.cancel()
         suggesting?.cancel()
+        remembering?.cancel()
         addressCheck?.cancel()
         _state.update { NewOrderState(menu = it.menu) }
     }
@@ -729,6 +779,20 @@ private fun fulfilmentLabel(fulfilment: Fulfilment): Int =
 private fun AddressSection(state: NewOrderState, model: NewOrderViewModel) {
     val draft = state.draft
     Section(stringResource(R.string.new_order_address)) {
+        // First: for a caller who has ordered before, one tap is the whole address.
+        if (state.recentChoices.isNotEmpty()) {
+            Text(stringResource(R.string.new_order_recent_addresses), style = MaterialTheme.typography.labelLarge)
+            for (recent in state.recentChoices) {
+                OutlinedCard(Modifier.fillMaxWidth().clickable { model.pickAddress(recent) }) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Text(recent.line, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        if (recent.addressNote.isNotBlank()) {
+                            Text(recent.addressNote, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
         OutlinedTextField(
             value = draft.street,
             onValueChange = { v -> model.edit { it.copy(street = v) } },

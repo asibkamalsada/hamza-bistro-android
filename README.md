@@ -65,6 +65,7 @@ tablet stays the place orders are taken.
 | ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
 | The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every accepted order, screen on    |
 | A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Bar" / "Karte"; alarm "once" or off; own night window      |
+| The shop's phone (optional)     | a staff account                           | "Anrufe ans Tablet melden": tells the tablet who is calling                           |
 
 Which one a device is follows from the account: staff get the queue. A
 print account (`public.print_accounts`) gets the printer setup and nothing
@@ -131,7 +132,12 @@ accepted order
   its order, a "single" group a required choice that starts on its first
   choice still on sale, a "multiple" one any number; sold out by an
   ingredient counts. A quantity and a note per dish (80 characters);
-- name and phone, needed for a delivery or a pickup;
+- name and phone, needed for a delivery or a pickup. With
+  [the shop's phone reporting its calls](#the-callers-number-on-the-tablet),
+  the number is there before it is asked for;
+- for a number that had deliveries in the last 30 days, the addresses they
+  went to — three at most, the latest first, each with its door note — to
+  take with a tap. They are offered, never filled in;
 - for a delivery, the street is picked rather than spelled. As it is typed,
   Leipzig's streets like it are offered — from half a name, without its
   umlauts or "Straße", spelled the way it sounded ("karl herting 9" is
@@ -157,6 +163,34 @@ accepted order
 The card and "Letzte Bestellungen" mark such orders "Telefon" or "Vor Ort /
 Theke", "Hier essen" and "Gebühr erlassen", and never "Neuer Kunde". The
 Auswertung splits by source once there is anything but the website.
+
+### The caller's number on the tablet
+
+A phone order used to start with copying the caller's number off the
+phone's screen. With the app also on the shop's phone, the tablet shows
+who is calling, over whatever screen is up: **Anruf von 0176 1234567**,
+where that number had its last delivery, and **Neue Bestellung**, which
+opens the form with the number in it and "Telefon" picked. With the form
+already open, the button is **Nummer übernehmen**, and only while its phone
+field is empty. Nothing opens by itself; a banner goes when it is used, put
+away with ✕, or three minutes old. A driver's phone shows none.
+
+On the shop's phone: install the app, sign in with a staff account, and
+switch on **Einstellungen → Laden-Telefon → Anrufe ans Tablet melden**.
+Android asks whether the app may be the phone's call screening app; without
+a yes it is never told about a call. It screens nothing
+([`CallReportService`](app/src/main/kotlin/de/hamzabistro/printstation/calls/CallReportService.kt)):
+every call goes through as it is, and only then is the number filed, as the
+signed-in account
+([`20261013120000_incoming_calls.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261013120000_incoming_calls.sql)).
+The database keeps it for two hours. The switch is only there on a device
+that takes calls.
+
+What it does not see: Android does not ask a screening app about numbers
+saved in the phone's contacts, so a regular who is in the shop phone's
+address book does not appear on the tablet; and a withheld number has
+nothing to pass on. On a database without the migration, the phone's
+reports fail quietly and the tablet shows no banners.
 
 ### Fahrer
 

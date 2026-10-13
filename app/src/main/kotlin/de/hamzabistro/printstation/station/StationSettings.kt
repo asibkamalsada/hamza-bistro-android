@@ -65,6 +65,8 @@ data class DevicePrefs(
     val keepAwake: Boolean = true,
     /** A driver's phone: the queue opens on "Fahrer", the bags to take and the stops to ride. */
     val driver: Boolean = false,
+    /** The shop's phone: tells the order tablet who is calling ("Anrufe ans Tablet melden"). */
+    val reportCalls: Boolean = false,
 )
 
 /**
@@ -172,6 +174,7 @@ class StationSettings(context: Context) {
             travelMode = enumOr(prefs.getString(TRAVEL_MODE, null), d.travelMode)!!,
             keepAwake = prefs.getBoolean(KEEP_AWAKE, d.keepAwake),
             driver = prefs.getBoolean(DRIVER, d.driver),
+            reportCalls = prefs.getBoolean(REPORT_CALLS, d.reportCalls),
         )
     }
 
@@ -203,6 +206,7 @@ class StationSettings(context: Context) {
             .putString(TRAVEL_MODE, p.travelMode.name)
             .putBoolean(KEEP_AWAKE, p.keepAwake)
             .putBoolean(DRIVER, p.driver)
+            .putBoolean(REPORT_CALLS, p.reportCalls)
             .apply()
     }
 
@@ -253,6 +257,7 @@ class StationSettings(context: Context) {
         private const val TRAVEL_MODE = "travel_mode"
         private const val KEEP_AWAKE = "keep_awake"
         private const val DRIVER = "driver"
+        private const val REPORT_CALLS = "report_calls"
         private const val NEVER = "never"
     }
 }
