@@ -480,11 +480,12 @@ the app logs it.
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer
-  release (`AppUpdate`).
+  release and the download of its APK (`AppUpdate`).
 - [`app/`](app) — what only Android can do: the service and the boot
   receiver (`station/`), the alarm's sound and screen (`alarm/`), the undo
   window (`queue/`), the BLE printer (`printer/`), the Keystore-sealed
-  session (`security/`), and the screens (`ui/`).
+  session (`security/`), handing a downloaded update to Android's installer
+  (`update/`), and the screens (`ui/`).
 
 The package is still `de.hamzabistro.printstation`: it is the application
 id, and changing it would make the new app a second install beside the
@@ -521,6 +522,13 @@ pockets, so it gives away as little as it can:
   receiver and the "Stumm" receiver hear only the system and the app's own
   notification. Releases are minified with debug logging stripped, and
   logs never carry a token or anything about a customer.
+- **Updates.** The app may ask Android to install an APK
+  (`REQUEST_INSTALL_PACKAGES`), and uses that for one thing: **Installieren**
+  on a newer release. It downloads that release's APK from GitHub over the
+  same HTTPS, hands it over only when it carries this app's own id, and
+  Android asks the person every time and installs it only when it is signed
+  with the release key. So it can replace this app with a build of it from
+  CI, and install nothing else.
 - **The captcha.** The site's sign-in is behind Cloudflare Turnstile; the
   app shows the same widget in a WebView that cannot navigate or call into
   the app, wiped when it closes.
@@ -567,7 +575,8 @@ In hamza-bistro-web:
    [releases](https://github.com/asibkamalsada/hamza-bistro-android/releases/latest),
    open it and allow installing from that source when Android asks. A newer
    release installs the same way, over the old one — and over the old
-   **Druckstation**, keeping its sign-in, printer and printing.
+   **Druckstation**, keeping its sign-in, printer and printing — or from
+   the app itself (see "Newer versions").
 2. Open **Hamza Team**. The first screen, **Gerät einrichten**, asks for
    everything at once, one after the other: notifications and "Geräte in
    der Nähe" (the printer's Bluetooth) in Android's own dialog, then
@@ -612,16 +621,24 @@ encrypted data locked.
 
 ### Newer versions
 
-The app does not update itself. It reads the latest release from GitHub's
-API (unauthenticated: the repository is public) when the queue or the
-settings are opened, at most once an hour, and once a day while on shift;
-a release whose tag's run number (`v0.2.<run>`) is above the installed
-`versionCode` shows **Update verfügbar: 0.2.… · Installieren** above the
-queue and under **Einstellungen → App**. **Installieren** opens the APK's
-download in the browser; Android's installer puts it over the old version,
-keeping the sign-in and the printer. A GitHub that does not answer changes
-nothing: the check runs beside the queue and the alarm, never in their way,
-and only the settings say that it failed.
+The app does not update itself unasked. It reads the latest release from
+GitHub's API (unauthenticated: the repository is public) when the queue or
+the settings are opened, at most once an hour, and once a day while on
+shift; a release whose tag's run number (`v0.2.<run>`) is above the
+installed `versionCode` shows **Update verfügbar: 0.2.… · Installieren** in
+the drawer (☰, which gets a dot) and under **Einstellungen → App**.
+
+**Installieren** downloads the APK in the app itself — the button says how
+far it is — and opens Android's installer, which puts it over the old
+version, keeping the sign-in and the printer. No browser is involved, so
+none has to agree to download an APK. The first time, Android asks whether
+Hamza Team may install apps: allow it and go back. Should the download fail,
+**Im Browser laden** appears under the button and opens it in the browser
+instead, as before.
+
+A GitHub that does not answer changes nothing: the check and the download
+run beside the queue and the alarm, never in their way, and only the
+settings and the button say that they failed.
 
 ### Updating from the Druckstation
 

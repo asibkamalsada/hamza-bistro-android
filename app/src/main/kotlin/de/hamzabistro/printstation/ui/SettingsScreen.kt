@@ -75,6 +75,7 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
     val state by staff.state.collectAsStateWithLifecycle()
     val mainState by main.state.collectAsStateWithLifecycle()
     val update by staff.update.collectAsStateWithLifecycle()
+    val install by staff.installing.collectAsStateWithLifecycle()
     val prefs = state.prefs
     val context = LocalContext.current
     var checks by remember { mutableIntStateOf(0) }
@@ -294,7 +295,7 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
 
             AccountSection(mainState, main)
 
-            AppSection(update, onCheck = { staff.checkForUpdate() })
+            AppSection(update, install, onCheck = { staff.checkForUpdate() }, onInstall = { staff.install(it) })
         }
     }
 }

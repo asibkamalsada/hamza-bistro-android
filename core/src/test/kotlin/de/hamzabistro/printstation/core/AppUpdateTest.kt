@@ -1,6 +1,8 @@
 package de.hamzabistro.printstation.core
 
+import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -11,7 +13,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
 
 class AppReleasesTest {
     /** /releases/latest as GitHub answered it for v0.2.30, cut down to what is read and a little more. */
@@ -46,6 +52,7 @@ class AppReleasesTest {
             "https://github.com/asibkamalsada/hamza-bistro-android/releases/download/v0.2.30/hamza-team-0.2.30.apk",
             release.downloadUrl,
         )
+        assertEquals(release.downloadUrl, release.apkUrl)
         assertEquals(listOf("Add staff management screens: menu, hours, health, and history", "Fix the printer"), release.changes)
     }
 
@@ -53,12 +60,14 @@ class AppReleasesTest {
     fun `falls back to the release's page without an APK`() {
         val release = AppReleases.parse(release(assets = """[{"name":"notes.txt","browser_download_url":"https://example.org/notes.txt"}]"""))!!
         assertEquals("https://github.com/asibkamalsada/hamza-bistro-android/releases/tag/v0.2.30", release.downloadUrl)
+        assertNull(release.apkUrl)
     }
 
     @Test
     fun `never offers a download over plain http`() {
         val release = AppReleases.parse(release(assets = """[{"name":"a.apk","browser_download_url":"http://example.org/a.apk"}]"""))!!
         assertEquals("https://github.com/asibkamalsada/hamza-bistro-android/releases/tag/v0.2.30", release.downloadUrl)
+        assertNull(release.apkUrl)
     }
 
     @Test
@@ -216,5 +225,204 @@ class UpdateCheckerTest {
         clock += 10.minutes.inWholeMilliseconds
         checker.check(UpdateChecker.ON_OPEN)
         assertEquals(1, asked)
+    }
+}
+
+class ApkDownloadTest {
+    private val test = TestServer()
+    private val dir = Files.createTempDirectory("apk").toFile()
+    private val target = File(dir, "hamza-team-31.apk")
+    private val url = test.server.url("/x/y/releases/download/v0.2.31/hamza-team-0.2.31.apk").toString()
+
+    @AfterTest
+    fun close() {
+        test.close()
+        dir.deleteRecursively()
+    }
+
+    private fun apk(bytes: Int) = test.reply(200, "x".repeat(bytes), "application/vnd.android.package-archive")
+
+    /** The same without a Content-Length: the stream just ends. */
+    private fun apkOfUnknownLength(bytes: Int) =
+        test.server.enqueue(MockResponse.Builder().code(200).body("x".repeat(bytes)).removeHeader("Content-Length").build())
+
+    @Test
+    fun `writes the APK to the file, and says how far it is`() = runBlocking<Unit> {
+        apk(300_000)
+        val progress = mutableListOf<Float?>()
+
+        ApkDownload(test.client, "HamzaTeam/0.2.30").fetch(url, target) { progress += it }
+
+        assertEquals(300_000L, target.length())
+        assertEquals(listOf(target.name), dir.list()!!.toList())
+        assertEquals(1f, progress.last())
+        assertEquals<List<Float?>>(progress.map { it!! }.sorted(), progress)
+        val request = test.server.takeRequest()
+        assertEquals("HamzaTeam/0.2.30", request.headers["User-Agent"])
+        assertNull(request.headers["Authorization"])
+    }
+
+    @Test
+    fun `says nothing of how far when the server does not say how long`() = runBlocking<Unit> {
+        apkOfUnknownLength(5_000)
+        val progress = mutableListOf<Float?>()
+
+        ApkDownload(test.client, "HamzaTeam/0.2.30").fetch(url, target) { progress += it }
+
+        assertEquals(5_000L, target.length())
+        assertTrue(progress.isNotEmpty() && progress.all { it == null })
+    }
+
+    @Test
+    fun `takes the place of what was there`() = runBlocking<Unit> {
+        target.writeText("the build before")
+        apk(2_000)
+        ApkDownload(test.client, "HamzaTeam/0.2.30").fetch(url, target) {}
+        assertEquals(2_000L, target.length())
+    }
+
+    @Test
+    fun `an error leaves nothing behind`() = runBlocking<Unit> {
+        test.reply(404, "Not Found", "text/plain")
+        assertFailsWith<IOException> { ApkDownload(test.client, "HamzaTeam/0.2.30").fetch(url, target) {} }
+        assertEquals(emptyList(), dir.list()!!.toList())
+    }
+
+    @Test
+    fun `refuses far more than an APK, whether the server says how long or not`() = runBlocking<Unit> {
+        val small = ApkDownload(test.client, "HamzaTeam/0.2.30", maxBytes = 1_000)
+        apk(5_000)
+        assertFailsWith<IOException> { small.fetch(url, target) {} }
+        apkOfUnknownLength(5_000)
+        assertFailsWith<IOException> { small.fetch(url, target) {} }
+        assertEquals(emptyList(), dir.list()!!.toList())
+    }
+
+    @Test
+    fun `never fetches over plain http`() = runBlocking<Unit> {
+        assertFailsWith<IOException> { ApkDownload(test.client, "HamzaTeam/0.2.30").fetch("http://example.org/a.apk", target) {} }
+        assertEquals(0, test.server.requestCount)
+    }
+}
+
+class UpdateInstallerTest {
+    private val dir = File(Files.createTempDirectory("cache").toFile(), "updates")
+
+    private var fetches = 0
+    private var failing = false
+    private var ours = true
+    private val opened = mutableListOf<File>()
+
+    /** What the buttons showed while the APK was on its way. */
+    private val shown = mutableListOf<InstallState>()
+
+    /** Holds the fetch until it is completed, for a second tap meanwhile. */
+    private var gate: CompletableDeferred<Unit>? = null
+    private val fetching = CompletableDeferred<Unit>()
+
+    private val source: ApkSource = ApkSource { _, target, progress ->
+        fetches++
+        shown += installer.state.value
+        fetching.complete(Unit)
+        gate?.await()
+        if (failing) throw IOException("no network")
+        progress(0.5f)
+        shown += installer.state.value
+        target.writeText("apk")
+    }
+
+    private val device =
+        object : ApkInstaller {
+            override fun isThisApp(apk: File) = ours
+
+            override fun open(apk: File) {
+                opened += apk
+            }
+        }
+
+    private val installer: UpdateInstaller = UpdateInstaller(source, dir, device, Logger.NONE)
+
+    private fun build(code: Int, apk: Boolean = true) =
+        AppRelease(
+            versionCode = code,
+            versionName = "0.2.$code",
+            downloadUrl = "https://example.org/releases/tag/v0.2.$code",
+            apkUrl = "https://example.org/hamza-team-0.2.$code.apk".takeIf { apk },
+        )
+
+    @AfterTest
+    fun clear() {
+        dir.parentFile.deleteRecursively()
+    }
+
+    @Test
+    fun `fetches the APK and hands it to Android's installer`() = runBlocking {
+        installer.install(build(31))
+
+        assertEquals<List<File>>(listOf(File(dir, "hamza-team-31.apk")), opened)
+        assertEquals("apk", opened.single().readText())
+        assertEquals<List<InstallState>>(listOf(InstallState.Fetching(null), InstallState.Fetching(0.5f)), shown)
+        assertEquals(InstallState.Idle, installer.state.value)
+    }
+
+    @Test
+    fun `a tap after Android's installer was closed opens what is already here`() = runBlocking {
+        installer.install(build(31))
+        installer.install(build(31))
+        assertEquals(1, fetches)
+        assertEquals(2, opened.size)
+    }
+
+    @Test
+    fun `a newer build takes the place of the one before`() = runBlocking {
+        installer.install(build(31))
+        installer.install(build(32))
+        assertEquals(2, fetches)
+        assertEquals(listOf("hamza-team-32.apk"), dir.list()!!.toList())
+    }
+
+    @Test
+    fun `a failure never escapes, and the next tap tries again`() = runBlocking {
+        failing = true
+        installer.install(build(31))
+        assertEquals(InstallState.Failed, installer.state.value)
+        assertTrue(opened.isEmpty())
+
+        failing = false
+        installer.install(build(31))
+        assertEquals(InstallState.Idle, installer.state.value)
+        assertEquals(1, opened.size)
+    }
+
+    @Test
+    fun `never hands over what is not a build of this app`() = runBlocking {
+        ours = false
+        installer.install(build(31))
+        assertEquals(InstallState.Failed, installer.state.value)
+        assertTrue(opened.isEmpty())
+        assertEquals(emptyList(), dir.list()!!.toList())
+    }
+
+    @Test
+    fun `a release without an APK is left to the browser`() = runBlocking {
+        installer.install(build(31, apk = false))
+        assertEquals(InstallState.Failed, installer.state.value)
+        assertEquals(0, fetches)
+    }
+
+    @Test
+    fun `a tap while one is on its way does nothing`() = runBlocking {
+        val held = CompletableDeferred<Unit>().also { gate = it }
+        val first = launch(Dispatchers.Default) { installer.install(build(31)) }
+        fetching.await()
+
+        installer.install(build(31))
+        assertEquals(1, fetches)
+        assertTrue(opened.isEmpty())
+        assertEquals(InstallState.Fetching(null), installer.state.value)
+
+        held.complete(Unit)
+        first.join()
+        assertEquals(1, opened.size)
     }
 }

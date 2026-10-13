@@ -752,7 +752,11 @@
     <string name="update_failing">Gerade nicht geprüft (keine Antwort von GitHub). Die App läuft wie bisher.</string>
     <string name="update_check">Jetzt prüfen</string>
     <string name="update_changes">Neu:</string>
-    <string name="update_hint">„Installieren“ lädt die APK im Browser; öffnen, und Android installiert sie über diese Version. Anmeldung und Drucker bleiben. Beim ersten Mal fragt Android, ob der Browser Apps installieren darf.</string>
+    <string name="update_fetching">Lädt …</string>
+    <string name="update_fetching_percent">Lädt … %1$d %%</string>
+    <string name="update_fetch_failed">Das Update ließ sich hier nicht laden.</string>
+    <string name="update_in_browser">Im Browser laden</string>
+    <string name="update_hint">„Installieren“ lädt das Update hier in der App und öffnet Androids Installation, die es über diese Version legt. Anmeldung und Drucker bleiben. Beim ersten Mal fragt Android, ob diese App Apps installieren darf: erlauben und zurückgehen.</string>
 
     <!-- Der Fahrer: mehrere Tüten auf einmal, eine Route (#8) -->
     <string name="queue_tab">Bestellungen</string>

@@ -7,6 +7,7 @@ import android.util.Log
 import de.hamzabistro.printstation.alarm.AlarmPlayer
 import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.ApkDownload
 import de.hamzabistro.printstation.core.CallWatch
 import de.hamzabistro.printstation.core.CallsState
 import de.hamzabistro.printstation.core.DeviceReport
@@ -40,6 +41,7 @@ import de.hamzabistro.printstation.core.SupabaseRatingsBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
 import de.hamzabistro.printstation.core.UpdateChecker
+import de.hamzabistro.printstation.core.UpdateInstaller
 import de.hamzabistro.printstation.printer.BlePrinter
 import de.hamzabistro.printstation.queue.PendingSteps
 import de.hamzabistro.printstation.security.KeystoreSessionStore
@@ -48,6 +50,7 @@ import de.hamzabistro.printstation.station.StationSettings
 import de.hamzabistro.printstation.station.StationState
 import de.hamzabistro.printstation.station.wire
 import de.hamzabistro.printstation.ui.ShopView
+import de.hamzabistro.printstation.update.AndroidApkInstaller
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -310,6 +313,20 @@ class AppGraph(context: Context) {
             installed = BuildConfig.VERSION_CODE,
             logger = logger,
             now = monotonic,
+        )
+
+    /**
+     * "Installieren": that APK fetched here and handed to Android's
+     * installer, with no browser in between. Given minutes rather than the
+     * seconds every other call gets: it is megabytes, perhaps on a phone's
+     * weak signal.
+     */
+    val installer =
+        UpdateInstaller(
+            source = ApkDownload(http.newBuilder().callTimeout(5, TimeUnit.MINUTES).build(), "HamzaTeam/${BuildConfig.VERSION_NAME}"),
+            dir = File(this.context.cacheDir, AndroidApkInstaller.DIR),
+            device = AndroidApkInstaller(this.context),
+            logger = logger,
         )
 
     // -----------------------------------------------------------------------
