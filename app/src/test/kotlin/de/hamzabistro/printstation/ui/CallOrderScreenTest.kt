@@ -42,9 +42,9 @@ class CallOrderScreenTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
-    private fun open(texting: Boolean = true): NewOrderViewModel {
+    private fun open(): NewOrderViewModel {
         val model = NewOrderViewModel(app)
-        compose.setContent { AppTheme { CallOrderScreen(onBack = {}, onFullForm = {}, model = model, texting = texting) } }
+        compose.setContent { AppTheme { CallOrderScreen(onBack = {}, onFullForm = {}, model = model) } }
         compose.waitForIdle()
         return model
     }
@@ -84,12 +84,15 @@ class CallOrderScreenTest {
     }
 
     @Test
-    fun withNothingToSendTextsTheAddressIsTypedOnly() {
-        val model = open(texting = false)
-        named(model)
-        compose.onNodeWithText("Where should it go?").assertIsDisplayed()
-        compose.onNodeWithText("📱 Send the caller an SMS").assertDoesNotExist()
-        compose.onNodeWithText("Street and house number").assertIsDisplayed()
+    fun aLandlineIsNotOfferedAnSms() {
+        val model = open()
+        compose.onNodeWithText("Name").performTextInput("Ali")
+        compose.onNodeWithText("Phone number").performTextInput("0341 5550001")
+        compose.onNodeWithText("Next ➜").performClick()
+        compose.waitForIdle()
+        assertEquals(CallStep.ADDRESS, model.state.value.step)
+        compose.onNodeWithText("📱 Send the caller an SMS").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText("That is a landline number: an SMS only goes to a mobile.").assertIsDisplayed()
     }
 
     @Test
