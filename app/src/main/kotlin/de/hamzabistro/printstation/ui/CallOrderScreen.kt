@@ -644,8 +644,8 @@ internal fun DishGrid(
             for (name in categories) CategoryChip(name, category == name) { category = name }
         }
         LazyVerticalGrid(
-            // Two to a row on a phone, five or six on a tablet.
-            columns = GridCells.Adaptive(minSize = 160.dp),
+            // Two to a row on a phone (360 dp less the padding is 328: two of 150 and a gap), five on a tablet.
+            columns = GridCells.Adaptive(minSize = 150.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 12.dp),
