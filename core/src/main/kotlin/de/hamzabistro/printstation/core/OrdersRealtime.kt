@@ -241,6 +241,13 @@ class OrdersRealtime(
 
         /** The calls the shop's phone reports (hamza-bistro-web: 20261013120000_incoming_calls), for the tablet's banner. */
         CALLS("realtime:incoming-calls", null, "incoming_calls"),
+
+        /**
+         * The links texted to callers for their address (hamza-bistro-web:
+         * 20261013170000_address_requests): the address arriving, a text to
+         * send, a text sent.
+         */
+        ADDRESS_REQUESTS("realtime:address-requests", null, "address_requests"),
     }
 
     companion object {

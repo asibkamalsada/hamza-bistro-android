@@ -67,7 +67,7 @@ tablet stays the place orders are taken.
 | ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
 | The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every order as it comes in, screen on |
 | A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Bar" / "Karte"; alarm "once" or off; own night window      |
-| The shop's phone (optional)     | a staff account                           | "Anrufe ans Tablet melden": tells the tablet who is calling                           |
+| The shop's phone (optional)     | a staff account                           | "Anrufe ans Tablet melden": who is calling; "SMS-Links senden": the address links     |
 
 Which one a device is follows from the account: staff get the queue. A
 print account (`public.print_accounts`) gets the printer setup and nothing
@@ -170,12 +170,14 @@ Auswertung splits by source once there is anything but the website.
 
 A phone order used to start with copying the caller's number off the
 phone's screen. With the app also on the shop's phone, the tablet shows
-who is calling, over whatever screen is up: **Anruf von 0176 1234567**,
-where that number had its last delivery, and **Neue Bestellung**, which
-opens the form with the number in it and "Telefon" picked. With the form
-already open, the button is **Nummer übernehmen**, and only while its phone
-field is empty. Nothing opens by itself; a banner goes when it is used, put
-away with ✕, or three minutes old. A driver's phone shows none.
+who is calling, over whatever screen is up, big enough to read from across
+the kitchen: **📞 Das Telefon klingelt**, **Anruf von 0176 1234567** in
+large type, where that number had its last delivery, and one wide button,
+**Bestellung aufnehmen**, which opens [Telefon-Bestellung](#telefon-bestellung)
+with the number in it. With an order form already open, the button is
+**Nummer übernehmen**, and only while its phone field is empty. Nothing
+opens by itself; a banner goes when it is used, put away with ✕, or three
+minutes old. A driver's phone shows none.
 
 On the shop's phone: install the app, sign in with a staff account, and
 switch on **Einstellungen → Laden-Telefon → Anrufe ans Tablet melden**.
@@ -193,6 +195,75 @@ saved in the phone's contacts, so a regular who is in the shop phone's
 address book does not appear on the tablet; and a withheld number has
 nothing to pass on. On a database without the migration, the phone's
 reports fail quietly and the tablet shows no banners.
+
+### Telefon-Bestellung
+
+The same order as [Neue Bestellung](#neue-bestellung), taken one screen at
+a time by somebody who need not read or see well: everything 1.3 times as
+big, one question per screen, the buttons along the bottom, **Weiter ➜**
+only once the screen is answered
+([`CallOrderScreen`](app/src/main/kotlin/de/hamzabistro/printstation/ui/CallOrderScreen.kt)).
+It opens from the call's banner, and from **📞 Telefon-Bestellung** on the
+queue, beside **+ Neue Bestellung**:
+
+1. **Wie heißt der Anrufer?** The name; the number is there already from
+   the call.
+2. **Wohin soll es gehen?** The address as in Neue Bestellung — the
+   caller's earlier addresses to tap, Leipzig's streets offered as it is
+   typed, the postcode and town filled in, check-address's verdict ("✓" or
+   "Dorthin liefern wir nicht") — or, when the address does not survive the
+   phone, **📱 SMS an den Anrufer senden** (below). **🛍 Holt selbst ab**
+   makes it a pickup with no address.
+3. **Welche Gerichte?** Only the dishes: big tiles with their photos, a
+   category at a time; a tap puts one in the basket (or opens the dish's
+   choices over the whole screen), and the tile says "2×".
+4. **Prüfen, dann speichern**: who, where, the dishes with − and +, the
+   price (the database's own dry run, as in Neue Bestellung), and "Fertig
+   in ca. 35 Min." to tell the caller. **✓ Bestellung speichern** puts it
+   into the kitchen, accepted, as soon as possible, at the minutes an
+   incoming order would be offered.
+
+**Alle Felder** switches to the full form with everything typed so far, for
+a time ahead, a counter order or the fee waiver.
+
+#### The address by SMS
+
+**📱 SMS an den Anrufer senden** texts the caller a link —
+`https://www.hamzabistro.de/a/…` — to a page where they type the address
+themselves, on their own phone, during the call or after it
+([`AddressRequests`](core/src/main/kotlin/de/hamzabistro/printstation/core/AddressRequests.kt),
+[`20261013170000_address_requests.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261013170000_address_requests.sql)).
+The screen says how the text fares ("✓ SMS gesendet", or why not, with
+**Nochmal senden**), and the dishes are taken meanwhile.
+
+- The address arrives while the caller is still on the line: it goes into
+  the fields, is checked and priced like one typed, and the order is saved
+  the usual way.
+- It has not arrived by step 4: **✓ Speichern und auf die Adresse warten**
+  saves the basket on the link. The tablet puts the order into the kitchen
+  by itself the moment the caller sends the address — checked with
+  check-address, priced, saved, and printed like any other
+  ([`AddressRequestPlacer`](core/src/main/kotlin/de/hamzabistro/printstation/core/AddressRequests.kt)).
+  Until then it waits above the queue, on every device, as **Warten auf
+  Adresse**: who, what, and how far it got. An address outside the area,
+  under the last ring's minimum or with a dish sold out since waits there in
+  red for a person, with **📞** to call back and **Nochmal versuchen**; a
+  corrected address from the caller tries again by itself. **Löschen** ends
+  it, and the link with it.
+
+The link takes an address for three hours, and only until the order is
+placed; the database keeps the request a day.
+
+**The text is sent by the shop's phone** — the one the caller has just
+rung, from its own number and SIM: no SMS gateway, nothing to pay per text
+beyond the phone's plan, and the caller's number goes to nobody new. On that
+phone: **Einstellungen → Laden-Telefon → SMS-Links senden**, and allow
+sending SMS when Android asks. The app then keeps a small service running
+for it, on shift or not
+([`TextSender`](app/src/main/kotlin/de/hamzabistro/printstation/calls/TextSender.kt)).
+If no phone sends a text within 45 seconds, the tablet says so: "Kein Handy
+hat die SMS gesendet". A tablet with a SIM of its own can send them itself
+with the same switch.
 
 ### Fahrer
 
@@ -489,13 +560,14 @@ the app logs it.
   and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
-  phone and walk-in orders (`PhoneOrder`), who hears about orders, the print
+  phone and walk-in orders (`PhoneOrder`), the caller's number and the
+  address by SMS (`IncomingCalls`, `AddressRequests`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer
   release and the download of its APK (`AppUpdate`).
 - [`app/`](app) — what only Android can do: the service and the boot
-  receiver (`station/`), the alarm's sound and screen (`alarm/`), the undo
+  receiver (`station/`), the call screening and the texts (`calls/`), the alarm's sound and screen (`alarm/`), the undo
   window (`queue/`), the BLE printer (`printer/`), the Keystore-sealed
   session (`security/`), handing a downloaded update to Android's installer
   (`update/`), and the screens (`ui/`).
@@ -580,6 +652,9 @@ In hamza-bistro-web:
 4. For opening and closing the shop from the app:
    `20261001150000_shop_hours.sql`. Without it the line above the queue is
    not shown, and everything else works as before.
+5. For the address by SMS: `20261013170000_address_requests.sql`, and the
+   site deployed with its `/a/…` page. Without it, **SMS an den Anrufer
+   senden** says the server needs the update, and everything else works.
 
 ### 2. Each device
 

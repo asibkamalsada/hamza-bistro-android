@@ -47,6 +47,9 @@ class ShiftService : LifecycleService() {
 
     private var shiftJob: Job? = null
     private var printJob: Job? = null
+
+    /** The address links: watched on shift (to place what has its address) and on the phone that sends the texts. */
+    private var addressJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     /** What each part shows in the permanent notification. */
@@ -60,7 +63,8 @@ class ShiftService : LifecycleService() {
             // to do (switched off in the moment between): Android still
             // wants the notification before the service may stop.
             runCatching {
-                startForeground(StationNotifications.RUNNING_ID, notification(Parts(shift = true, printing = false)), types(Parts(shift = true, printing = false)))
+                val any = Parts(shift = true, printing = false, texting = false)
+                startForeground(StationNotifications.RUNNING_ID, notification(any), types(any))
             }
             stopEverything()
             return START_NOT_STICKY
@@ -96,6 +100,14 @@ class ShiftService : LifecycleService() {
             queueShown.value = null
         }
 
+        if ((parts.shift || parts.texting) && addressJob?.isActive != true) {
+            addressJob = lifecycleScope.launch { graph.liveAddressRequests.collect {} }
+        }
+        if (!parts.shift && !parts.texting) {
+            addressJob?.cancel()
+            addressJob = null
+        }
+
         if (parts.printing) {
             StationNotifications.clearStopped(this)
             val skipWaiting = intent?.getBooleanExtra(EXTRA_SKIP_WAITING, false) == true
@@ -128,7 +140,7 @@ class ShiftService : LifecycleService() {
         // Before Android 14 a type is not asked for, and specialUse does not exist.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
         var types = 0
-        if (parts.shift) types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        if (parts.shift || parts.texting) types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         if (parts.printing) types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         return types
     }
@@ -140,6 +152,7 @@ class ShiftService : LifecycleService() {
             onShift = parts.shift,
             printing = (station as? StationState.Running)?.status,
             printingOn = parts.printing,
+            texting = parts.texting,
         )
 
     /**
@@ -199,6 +212,7 @@ class ShiftService : LifecycleService() {
     override fun onDestroy() {
         shiftJob?.cancel()
         printJob?.cancel()
+        addressJob?.cancel()
         releaseCpu()
         if (graph.stationState.value is StationState.Running) graph.stationState.value = StationState.Stopped
         super.onDestroy()
@@ -207,6 +221,7 @@ class ShiftService : LifecycleService() {
     private fun stopEverything() {
         shiftJob?.cancel()
         printJob?.cancel()
+        addressJob?.cancel()
         releaseCpu()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -217,7 +232,7 @@ class ShiftService : LifecycleService() {
         graph.stationState.value = StationState.Failed(reason)
         StationNotifications.stopped(this, reason)
         printJob?.cancel()
-        if (shiftJob?.isActive != true) stopEverything()
+        if (shiftJob?.isActive != true && addressJob?.isActive != true) stopEverything()
     }
 
     /**
@@ -244,9 +259,9 @@ class ShiftService : LifecycleService() {
     }
 
     /** What the service should be running. */
-    data class Parts(val shift: Boolean, val printing: Boolean) {
+    data class Parts(val shift: Boolean, val printing: Boolean, val texting: Boolean = false) {
         val any: Boolean
-            get() = shift || printing
+            get() = shift || printing || texting
     }
 
     companion object {
@@ -254,13 +269,15 @@ class ShiftService : LifecycleService() {
         private const val EXTRA_SKIP_WAITING = "skip_waiting"
         private const val EXTRA_RESTART_PRINTING = "restart_printing"
 
-        /** Signed in, and on shift as staff; signed in, switched on and a printer chosen. */
+        /** Signed in, and on shift as staff; signed in, switched on and a printer chosen; signed in as staff and sending texts. */
         fun wanted(graph: AppGraph): Parts {
             if (graph.sessions.account.value == null) return Parts(shift = false, printing = false)
             val device = graph.settings.device.value
             return Parts(
                 shift = device.role == Role.STAFF && device.onShift,
                 printing = graph.settings.enabled && graph.settings.printer != null,
+                // The phone with the shop's SIM: sends the address links, on shift or not.
+                texting = device.role == Role.STAFF && device.sendTexts && graph.texts.canSend(),
             )
         }
 

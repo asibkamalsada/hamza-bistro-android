@@ -47,6 +47,9 @@ enum class StaffScreen {
 
     /** "Neue Bestellung": a phone or walk-in order, typed in (#9). */
     NEW_ORDER,
+
+    /** "Telefon-Bestellung": the same, one big step at a time, with the address by SMS when it does not survive the phone. */
+    CALL_ORDER,
 }
 
 /**
@@ -99,12 +102,14 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                 StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
                 StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
                 StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
+                StaffScreen.CALL_ORDER -> CallOrderScreen(onBack = back, onFullForm = { screen = StaffScreen.NEW_ORDER })
             }
             // Who is calling the shop's phone, over any screen. Not on a driver's phone: nobody takes an order there.
             if (!prefs.driver) {
                 CallBanners(
-                    newOrderOpen = screen == StaffScreen.NEW_ORDER,
-                    onNewOrder = { screen = StaffScreen.NEW_ORDER },
+                    newOrderOpen = screen == StaffScreen.NEW_ORDER || screen == StaffScreen.CALL_ORDER,
+                    // A call opens the screens made for it; with the full form already open, it stays.
+                    onNewOrder = { if (screen != StaffScreen.NEW_ORDER) screen = StaffScreen.CALL_ORDER },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
             }

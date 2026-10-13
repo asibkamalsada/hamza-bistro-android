@@ -125,7 +125,17 @@ fun QueueScreen(
         // A call or somebody at the counter (#9): typed in, straight into "In der Küche".
         floatingActionButton = {
             if (!driving) {
-                ExtendedFloatingActionButton(onClick = { onOpen(StaffScreen.NEW_ORDER) }) { Text("+ " + stringResource(R.string.new_order)) }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // The phone, step by step and big; the full form beside it for everything else.
+                    ExtendedFloatingActionButton(
+                        onClick = { onOpen(StaffScreen.CALL_ORDER) },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Text("📞 " + stringResource(R.string.call_order), style = MaterialTheme.typography.titleLarge)
+                    }
+                    ExtendedFloatingActionButton(onClick = { onOpen(StaffScreen.NEW_ORDER) }) { Text("+ " + stringResource(R.string.new_order)) }
+                }
             }
         },
     ) { padding ->
@@ -162,6 +172,8 @@ fun QueueScreen(
                     Tab(selected = !driving, onClick = { driving = false }, text = { Text(stringResource(R.string.queue_tab)) })
                     Tab(selected = driving, onClick = { driving = true }, text = { Text(stringResource(R.string.driver_tab, forDriver)) })
                 }
+                // Phone orders whose caller is still to type the address, on every device.
+                if (!driving) WaitingForAddress(Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                 when {
                     !state.queue.loaded && state.queue.failingSince == null ->
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -417,5 +429,5 @@ internal class Actions(private val context: Context, private val viewModel: Staf
 
 private const val FOCUS_MS = 4_000L
 
-/** Room under the last card, so "Neue Bestellung" never covers its buttons. */
-private val FAB_ROOM = 88.dp
+/** Room under the last card, so "Telefon-Bestellung" and "Neue Bestellung" never cover its buttons. */
+private val FAB_ROOM = 160.dp

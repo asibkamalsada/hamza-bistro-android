@@ -39,7 +39,7 @@ class CallBannerTest {
     }
 
     @Test
-    fun theCallersNumberOpensNeueBestellungWithItFilledIn() {
+    fun theCallersNumberOpensTheCallOrderWithItFilledIn() {
         banners(listOf(call("c-1", "+491761234567")), lastAddress = RecentAddress("Karl-Heine-Straße 9", "04229", "Leipzig", "Hinterhaus"))
         compose.onNodeWithText("Call from 0176 1234567").assertIsDisplayed()
         compose.onNodeWithText("last delivery: Karl-Heine-Straße 9, 04229 Leipzig").assertIsDisplayed()
@@ -47,7 +47,7 @@ class CallBannerTest {
         assertEquals(0, opened)
         assertEquals("", order.state.value.draft.phone)
 
-        compose.onNodeWithText("New order").performClick()
+        compose.onNodeWithText("Take the order").performClick()
         compose.waitForIdle()
 
         assertEquals(1, opened)
@@ -64,7 +64,7 @@ class CallBannerTest {
         compose.onNodeWithText("Call from 0176 1234567").assertIsDisplayed()
         // A number is typed already: the banner can only be put away.
         compose.onNodeWithText("Use number").assertDoesNotExist()
-        compose.onNodeWithText("New order").assertDoesNotExist()
+        compose.onNodeWithText("Take the order").assertDoesNotExist()
 
         order.edit { it.copy(phone = "") }
         compose.waitForIdle()
