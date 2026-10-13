@@ -5,7 +5,6 @@ import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -56,7 +55,6 @@ import de.hamzabistro.printstation.core.TravelMode
 import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.station.AlarmSound
 import de.hamzabistro.printstation.station.DevicePrefs
-import de.hamzabistro.printstation.station.ShiftService
 import de.hamzabistro.printstation.station.StationSettings
 import de.hamzabistro.printstation.station.alarmForDevice
 import java.time.LocalTime
@@ -256,12 +254,10 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                 Text(stringResource(R.string.driver_device_hint), style = MaterialTheme.typography.bodySmall)
             }
 
-            // Only on a device that takes calls: a tablet without a SIM has no screening role to give, nor texts to send.
+            // Only on a device that takes calls: a tablet without a SIM has no screening role to give.
             val roles = remember { context.getSystemService(RoleManager::class.java) }
-            val screeningAvailable = roles?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true
-            val textsAvailable = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING) }
-            if (screeningAvailable || textsAvailable) Section(stringResource(R.string.section_calls)) {
-                if (roles != null && screeningAvailable) {
+            if (roles?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true) {
+                Section(stringResource(R.string.section_calls)) {
                     // Read again on the way back from Android's settings, where the role can be taken away.
                     val screening = remember(checks) { roles.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) }
                     val askForRole =
@@ -278,26 +274,6 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                         }
                     }
                     Text(stringResource(R.string.report_calls_hint), style = MaterialTheme.typography.bodySmall)
-                }
-                if (textsAvailable) {
-                    // Read again on the way back from Android's settings, where the permission can be taken away.
-                    val canText = remember(checks) { context.checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED }
-                    val askToText =
-                        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                            // On only if Android's question was answered with yes.
-                            staff.updatePrefs { it.copy(sendTexts = granted) }
-                            checks++
-                            ShiftService.update(context)
-                        }
-                    SwitchRow(stringResource(R.string.send_texts), prefs.sendTexts && canText) { on ->
-                        if (on && !canText) {
-                            askToText.launch(Manifest.permission.SEND_SMS)
-                        } else {
-                            staff.updatePrefs { it.copy(sendTexts = on) }
-                            ShiftService.update(context)
-                        }
-                    }
-                    Text(stringResource(R.string.send_texts_hint), style = MaterialTheme.typography.bodySmall)
                 }
             }
 

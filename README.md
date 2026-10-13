@@ -67,7 +67,7 @@ tablet stays the place orders are taken.
 | ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
 | The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every order as it comes in, screen on |
 | A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Bar" / "Karte"; alarm "once" or off; own night window      |
-| The shop's phone (optional)     | a staff account                           | "Anrufe ans Tablet melden": who is calling; "SMS-Links senden": the address links     |
+| The shop's phone (optional)     | a staff account                           | "Anrufe ans Tablet melden": tells the tablet who is calling                           |
 
 Which one a device is follows from the account: staff get the queue. A
 print account (`public.print_accounts`) gets the printer setup and nothing
@@ -212,8 +212,8 @@ queue, beside **+ Neue Bestellung**:
    caller's earlier addresses to tap, Leipzig's streets offered as it is
    typed, the postcode and town filled in, check-address's verdict ("✓" or
    "Dorthin liefern wir nicht") — or, when the address does not survive the
-   phone, **📱 SMS an den Anrufer senden** (below). **🛍 Holt selbst ab**
-   makes it a pickup with no address.
+   phone, **📱 SMS an den Anrufer senden** (below; offered once something
+   sends the texts). **🛍 Holt selbst ab** makes it a pickup with no address.
 3. **Welche Gerichte?** Only the dishes: big tiles with their photos, a
    category at a time; a tap puts one in the basket (or opens the dish's
    choices over the whole screen), and the tile says "2×".
@@ -226,16 +226,18 @@ queue, beside **+ Neue Bestellung**:
 **Alle Felder** switches to the full form with everything typed so far, for
 a time ahead, a counter order or the fee waiver.
 
-#### The address by SMS
+#### The address by SMS (the sending is still open)
 
-**📱 SMS an den Anrufer senden** texts the caller a link —
-`https://www.hamzabistro.de/a/…` — to a page where they type the address
-themselves, on their own phone, during the call or after it
+For an address that does not survive the phone, the caller is to get a
+text with a link — `https://www.hamzabistro.de/a/…` — to a page where they
+type the address themselves, during the call or after it
 ([`AddressRequests`](core/src/main/kotlin/de/hamzabistro/printstation/core/AddressRequests.kt),
 [`20261013170000_address_requests.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261013170000_address_requests.sql)).
-The screen says how the text fares ("✓ SMS gesendet", or why not, with
-**Nochmal senden**), and the dishes are taken meanwhile.
+Everything but the sending is in place:
 
+- **📱 SMS an den Anrufer senden** on the address step makes the link,
+  shows how the text fares ("✓ SMS gesendet", or why not, with **Nochmal
+  senden**), and the dishes are taken meanwhile.
 - The address arrives while the caller is still on the line: it goes into
   the fields, is checked and priced like one typed, and the order is saved
   the usual way.
@@ -243,27 +245,22 @@ The screen says how the text fares ("✓ SMS gesendet", or why not, with
   saves the basket on the link. The tablet puts the order into the kitchen
   by itself the moment the caller sends the address — checked with
   check-address, priced, saved, and printed like any other
-  ([`AddressRequestPlacer`](core/src/main/kotlin/de/hamzabistro/printstation/core/AddressRequests.kt)).
-  Until then it waits above the queue, on every device, as **Warten auf
-  Adresse**: who, what, and how far it got. An address outside the area,
-  under the last ring's minimum or with a dish sold out since waits there in
-  red for a person, with **📞** to call back and **Nochmal versuchen**; a
-  corrected address from the caller tries again by itself. **Löschen** ends
-  it, and the link with it.
+  (`AddressRequestPlacer`, while the tablet is on shift). Until then it
+  waits above the queue, on every device, as **Warten auf Adresse**. An
+  address outside the area, under the last ring's minimum or with a dish
+  sold out since waits there in red for a person, with **📞** to call back
+  and **Nochmal versuchen**; a corrected address from the caller tries
+  again by itself. **Löschen** ends it, and the link with it.
+- The link takes an address for three hours, and only until the order is
+  placed; the database keeps the request a day.
 
-The link takes an address for three hours, and only until the order is
-placed; the database keeps the request a day.
-
-**The text is sent by the shop's phone** — the one the caller has just
-rung, from its own number and SIM: no SMS gateway, nothing to pay per text
-beyond the phone's plan, and the caller's number goes to nobody new. On that
-phone: **Einstellungen → Laden-Telefon → SMS-Links senden**, and allow
-sending SMS when Android asks. The app then keeps a small service running
-for it, on shift or not
-([`TextSender`](app/src/main/kotlin/de/hamzabistro/printstation/calls/TextSender.kt)).
-If no phone sends a text within 45 seconds, the tablet says so: "Kein Handy
-hat die SMS gesendet". A tablet with a SIM of its own can send them itself
-with the same switch.
+**How the text goes out is not decided** — a gateway from the server, or a
+phone with the shop's SIM. It is one interface, `SmsTransport`
+(`send(phone, text)`: null when sent, else why not), and `AddressSmsSender`
+runs it against the database's `claim_address_sms` / `address_sms_result`,
+so each text goes out once whichever device or service sends it.
+`AppGraph.sms` is null until one is chosen, and until then the call screens
+do not offer the SMS button at all: the address is typed, as before.
 
 ### Fahrer
 
@@ -567,7 +564,7 @@ the app logs it.
   (`SupabasePrintBackend`, `PrintStation`), and the check for a newer
   release and the download of its APK (`AppUpdate`).
 - [`app/`](app) — what only Android can do: the service and the boot
-  receiver (`station/`), the call screening and the texts (`calls/`), the alarm's sound and screen (`alarm/`), the undo
+  receiver (`station/`), the call screening (`calls/`), the alarm's sound and screen (`alarm/`), the undo
   window (`queue/`), the BLE printer (`printer/`), the Keystore-sealed
   session (`security/`), handing a downloaded update to Android's installer
   (`update/`), and the screens (`ui/`).
@@ -652,9 +649,10 @@ In hamza-bistro-web:
 4. For opening and closing the shop from the app:
    `20261001150000_shop_hours.sql`. Without it the line above the queue is
    not shown, and everything else works as before.
-5. For the address by SMS: `20261013170000_address_requests.sql`, and the
-   site deployed with its `/a/…` page. Without it, **SMS an den Anrufer
-   senden** says the server needs the update, and everything else works.
+5. For the address by SMS (once something sends the texts):
+   `20261013170000_address_requests.sql`, and the site deployed with its
+   `/a/…` page. Without it, the waiting cards are not shown and everything
+   else works.
 
 ### 2. Each device
 

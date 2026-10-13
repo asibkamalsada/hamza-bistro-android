@@ -138,7 +138,13 @@ private const val STEPS = 4
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderViewModel = viewModel()) {
+fun CallOrderScreen(
+    onBack: () -> Unit,
+    onFullForm: () -> Unit,
+    model: NewOrderViewModel = viewModel(),
+    /** Whether "SMS an den Anrufer senden" is offered: only once something sends the texts ([AppGraph.sms]). */
+    texting: Boolean = (LocalContext.current.applicationContext as PrintStationApp).graph.textingAvailable,
+) {
     val graph = (LocalContext.current.applicationContext as PrintStationApp).graph
     val state by model.state.collectAsStateWithLifecycle()
     val links by graph.liveAddressRequests.collectAsStateWithLifecycle(AddressRequestsState())
@@ -180,7 +186,7 @@ fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderV
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when (state.step) {
                     CallStep.NAME -> NameStep(state, model)
-                    CallStep.ADDRESS -> AddressStep(state, model, link)
+                    CallStep.ADDRESS -> AddressStep(state, model, link, texting)
                     CallStep.DISHES -> DishesStep(state, model)
                     CallStep.CONFIRM -> ConfirmStep(state, model, link)
                     CallStep.DONE -> DoneStep(state, link, remember(graph) { LinkActions(graph) }, onDone = finish)
@@ -334,7 +340,7 @@ private fun NameStep(state: NewOrderState, model: NewOrderViewModel) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?) {
+private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?, texting: Boolean) {
     val draft = state.draft
     val outside = state.addressChecked && state.address?.outside == true
     val goOn = !draft.delivery || state.link != null || (PhoneOrders.addressComplete(draft) && !outside)
@@ -353,8 +359,10 @@ private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: Ad
         } else {
             TypedAddress(state, model, outside)
             HorizontalDivider()
-            TextedAddress(state, model, link)
-            HorizontalDivider()
+            if (texting || state.link != null) {
+                TextedAddress(state, model, link)
+                HorizontalDivider()
+            }
             OutlinedButton(onClick = { model.edit { it.copy(fulfilment = Fulfilment.PICKUP) } }, modifier = Modifier.heightIn(min = 56.dp)) {
                 Text(stringResource(R.string.call_order_pickup), style = MaterialTheme.typography.titleMedium)
             }

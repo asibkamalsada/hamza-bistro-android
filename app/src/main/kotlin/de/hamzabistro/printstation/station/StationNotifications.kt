@@ -122,20 +122,14 @@ object StationNotifications {
      * The permanent notification. [queue] is null on a device that only
      * prints; [printing] is null on one that has no printer switched on.
      */
-    fun running(context: Context, queue: QueueState?, onShift: Boolean, printing: StationStatus?, printingOn: Boolean, texting: Boolean = false): Notification {
+    fun running(context: Context, queue: QueueState?, onShift: Boolean, printing: StationStatus?, printingOn: Boolean): Notification {
         val lines =
             listOfNotNull(
                 if (onShift) queueSummary(context, queue) else null,
                 if (printingOn) context.getString(R.string.running_printer_line, summary(context, printing)) else null,
-                if (texting) context.getString(R.string.running_texts_line) else null,
             )
         val text = lines.joinToString("\n")
-        val title =
-            when {
-                onShift -> R.string.running_shift_title
-                printingOn || !texting -> R.string.running_title
-                else -> R.string.running_texts_title
-            }
+        val title = if (onShift) R.string.running_shift_title else R.string.running_title
         return Notification.Builder(context, CHANNEL_RUNNING)
             .setSmallIcon(if (onShift) R.drawable.ic_stat_bell else R.drawable.ic_stat_print)
             .setContentTitle(context.getString(title))

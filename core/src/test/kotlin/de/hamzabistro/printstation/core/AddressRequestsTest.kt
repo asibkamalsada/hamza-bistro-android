@@ -358,7 +358,7 @@ class AddressRequestsTest {
     }
 
     // -----------------------------------------------------------------------
-    // Texting, on the phone that sends them
+    // Texting, wherever a transport runs
     // -----------------------------------------------------------------------
 
     @Test
@@ -366,7 +366,16 @@ class AddressRequestsTest {
         val requests = FakeRequests(mutableListOf())
         val sent = mutableListOf<Pair<String, String>>()
         var answer: String? = null
-        val sender = AddressSmsSender(requests, Quiet, enabled = { true }, send = { phone, text -> sent += phone to text; answer }, now = { now })
+        val sender =
+            AddressSmsSender(
+                requests,
+                { phone, text ->
+                    sent += phone to text
+                    answer
+                },
+                Quiet,
+                now = { now },
+            )
         val read = AddressRequestsState(available = true, requests = listOf(request("r-1"), request("r-2", sent = true)))
 
         sender.sendAll(read)

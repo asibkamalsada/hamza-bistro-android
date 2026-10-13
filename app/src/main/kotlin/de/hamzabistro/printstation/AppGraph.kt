@@ -5,7 +5,6 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import de.hamzabistro.printstation.alarm.AlarmPlayer
-import de.hamzabistro.printstation.calls.TextSender
 import de.hamzabistro.printstation.core.AddressRequestPlacer
 import de.hamzabistro.printstation.core.AddressRequestWatch
 import de.hamzabistro.printstation.core.AddressRequestsState
@@ -25,6 +24,7 @@ import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrdersRealtime
 import de.hamzabistro.printstation.core.PhoneOrders
+import de.hamzabistro.printstation.core.SmsTransport
 import de.hamzabistro.printstation.core.RatingWatch
 import de.hamzabistro.printstation.core.RatingsState
 import de.hamzabistro.printstation.core.PrintStation
@@ -321,8 +321,19 @@ class AppGraph(context: Context) {
     /** The last day's links, for the call order screens and the waiting cards. */
     val addressWatch = AddressRequestWatch(addressRequests, logger)
 
-    /** This phone's SIM, for the texts: only with "SMS-Links senden" on. */
-    val texts = TextSender(this.context)
+    /**
+     * How the texts with the address link go out — a gateway from the
+     * server, or a phone with a SIM — is not decided yet. Null: nothing here
+     * sends them, and the call screens do not offer "SMS an den Anrufer
+     * senden"; the link, the customer's page and the basket waiting for the
+     * address are in place for when something does. A transport running on
+     * another device, or on the server, would set [textingAvailable] instead.
+     */
+    val sms: SmsTransport? = null
+
+    /** Whether the call screens offer the link by SMS: something sends the texts. */
+    val textingAvailable: Boolean
+        get() = sms != null
 
     /**
      * Puts a waiting basket into the kitchen once its caller has typed the
@@ -341,17 +352,11 @@ class AppGraph(context: Context) {
             },
         )
 
-    private val textSender =
-        AddressSmsSender(
-            backend = addressRequests,
-            logger = logger,
-            enabled = { settings.device.value.sendTexts && texts.canSend() },
-            send = texts::send,
-        )
+    private val textSender = sms?.let { AddressSmsSender(addressRequests, it, logger) }
 
     /**
      * Keeps [addressWatch] reading — and, beside it, places what has its
-     * address and sends what this phone is to send — while anybody collects
+     * address and sends what is to be texted from here — while anybody collects
      * [liveAddressRequests], through sign-outs, as [callRunner] does.
      */
     private val addressRunner =
@@ -359,7 +364,7 @@ class AppGraph(context: Context) {
                 addressWatch.reset()
                 coroutineScope {
                     launch { addressPlacer.run(addressWatch.state) { sessions.account.value?.userId } }
-                    launch { textSender.run(addressWatch.state) }
+                    textSender?.let { sender -> launch { sender.run(addressWatch.state) } }
                     addressWatch.run(realtime.changes(OrdersRealtime.Watch.ADDRESS_REQUESTS))
                 }
             }

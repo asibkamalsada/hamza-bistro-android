@@ -40,16 +40,6 @@
          each update, and takes only an APK signed with this app's key. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- "SMS-Links senden", on the phone with the shop's SIM: the text with
-         the link a caller types their address into, sent from this phone's
-         own number when the tablet asks. Asked for only when the switch is
-         turned on; a tablet without a SIM never asks, and does not need the
-         feature. -->
-    <uses-permission android:name="android.permission.SEND_SMS" />
-    <uses-feature
-        android:name="android.hardware.telephony"
-        android:required="false" />
-
     <!-- Nothing leaves the device in a backup or a transfer to a new phone:
          the session is encrypted with a key that stays here anyway, and a
          restored station id would be two tablets claiming to be one. -->
@@ -106,7 +96,7 @@
             android:foregroundServiceType="connectedDevice|specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Receives a restaurant's incoming orders in real time while staff are on shift, and rings an alarm until one of them accepts or declines the order. On the restaurant's own phone, it also sends the text message with a link that a caller types their delivery address into, when staff ask for one." />
+                android:value="Receives a restaurant's incoming orders in real time while staff are on shift, and rings an alarm until one of them accepts or declines the order." />
         </service>
 
         <!-- "Stumm" on the alarm's notification; only the app's own

@@ -67,11 +67,6 @@ data class DevicePrefs(
     val driver: Boolean = false,
     /** The shop's phone: tells the order tablet who is calling ("Anrufe ans Tablet melden"). */
     val reportCalls: Boolean = false,
-    /**
-     * A phone with the shop's SIM: sends the texts with the address link the
-     * tablet asks for ("SMS-Links senden"), from its own number.
-     */
-    val sendTexts: Boolean = false,
 )
 
 /**
@@ -180,7 +175,6 @@ class StationSettings(context: Context) {
             keepAwake = prefs.getBoolean(KEEP_AWAKE, d.keepAwake),
             driver = prefs.getBoolean(DRIVER, d.driver),
             reportCalls = prefs.getBoolean(REPORT_CALLS, d.reportCalls),
-            sendTexts = prefs.getBoolean(SEND_TEXTS, d.sendTexts),
         )
     }
 
@@ -213,7 +207,6 @@ class StationSettings(context: Context) {
             .putBoolean(KEEP_AWAKE, p.keepAwake)
             .putBoolean(DRIVER, p.driver)
             .putBoolean(REPORT_CALLS, p.reportCalls)
-            .putBoolean(SEND_TEXTS, p.sendTexts)
             .apply()
     }
 
@@ -265,7 +258,6 @@ class StationSettings(context: Context) {
         private const val KEEP_AWAKE = "keep_awake"
         private const val DRIVER = "driver"
         private const val REPORT_CALLS = "report_calls"
-        private const val SEND_TEXTS = "send_texts"
         private const val NEVER = "never"
     }
 }

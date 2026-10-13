@@ -1001,7 +1001,7 @@
     <string name="call_order_sms_sending">📱 SMS wird gesendet …</string>
     <string name="call_order_sms_sent">✓ SMS gesendet</string>
     <string name="call_order_sms_failed">✗ SMS nicht gesendet: %1$s</string>
-    <string name="call_order_sms_no_sender">✗ Kein Handy hat die SMS gesendet. Ist das Laden-Telefon an, mit „SMS-Links senden“?</string>
+    <string name="call_order_sms_no_sender">✗ Die SMS ist nicht rausgegangen: Gerade sendet nichts SMS.</string>
     <string name="call_order_sms_again">Nochmal senden</string>
     <string name="call_order_link_failed">Die SMS ging nicht: %1$s</string>
     <string name="call_order_address_arrived">✓ Adresse vom Anrufer: %1$s</string>
@@ -1040,8 +1040,4 @@
     <string name="address_problem_unchecked">Die Adresse konnte nicht geprüft werden</string>
     <string name="address_problem_basket">Ein Gericht ist jetzt ausverkauft</string>
     <string name="address_problem_other">Die Bestellung ging nicht (%1$s)</string>
-    <string name="send_texts">SMS-Links senden</string>
-    <string name="send_texts_hint">Für das Telefon mit der SIM-Karte des Ladens. Schickt das Tablet einem Anrufer einen Link, in den er seine Adresse tippt, sendet dieses Telefon die SMS – von seiner eigenen Nummer. Es tut das im Hintergrund, auch ohne Schicht. Android fragt einmal, ob die App SMS senden darf.</string>
-    <string name="running_texts_title">SMS-Links senden</string>
-    <string name="running_texts_line">Sendet die SMS-Links, um die das Tablet bittet</string>
 </resources>
