@@ -1020,6 +1020,7 @@ private fun AddressSection(state: NewOrderState, model: NewOrderViewModel) {
  */
 @Composable
 private fun StreetChoices(streets: List<StreetSuggestion>, onPick: (StreetSuggestion) -> Unit) {
+    val resources = LocalResources.current
     for (street in streets) {
         // Outlined: the section is a card itself, and a card on a card does not show.
         OutlinedCard(Modifier.fillMaxWidth().clickable { onPick(street) }) {
@@ -1030,14 +1031,24 @@ private fun StreetChoices(streets: List<StreetSuggestion>, onPick: (StreetSugges
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(street.fullStreet, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    // With a house the list has: its own postcode, and the ring it is in.
                     Text(
-                        listOfNotNull(street.entry.postcodes.joinToString(", "), street.entry.district).joinToString(" · "),
+                        listOfNotNull(street.postcodes.joinToString(", "), street.entry.district, street.ringZone?.let { ringName(resources, it) })
+                            .joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // Said, and no more than that: the number may be misheard, or the house new.
+                    if (street.houseUnlisted) {
+                        Text(
+                            stringResource(R.string.new_order_house_unlisted, street.houseNumber.orEmpty()),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = toneColor(Tone.SOON),
+                        )
+                    }
                 }
                 // From the list, so only roughly: check-address has the last word on the door.
-                when (street.entry.delivery) {
+                when (street.delivery) {
                     StreetDelivery.OUTSIDE ->
                         Text(stringResource(R.string.new_order_street_outside), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                     StreetDelivery.PARTLY -> Text(stringResource(R.string.new_order_street_partly), color = toneColor(Tone.SOON))

@@ -146,7 +146,12 @@ accepted order
   Karl-Härting-Straße 9) or a letter off — and a tap fills in the name as
   the city spells it, the house number typed, the postcode and the town.
   A street outside the delivery area says "keine Lieferung" before it is
-  picked. The list is built into the app
+  picked. With a house number the list has, the row is that house's: its
+  own postcode on a street with several (Lützner Straße 150 is 04179, most
+  of the street 04177), the ring it is in, and "keine Lieferung" for a house
+  past the area's edge on a street that is only partly in it. A number the
+  list does not have on the street is said to be so — misheard, or a new
+  house — and is taken all the same. The list is built into the app
   ([`StreetMatcher`](core/src/main/kotlin/de/hamzabistro/printstation/core/StreetMatcher.kt),
   [the street list](#the-street-list)); a street that is not on it stays
   as typed;
@@ -798,11 +803,32 @@ commonest first), its district, and whether it lies inside, partly inside
 or outside the outermost delivery ring. "Neue Bestellung" offers them as a
 caller's street is typed.
 
-`node tools/streets/generate.mjs` writes it again from OpenStreetMap, with
-one Overpass query that takes about a minute. Run it after the delivery
-area changes — the ring in the script is a copy of `EDGE_AREA_POLYGON` in
-hamza-bistro-web's `src/app/delivery-area.ts` — or when a new street is
-missing, and commit the result; `StreetDirectoryTest` checks it.
+A street the shop rides to also has its house numbers, about 45,000 in
+all, packed by what is a house's own: `"04177i:2 2a 4-7;04179n:125 129"`
+is numbers 2, 2a and 4 to 7 in 04177 and the inner ring, 125 and 129 in
+04179 and the near one (`i`, `n`, `f`, `e` for the rings from the inside
+out, `x` for outside all of them). A street nobody rides to carries none.
+
+The numbers are OpenStreetMap's, as the streets are, and not the land
+registry's: the same map the address check's own geocoder reads, so a
+house on the list is a house check-address will find. OpenStreetMap does
+not have every house. A number missing from the list is therefore only
+said to be missing, never refused, and check-address has the last word on
+every door either way.
+
+`node tools/streets/generate.mjs` writes the file again from OpenStreetMap,
+with one Overpass query that takes about a minute; it tries several public
+Overpass servers, since any one of them is often busy. The rings it sorts
+the houses into are a copy of the website's, in
+[`tools/streets/delivery-area.json`](tools/streets/delivery-area.json).
+After the delivery area changes, take the copy again and regenerate:
+
+```
+node tools/streets/generate.mjs --area ../hamza-bistro-web/src/app/delivery-area.ts
+```
+
+Run it without `--area` when a new street or house is missing. Commit the
+result either way; `StreetDirectoryTest` and `HouseNumbersTest` check it.
 
 The data is © OpenStreetMap contributors, under the
 [Open Database License](https://www.openstreetmap.org/copyright).
