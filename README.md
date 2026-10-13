@@ -16,8 +16,9 @@ every device the moment the order is accepted or declined anywhere: in the
 app, on the website, in Telegram.
 
 It is also the print station it grew out of: the device beside the
-Bluetooth receipt printer prints every accepted order with the screen off,
-and says out loud when a ticket did not come out.
+Bluetooth receipt printer prints every order the moment it comes in — before
+it is accepted — with the screen off, and says out loud when a ticket did
+not come out.
 
 Installed from an APK, never through Google Play.
 
@@ -47,7 +48,8 @@ anybody else. It is where it happens:
 
 - **orders are accepted (or declined) on it** — it rings until somebody
   does;
-- **it prints** every accepted order, on the Bluetooth printer beside it;
+- **it prints** every order as it comes in, while it is still ringing, on
+  the Bluetooth printer beside it;
 - it moves them on, "Unterwegs" / "Abholbereit", then "Geliefert · Bar /
   Karte" or "Abgeholt · Bar / Karte": delivered and how it was paid, in one
   tap, for the Kassensturz.
@@ -63,7 +65,7 @@ tablet stays the place orders are taken.
 
 | Device                          | Signs in as                               | Does                                                                                  |
 | ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
-| The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every accepted order, screen on    |
+| The tablet in the shop          | a staff account of its own                | Accepts orders, loud alarm until answered, prints every order as it comes in, screen on |
 | A driver's phone (optional)     | the driver's own staff account            | The queue, route, call, "Bar" / "Karte"; alarm "once" or off; own night window      |
 | The shop's phone (optional)     | a staff account                           | "Anrufe ans Tablet melden": tells the tablet who is calling                           |
 
@@ -449,7 +451,18 @@ in seconds.
 
 ### Printing
 
-Unchanged from the print station, and the same protocol as every printing
+Every order prints **as it comes in**, status "new", while it is still
+ringing and before anybody has accepted it — so the paper is in hand while
+the minutes are chosen. Accepting it prints nothing more; one that is
+declined leaves a ticket for the bin. Nothing has been promised yet, so the
+ticket has no "fällig um" line: the card has it. An order that did not
+print while it was new (the printer off, the app not running) prints once it
+is accepted
+([`20261013150000_print_on_arrival.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261013150000_print_on_arrival.sql)).
+Against a database from before that, a new order is refused ("moved") and
+asked for again at every look, so it prints on acceptance as it used to.
+
+The same protocol as every printing
 device (`supabase/migrations/20260930150000_order_printing.sql` in the
 site): the station registers with `print_station_seen` (label
 `Android-App`), takes each order with `claim_print` before printing it and
@@ -499,8 +512,8 @@ pockets, so it gives away as little as it can:
 - **Each person signs in with their own account**, the one they use on
   the website. What an account may do is decided by the database, exactly
   as for `/orders`: staff read and move orders (`is_staff()` and RLS), a
-  print account reads only the accepted orders nobody has printed and
-  prints them. A driver taken off the `staff` table can no longer read the
+  print account reads only the new and accepted orders nobody has printed
+  and prints them. A driver taken off the `staff` table can no longer read the
   queue and drops off the website's list at once.
 - **The shop's tablet** needs a staff account to accept orders and ring,
   so it can read what `/orders` on that tablet could already read. Give it
@@ -603,9 +616,9 @@ In hamza-bistro-web:
 
 **The tablet** additionally, under **Einstellungen → Bondrucker**: switch
 the printer on, **Drucker suchen**, tap the printer (`CY-BX58D-…`, allow
-"Geräte in der Nähe"), **Testdruck**, and switch on **Jede angenommene
-Bestellung drucken**. In Chrome on the same tablet, switch the website's
-own "Jede angenommene Bestellung drucken" off: the printer takes one
+"Geräte in der Nähe"), **Testdruck**, and switch on **Jede Bestellung
+drucken, sobald sie eingeht**. In Chrome on the same tablet, switch the
+website's own "Jede Bestellung drucken" off: the printer takes one
 connection at a time. **Tütenzettel nach jedem Bon** adds a strip for the
 bag after each ticket. Leave the alarm on "Laut klingeln" and the shift on
 for good; keep it plugged in; **Bildschirm anlassen** keeps the queue on
@@ -651,8 +664,8 @@ for a print account nothing changes on screen.
 To make the shop's tablet the place orders are accepted: **Abmelden** (which
 switches printing off and takes the station off the website's list),
 sign in with the tablet's staff account (which starts the shift), and under
-**Einstellungen → Bondrucker** switch **Jede angenommene Bestellung
-drucken** on again — the printer stays chosen. The print account is then
+**Einstellungen → Bondrucker** switch **Jede Bestellung drucken, sobald
+sie eingeht** on again — the printer stays chosen. The print account is then
 no longer needed; delete its row in `print_accounts` (or the account).
 
 ## Building

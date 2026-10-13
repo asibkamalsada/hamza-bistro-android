@@ -39,9 +39,10 @@ sealed interface Problem {
 }
 
 /**
- * Prints every accepted order, by itself: what
- * src/app/services/print-station.service.ts in hamza-bistro-web does on a
- * page, from a service that runs with the screen off.
+ * Prints every order as it comes in, before anybody has accepted it, by
+ * itself: what src/app/services/print-station.service.ts in hamza-bistro-web
+ * does on a page, from a service that runs with the screen off. An order
+ * that did not print while it was new prints once it is accepted.
  *
  * It looks at the queue when Realtime says something changed, and every 25
  * seconds besides; says it is there at least once a minute; takes each order
@@ -111,14 +112,14 @@ class PrintStation(
     }
 
     /**
-     * Counts every order accepted so far as none of this station's business.
-     * Switching printing on is not a request to print the whole evening
-     * again — the same rule as the switch on the site.
+     * Counts every order waiting or accepted so far as none of this
+     * station's business. Switching printing on is not a request to print
+     * the whole evening again — the same rule as the switch on the site.
      */
     suspend fun skipWaiting() {
         val waiting = backend.openOrders()
         log.markDone(waiting.map { it.id })
-        logger.info("Printing switched on; ${waiting.size} accepted orders left to others")
+        logger.info("Printing switched on; ${waiting.size} open orders left to others")
     }
 
     private suspend fun look() {
@@ -152,8 +153,16 @@ class PrintStation(
             when (backend.claim(order.id)) {
                 // Printed elsewhere, or no longer waiting to be cooked:
                 // never this station's.
-                Claim.PRINTED, Claim.MOVED -> {
+                Claim.PRINTED -> {
                     log.markDone(listOf(order.id))
+                    continue
+                }
+                // A new order that "moved" was declined, and is not listed
+                // again — or the database is from before print-on-arrival
+                // and prints only accepted orders: asked again at each look,
+                // it prints once it is accepted.
+                Claim.MOVED -> {
+                    if (!order.isNew) log.markDone(listOf(order.id))
                     continue
                 }
                 // Another station is at it; looked at again next time, in

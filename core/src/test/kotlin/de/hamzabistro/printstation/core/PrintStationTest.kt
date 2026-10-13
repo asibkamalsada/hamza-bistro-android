@@ -97,10 +97,10 @@ class PrintStationTest {
             wallClock = { 1_000_000 + testScheduler.currentTime },
         )
 
-    private fun order(n: Long) = QueuedOrder("order-$n", n)
+    private fun order(n: Long, isNew: Boolean = false) = QueuedOrder("order-$n", n, isNew)
 
     @Test
-    fun `prints each accepted order once, taking it first and recording it after`() = runTest {
+    fun `prints each order once, taking it first and recording it after`() = runTest {
         backend.queue += listOf(order(1), order(2))
         val station = station()
         backgroundScope.launch { station.run(emptyFlow()) }
@@ -146,6 +146,34 @@ class PrintStationTest {
         assertTrue(printer.printed.isEmpty())
         // Asked once each: after that they are none of this station's business.
         assertEquals(listOf("claim order-1", "claim order-2"), backend.calls)
+    }
+
+    @Test
+    fun `prints an order as it comes in, and not again once it is accepted`() = runTest {
+        backend.queue += order(1, isNew = true)
+        backgroundScope.launch { station().run(emptyFlow()) }
+        runCurrent()
+        assertEquals(listOf("ticket order-1"), printer.printed)
+
+        // Accepted: the database would no longer list it, printed as it is;
+        // even if it did, this station has printed it.
+        backend.queue += order(1)
+        advanceTimeBy(26.seconds)
+        assertEquals(listOf("ticket order-1"), printer.printed)
+    }
+
+    @Test
+    fun `a new order a database before print-on-arrival will not give is printed once accepted`() = runTest {
+        backend.queue += order(1, isNew = true)
+        backend.claims["order-1"] = Claim.MOVED
+        backgroundScope.launch { station().run(emptyFlow()) }
+        runCurrent()
+        assertTrue(printer.printed.isEmpty())
+
+        backend.queue[0] = order(1)
+        backend.claims.remove("order-1")
+        advanceTimeBy(26.seconds)
+        assertEquals(listOf("ticket order-1"), printer.printed)
     }
 
     @Test
@@ -263,8 +291,8 @@ class PrintStationTest {
     }
 
     @Test
-    fun `switching on leaves what was accepted before to others`() = runTest {
-        backend.queue += listOf(order(1), order(2))
+    fun `switching on leaves what was waiting or accepted before to others`() = runTest {
+        backend.queue += listOf(order(1), order(2, isNew = true))
         val station = station()
         station.skipWaiting()
         backend.queue += order(3)
