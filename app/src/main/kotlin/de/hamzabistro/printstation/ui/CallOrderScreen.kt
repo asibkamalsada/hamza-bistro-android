@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -82,6 +82,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -114,11 +115,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * How much bigger the call screens are than the rest of the app: the person
- * taking the call may not read well, nor see well, and taps with a finger
- * that has just been holding the phone.
+ * How much bigger the call screens are than the rest of the app, on a
+ * tablet: the person taking the call may not read well, nor see well, and
+ * taps with a finger that has just been holding the phone.
  */
 private const val ZOOM = 1.3f
+
+/** Up to this on its shorter side, a screen is a phone's, with no room to spare: drawn as it is. */
+private val ZOOM_NONE_UP_TO = 440.dp
+
+/** From this on its shorter side, a screen is a tablet's: drawn [ZOOM] times as big. */
+private val ZOOM_FULL_FROM = 640.dp
 
 /** The steps with a number on them: name, address, dishes, check. */
 private const val STEPS = 4
@@ -210,11 +217,24 @@ fun CallOrderScreen(
     }
 }
 
-/** Everything inside drawn [ZOOM] times as big, text and touch targets alike. */
+/**
+ * Everything inside drawn bigger, text and touch targets alike, as far as
+ * the screen has room for it ([zoomFor]): a phone's is drawn as it is, or
+ * its button bar and the dishes no longer fit.
+ */
 @Composable
-private fun Zoomed(content: @Composable () -> Unit) {
-    val density = LocalDensity.current
-    CompositionLocalProvider(LocalDensity provides Density(density.density * ZOOM, density.fontScale), content = content)
+internal fun Zoomed(content: @Composable () -> Unit) {
+    BoxWithConstraints {
+        val density = LocalDensity.current
+        val zoom = zoomFor(minOf(maxWidth, maxHeight))
+        CompositionLocalProvider(LocalDensity provides Density(density.density * zoom, density.fontScale), content = content)
+    }
+}
+
+/** [ZOOM] from [ZOOM_FULL_FROM] on the screen's shorter side, none up to [ZOOM_NONE_UP_TO], and in between, in between. */
+internal fun zoomFor(shorterSide: Dp): Float {
+    val share = ((shorterSide - ZOOM_NONE_UP_TO) / (ZOOM_FULL_FROM - ZOOM_NONE_UP_TO)).coerceIn(0f, 1f)
+    return 1f + (ZOOM - 1f) * share
 }
 
 /** One step: which of how many, what it asks, its fields; the buttons along the bottom, always in reach. */
@@ -222,20 +242,26 @@ private fun Zoomed(content: @Composable () -> Unit) {
 private fun StepPage(number: Int, title: String, bottom: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             StepHeading(number, title)
             content()
         }
         HorizontalDivider()
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            content = bottom,
-        )
+        BottomBar(bottom)
     }
+}
+
+/** The buttons along the bottom: "Zurück" as wide as it needs, the step's own button the rest. */
+@Composable
+private fun BottomBar(content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
 }
 
 @Composable
@@ -250,7 +276,7 @@ private fun StepHeading(number: Int, title: String) {
 @Composable
 private fun BigButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, outlined: Boolean = false, tonal: Boolean = false) {
     val label: @Composable RowScope.() -> Unit = {
-        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
     val big = modifier.heightIn(min = 64.dp)
     val padding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
@@ -310,11 +336,11 @@ private fun NameStep(state: NewOrderState, model: NewOrderViewModel) {
         1,
         stringResource(R.string.call_order_name_title),
         bottom = {
-            Spacer(Modifier.weight(1f))
             BigButton(
                 stringResource(R.string.call_order_next),
                 onClick = { model.goTo(CallStep.ADDRESS) },
                 enabled = draft.name.isNotBlank() && draft.phone.isNotBlank(),
+                modifier = Modifier.weight(1f),
             )
         },
     ) {
@@ -349,8 +375,7 @@ private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: Ad
         stringResource(R.string.call_order_address_title),
         bottom = {
             BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.NAME) }, outlined = true)
-            Spacer(Modifier.weight(1f))
-            BigButton(stringResource(R.string.call_order_next), onClick = { model.goTo(CallStep.DISHES) }, enabled = goOn)
+            BigButton(stringResource(R.string.call_order_next), onClick = { model.goTo(CallStep.DISHES) }, enabled = goOn, modifier = Modifier.weight(1f))
         },
     ) {
         if (!draft.delivery) {
@@ -522,43 +547,18 @@ private fun DishesStep(state: NewOrderState, model: NewOrderViewModel) {
     var picking by remember { mutableStateOf<MenuDish?>(null) }
     val photos by model.photos.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                StepHeading(3, stringResource(R.string.call_order_dishes_title))
-                when {
-                    menu != null ->
-                        DishGrid(menu, state.draft.lines, photos, onPhoto = model::loadPhoto) { dish, groups ->
-                            // Nothing to choose: in the basket with one tap.
-                            if (groups.isEmpty()) model.add(BasketLine(dish, 1)) else picking = dish
-                        }
-                    state.menuError != null -> {
-                        StatusLine(stringResource(R.string.new_order_menu_failed, state.menuError), bad = true)
-                        BigButton(stringResource(R.string.retry), onClick = model::loadMenu, outlined = true)
-                    }
-                    else ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            CircularProgressIndicator()
-                            Text(stringResource(R.string.new_order_menu_loading), style = MaterialTheme.typography.titleLarge)
-                        }
-                }
-            }
-            HorizontalDivider()
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.ADDRESS) }, outlined = true)
-                val count = state.draft.count
-                Text(
-                    pluralStringResource(R.plurals.call_order_cart, count, count, Format.euro(state.draft.lines.sumOf { it.unitPrice * it.qty })),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
-                BigButton(stringResource(R.string.call_order_next), onClick = { model.goTo(CallStep.CONFIRM) }, enabled = state.draft.lines.isNotEmpty())
-            }
+        DishesPage(
+            menu = menu,
+            menuError = state.menuError,
+            lines = state.draft.lines,
+            photos = photos,
+            onPhoto = model::loadPhoto,
+            onRetry = model::loadMenu,
+            onBack = { model.goTo(CallStep.ADDRESS) },
+            onNext = { model.goTo(CallStep.CONFIRM) },
+        ) { dish, groups ->
+            // Nothing to choose: in the basket with one tap.
+            if (groups.isEmpty()) model.add(BasketLine(dish, 1)) else picking = dish
         }
         val dish = picking
         if (dish != null && menu != null) {
@@ -567,6 +567,57 @@ private fun DishesStep(state: NewOrderState, model: NewOrderViewModel) {
                 model.add(it)
                 picking = null
             }
+        }
+    }
+}
+
+/**
+ * Step 3 as it is drawn: the tiles, and under them what is in the basket
+ * — on a line of its own, so a narrow screen squeezes neither it nor the
+ * buttons beside it.
+ */
+@Composable
+internal fun DishesPage(
+    menu: OrderMenu?,
+    menuError: String?,
+    lines: List<BasketLine>,
+    photos: Map<String, ImageBitmap?>,
+    onPhoto: (String) -> Unit,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+    onTap: (MenuDish, List<OptionGroup>) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            StepHeading(3, stringResource(R.string.call_order_dishes_title))
+            when {
+                menu != null -> DishGrid(menu, lines, photos, onPhoto, onTap)
+                menuError != null -> {
+                    StatusLine(stringResource(R.string.new_order_menu_failed, menuError), bad = true)
+                    BigButton(stringResource(R.string.retry), onClick = onRetry, outlined = true)
+                }
+                else ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CircularProgressIndicator()
+                        Text(stringResource(R.string.new_order_menu_loading), style = MaterialTheme.typography.titleLarge)
+                    }
+            }
+        }
+        HorizontalDivider()
+        val count = lines.sumOf { it.qty }
+        Text(
+            pluralStringResource(R.plurals.call_order_cart, count, count, Format.euro(lines.sumOf { it.unitPrice * it.qty })),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),
+        )
+        BottomBar {
+            BigButton(stringResource(R.string.call_order_back), onClick = onBack, outlined = true)
+            BigButton(stringResource(R.string.call_order_next), onClick = onNext, enabled = lines.isNotEmpty(), modifier = Modifier.weight(1f))
         }
     }
 }
@@ -593,7 +644,8 @@ internal fun DishGrid(
             for (name in categories) CategoryChip(name, category == name) { category = name }
         }
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 180.dp),
+            // Two to a row on a phone (360 dp less the padding is 328: two of 150 and a gap), five on a tablet.
+            columns = GridCells.Adaptive(minSize = 150.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 12.dp),
@@ -717,14 +769,14 @@ private fun OptionsPanel(dish: MenuDish, groups: List<OptionGroup>, onDismiss: (
                 }
             }
             HorizontalDivider()
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
+            BottomBar {
                 BigButton(stringResource(R.string.cancel_back), onClick = onDismiss, outlined = true)
-                Spacer(Modifier.weight(1f))
-                BigButton(stringResource(R.string.call_order_add) + " · " + Format.euro(line.unitPrice * qty), onClick = { onAdd(line) }, enabled = valid)
+                BigButton(
+                    stringResource(R.string.call_order_add) + " · " + Format.euro(line.unitPrice * qty),
+                    onClick = { onAdd(line) },
+                    enabled = valid,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -758,12 +810,12 @@ private fun ConfirmStep(state: NewOrderState, model: NewOrderViewModel, link: Ad
         stringResource(R.string.call_order_confirm_title),
         bottom = {
             BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.DISHES) }, outlined = true)
-            Spacer(Modifier.weight(1f))
             if (waitsForLink) {
                 BigButton(
                     if (state.savingWaiting) stringResource(R.string.new_order_saving) else stringResource(R.string.call_order_save_waiting),
                     onClick = model::saveWaiting,
                     enabled = draft.lines.isNotEmpty() && !state.savingWaiting,
+                    modifier = Modifier.weight(1f),
                 )
             } else {
                 BigButton(
@@ -774,6 +826,7 @@ private fun ConfirmStep(state: NewOrderState, model: NewOrderViewModel, link: Ad
                     },
                     onClick = model::save,
                     enabled = state.priced && !state.saving && !state.quoting && problems.isEmpty(),
+                    modifier = Modifier.weight(1f),
                 )
             }
         },
