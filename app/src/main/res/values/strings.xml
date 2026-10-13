@@ -891,7 +891,11 @@
     <string name="new_order_phone">Phone</string>
     <string name="new_order_contact_optional">Optional when eaten in.</string>
     <string name="new_order_address">Delivery address</string>
+    <string name="new_order_recent_addresses">Delivered to before</string>
     <string name="new_order_street">Street and number</string>
+    <string name="new_order_street_outside">no delivery</string>
+    <string name="new_order_street_partly">partly in the delivery area</string>
+    <string name="new_order_street_unlisted">No street in Leipzig is called that or sounds like it: checked as typed.</string>
     <string name="new_order_postal_code">Postcode</string>
     <string name="new_order_city">Town</string>
     <string name="new_order_door_note">For the door (optional)</string>
@@ -965,4 +969,13 @@
     <string name="crash_copy">Copy</string>
     <string name="crash_copied">Copied</string>
     <string name="crash_continue">Continue</string>
+
+    <!-- The caller's number on the tablet (CallBanner.kt, CallReportService.kt) -->
+    <string name="call_from">Call from %1$s</string>
+    <string name="call_last_address">last delivery: %1$s</string>
+    <string name="call_take_number">Use number</string>
+    <string name="call_dismiss">Put away</string>
+    <string name="section_calls">Shop phone</string>
+    <string name="report_calls">Report calls to the tablet</string>
+    <string name="report_calls_hint">For the phone that customers call. While it rings, it passes the number of the caller to the order tablet, where “New order” starts with it. The call itself is left as it is. Android does not ask about numbers saved in the contacts of this phone, so those do not appear on the tablet, and neither do withheld numbers.</string>
 </resources>

@@ -109,5 +109,20 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!--
+          On the shop's phone, with "Anrufe ans Tablet melden" on: tells the
+          order tablet who is calling. Android binds it (nobody else may)
+          once the app holds the call screening role, which the setting asks
+          for. It lets every call through as it is.
+        -->
+        <service
+            android:name=".calls.CallReportService"
+            android:exported="true"
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

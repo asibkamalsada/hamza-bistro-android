@@ -890,7 +890,11 @@
     <string name="new_order_phone">Telefon</string>
     <string name="new_order_contact_optional">Für „Vor Ort“ freiwillig.</string>
     <string name="new_order_address">Lieferadresse</string>
+    <string name="new_order_recent_addresses">Zuletzt geliefert an</string>
     <string name="new_order_street">Straße und Hausnummer</string>
+    <string name="new_order_street_outside">keine Lieferung</string>
+    <string name="new_order_street_partly">nur zum Teil im Liefergebiet</string>
+    <string name="new_order_street_unlisted">Keine Straße in Leipzig heißt oder klingt so: wird geprüft, wie getippt.</string>
     <string name="new_order_postal_code">PLZ</string>
     <string name="new_order_city">Ort</string>
     <string name="new_order_door_note">Für die Tür (optional)</string>
@@ -964,4 +968,13 @@
     <string name="crash_copy">Kopieren</string>
     <string name="crash_copied">Kopiert</string>
     <string name="crash_continue">Weiter</string>
+
+    <!-- The caller's number on the tablet (CallBanner.kt, CallReportService.kt) -->
+    <string name="call_from">Anruf von %1$s</string>
+    <string name="call_last_address">zuletzt geliefert: %1$s</string>
+    <string name="call_take_number">Nummer übernehmen</string>
+    <string name="call_dismiss">Ausblenden</string>
+    <string name="section_calls">Laden-Telefon</string>
+    <string name="report_calls">Anrufe ans Tablet melden</string>
+    <string name="report_calls_hint">Für das Telefon, auf dem die Kundschaft anruft. Während es klingelt, gibt es die Nummer ans Bestell-Tablet weiter, wo „Neue Bestellung“ gleich mit ihr beginnt. Der Anruf selbst bleibt, wie er ist. Nach Nummern, die in den Kontakten dieses Telefons stehen, fragt Android nicht: Sie erscheinen nicht auf dem Tablet, unterdrückte Nummern auch nicht.</string>
 </resources>

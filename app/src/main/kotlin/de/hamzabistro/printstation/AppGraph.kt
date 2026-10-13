@@ -7,6 +7,8 @@ import android.util.Log
 import de.hamzabistro.printstation.alarm.AlarmPlayer
 import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.CallWatch
+import de.hamzabistro.printstation.core.CallsState
 import de.hamzabistro.printstation.core.DeviceReport
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.FilePrintLog
@@ -29,6 +31,7 @@ import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabasePrintBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
+import de.hamzabistro.printstation.core.SupabaseIncomingCallsBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
 import de.hamzabistro.printstation.core.SupabasePhoneOrderBackend
@@ -266,6 +269,31 @@ class AppGraph(context: Context) {
 
     /** The last day's ratings as read, kept fresh for as long as it is collected. */
     val liveRatings: Flow<RatingsState> = merge(ratingRunner, ratingWatch.state)
+
+    // -----------------------------------------------------------------------
+    // The calls
+    // -----------------------------------------------------------------------
+
+    /**
+     * Who is calling the shop's phone: filed by the app on that phone,
+     * shown by the one that takes the orders (hamza-bistro-web:
+     * 20261013120000_incoming_calls).
+     */
+    val calls = SupabaseIncomingCallsBackend(config, http, sessions)
+
+    /** The last minutes' calls, for the banner. */
+    val callWatch = CallWatch(calls, logger)
+
+    /** Keeps [callWatch] reading while anybody collects [liveCalls], through sign-outs, as [ratingRunner] does. */
+    private val callRunner =
+        signedInRunner("The calls") {
+                callWatch.reset()
+                callWatch.run(realtime.changes(OrdersRealtime.Watch.CALLS))
+            }
+            .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
+
+    /** The last minutes' calls as read, kept fresh for as long as it is collected. */
+    val liveCalls: Flow<CallsState> = merge(callRunner, callWatch.state)
 
     // -----------------------------------------------------------------------
     // A newer build

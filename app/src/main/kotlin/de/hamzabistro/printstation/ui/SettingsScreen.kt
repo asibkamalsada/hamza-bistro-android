@@ -1,6 +1,7 @@
 package de.hamzabistro.printstation.ui
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -250,6 +251,29 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
                 Text(stringResource(R.string.travel_by_ring_hint), style = MaterialTheme.typography.bodySmall)
                 SwitchRow(stringResource(R.string.driver_device), prefs.driver) { on -> staff.updatePrefs { it.copy(driver = on) } }
                 Text(stringResource(R.string.driver_device_hint), style = MaterialTheme.typography.bodySmall)
+            }
+
+            // Only on a device that takes calls: a tablet without a SIM has no screening role to give.
+            val roles = remember { context.getSystemService(RoleManager::class.java) }
+            if (roles?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true) {
+                Section(stringResource(R.string.section_calls)) {
+                    // Read again on the way back from Android's settings, where the role can be taken away.
+                    val screening = remember(checks) { roles.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) }
+                    val askForRole =
+                        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
+                            // On only if Android's question was answered with yes.
+                            staff.updatePrefs { it.copy(reportCalls = roles.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) }
+                        }
+                    SwitchRow(stringResource(R.string.report_calls), prefs.reportCalls && screening) { on ->
+                        // Android shows its own "Als Anruf-Screening-App festlegen?" first; without it, it never asks this app about a call.
+                        if (on && !roles.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) {
+                            askForRole.launch(roles.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                        } else {
+                            staff.updatePrefs { it.copy(reportCalls = on) }
+                        }
+                    }
+                    Text(stringResource(R.string.report_calls_hint), style = MaterialTheme.typography.bodySmall)
+                }
             }
 
             Section(stringResource(R.string.section_screen)) {

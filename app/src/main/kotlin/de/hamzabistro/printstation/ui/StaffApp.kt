@@ -1,6 +1,8 @@
 package de.hamzabistro.printstation.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -11,6 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.BuildConfig
 import kotlinx.coroutines.flow.StateFlow
@@ -74,21 +78,32 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
     }
     val issues by staff.issues.collectAsStateWithLifecycle()
     val account = main.state.collectAsStateWithLifecycle().value.account
-    val label = staff.state.collectAsStateWithLifecycle().value.prefs.label
+    val prefs = staff.state.collectAsStateWithLifecycle().value.prefs
+    val label = prefs.label
     val update = staff.update.collectAsStateWithLifecycle().value.available
     val header = remember(account, label, update) { DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME, update) }
     StaffDrawer(drawer, enabled = screen == StaffScreen.QUEUE, issues, header, onOpen = { screen = it }) {
-        when (screen) {
-            StaffScreen.QUEUE ->
-                QueueScreen(staff, focus, onFocused, onOpen = { screen = it }, onMenu = { scope.launch { drawer.open() } })
-            StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
-            StaffScreen.ISSUES -> IssuesScreen(onBack = back)
-            StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
-            StaffScreen.REPORT -> ReportScreen(onBack = back)
-            StaffScreen.MENU -> MenuScreen(onBack = back)
-            StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
-            StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
-            StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
+        Box(Modifier.fillMaxSize()) {
+            when (screen) {
+                StaffScreen.QUEUE ->
+                    QueueScreen(staff, focus, onFocused, onOpen = { screen = it }, onMenu = { scope.launch { drawer.open() } })
+                StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
+                StaffScreen.ISSUES -> IssuesScreen(onBack = back)
+                StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
+                StaffScreen.REPORT -> ReportScreen(onBack = back)
+                StaffScreen.MENU -> MenuScreen(onBack = back)
+                StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
+                StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
+                StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
+            }
+            // Who is calling the shop's phone, over any screen. Not on a driver's phone: nobody takes an order there.
+            if (!prefs.driver) {
+                CallBanners(
+                    newOrderOpen = screen == StaffScreen.NEW_ORDER,
+                    onNewOrder = { screen = StaffScreen.NEW_ORDER },
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            }
         }
     }
 }
