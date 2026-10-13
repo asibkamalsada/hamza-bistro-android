@@ -687,10 +687,20 @@ keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 4096 \
   -validity 10000 -alias druckstation
 ```
 
-Locally, with the Android SDK: `./gradlew :core:test :app:lintDebug
+Locally, with the Android SDK: `./gradlew :core:check :app:lintDebug
 :app:assembleDebug`, or with the environment variables `HB_KEYSTORE_FILE`,
 `HB_KEYSTORE_PASSWORD`, `HB_KEY_ALIAS` and `HB_KEY_PASSWORD` set,
 `./gradlew :app:assembleRelease`.
+
+`:core:check` is the core's tests and `:core:shrunkTest`, and needs no
+Android SDK. The tests run the classes as compiled; the tablet runs them as
+the release build's shrinker (R8) leaves them, renamed and moved out of
+their packages. So `:core:shrunkTest` puts the core through that same
+shrinker and runs [`core/src/shrunk`](core/src/shrunk) from the result.
+What can work as compiled and not once shrunk — a file looked for beside a
+class, a class found by its name — is asked for in there, the way the app
+asks: 0.2.159 passed every test and closed on opening, its street list
+looked for in a package the class was no longer in.
 
 Requirements: Android 12 or later; JDK 17+ to build.
 

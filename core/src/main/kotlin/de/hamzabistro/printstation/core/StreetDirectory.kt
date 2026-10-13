@@ -32,7 +32,12 @@ data class StreetEntry(
  * while a caller's street is typed, with no network and no geocoder asked.
  */
 object StreetDirectory {
-    private const val RESOURCE = "streets.json"
+    /**
+     * By its whole path, not by a name beside this class: the release
+     * build's shrinker moves the class out of its package and leaves the
+     * file where it is, and a name beside the class is then not found.
+     */
+    private const val RESOURCE = "/de/hamzabistro/printstation/core/streets.json"
 
     fun parse(text: String): List<StreetEntry> = json.decodeFromString(ListSerializer(StreetEntry.serializer()), text)
 
