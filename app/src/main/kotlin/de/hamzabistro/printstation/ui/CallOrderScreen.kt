@@ -860,7 +860,7 @@ private fun DoneStep(state: NewOrderState, link: AddressRequest?, actions: LinkA
         val problem = link?.problem
         when {
             saved != null -> DoneLine(stringResource(R.string.call_order_saved, saved.orderNumber ?: 0L))
-            link?.placed == true -> DoneLine(stringResource(R.string.call_order_saved, link.orderNumber ?: 0L))
+            link != null && link.placed -> DoneLine(stringResource(R.string.call_order_saved, link.orderNumber ?: 0L))
             link != null && problem != null -> {
                 Text(
                     stringResource(R.string.call_order_problem, problemText(problem)),
@@ -876,7 +876,8 @@ private fun DoneStep(state: NewOrderState, link: AddressRequest?, actions: LinkA
                 CircularProgressIndicator(Modifier.size(64.dp))
                 Text(stringResource(R.string.call_order_waiting_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(stringResource(R.string.call_order_waiting_text), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-                if (link?.address != null) StatusLine(stringResource(R.string.call_order_address_arrived, link.address!!.line), good = true)
+                val arrived = link?.address
+                if (arrived != null) StatusLine(stringResource(R.string.call_order_address_arrived, arrived.line), good = true)
                 else SmsStatus(link) { link?.let { actions.resend(it.id) } }
             }
         }
@@ -988,7 +989,7 @@ internal fun WaitingCards(
                         when {
                             problem != null ->
                                 Text(stringResource(R.string.call_order_problem, problemText(problem)), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                            request.address != null -> Text(stringResource(R.string.waiting_address, request.address!!.line))
+                            request.address != null -> Text(stringResource(R.string.waiting_address, request.address?.line.orEmpty()))
                             expired -> Text(stringResource(R.string.waiting_expired), color = MaterialTheme.colorScheme.error)
                             request.sms == SmsState.SENT -> Text(stringResource(R.string.call_order_sms_sent))
                             request.sms == SmsState.FAILED ->

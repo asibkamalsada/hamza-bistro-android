@@ -36,7 +36,8 @@ class TextSender(context: Context) {
      * for is reported as such; the tablet can then send it again.
      */
     suspend fun send(phone: String, text: String): String? {
-        if (!canSend()) return "no permission to send SMS"
+        // Asked here, beside the call it is for: the permission can be taken away in Android's settings at any time.
+        if (context.checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return "no permission to send SMS"
         val sms = context.getSystemService(SmsManager::class.java) ?: return "no SMS on this device"
         val parts = sms.divideMessage(text)
         val action = "${context.packageName}.SMS_SENT.${COUNTER.incrementAndGet()}"
@@ -67,6 +68,8 @@ class TextSender(context: Context) {
                 )
             try {
                 sms.sendMultipartTextMessage(phone, null, parts, sent, null)
+            } catch (e: SecurityException) {
+                return "no permission to send SMS"
             } catch (e: Exception) {
                 // A number Android cannot send to, or a SIM it will not use.
                 return e.message ?: e.javaClass.simpleName
@@ -85,9 +88,6 @@ class TextSender(context: Context) {
             SmsManager.RESULT_ERROR_NO_SERVICE -> "RESULT_ERROR_NO_SERVICE"
             SmsManager.RESULT_ERROR_RADIO_OFF -> "RESULT_ERROR_RADIO_OFF"
             SmsManager.RESULT_ERROR_NULL_PDU -> "RESULT_ERROR_NULL_PDU"
-            SmsManager.RESULT_ERROR_LIMIT_EXCEEDED -> "RESULT_ERROR_LIMIT_EXCEEDED"
-            SmsManager.RESULT_ERROR_SHORT_CODE_NOT_ALLOWED -> "RESULT_ERROR_SHORT_CODE_NOT_ALLOWED"
-            SmsManager.RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED -> "RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED"
             else -> "SMS error $code"
         }
 
