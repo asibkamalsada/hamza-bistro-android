@@ -7,9 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -40,22 +43,29 @@ class MainActivity : ComponentActivity() {
         val crash = mutableStateOf(CrashLog.pending(this))
         setContent {
             AppTheme {
-                val trace = crash.value
-                if (trace != null) {
-                    CrashScreen(trace) {
-                        CrashLog.clear(this)
-                        crash.value = null
-                    }
-                } else {
-                    val state by main.state.collectAsStateWithLifecycle()
-                    val setup by main.setup.collectAsStateWithLifecycle()
-                    when {
-                        // After an install, before the sign-in: everything the alarm and the printer need.
-                        setup -> SetupScreen(state.role, onDone = main::setupDone)
-                        state.account == null || state.role == Role.PRINTER -> MainScreen(main)
-                        state.role == Role.STAFF -> StaffApp(staff, main, focus, onFocused = { focus.value = null })
-                        // Finding out what this account is.
-                        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                // Edge to edge, Android no longer makes the window smaller for
+                // the keyboard (adjustResize only says how tall it is): every
+                // screen is made smaller here instead, so the keyboard covers
+                // nothing, and a list scrolls the field being typed in up above
+                // it. Underneath, the screens' own colour, not the window's.
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
+                    val trace = crash.value
+                    if (trace != null) {
+                        CrashScreen(trace) {
+                            CrashLog.clear(this@MainActivity)
+                            crash.value = null
+                        }
+                    } else {
+                        val state by main.state.collectAsStateWithLifecycle()
+                        val setup by main.setup.collectAsStateWithLifecycle()
+                        when {
+                            // After an install, before the sign-in: everything the alarm and the printer need.
+                            setup -> SetupScreen(state.role, onDone = main::setupDone)
+                            state.account == null || state.role == Role.PRINTER -> MainScreen(main)
+                            state.role == Role.STAFF -> StaffApp(staff, main, focus, onFocused = { focus.value = null })
+                            // Finding out what this account is.
+                            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        }
                     }
                 }
             }
