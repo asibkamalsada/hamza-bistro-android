@@ -144,13 +144,15 @@ class ShiftService : LifecycleService() {
 
     /**
      * The queue and its alarm, until the shift ends here — and, beside them,
-     * a look once a day for a newer build. That look never throws, and runs
+     * the orders waiting for an address, and a look once a day for a newer build. That look never throws, and runs
      * in a job of its own, so GitHub can do nothing to the alarm.
      */
     private suspend fun shift() {
         coroutineScope {
             val queue = graph.liveQueue.shareIn(this, SharingStarted.Eagerly, replay = 1)
             launch { queue.collect { queueShown.value = it } }
+            // The phone orders waiting for their caller's address: placed as it arrives, screen on or off.
+            launch { graph.liveAddressRequests.collect {} }
             launch {
                 try {
                     graph.updates.daily()

@@ -146,6 +146,8 @@ data class PhoneOrderQuote(
     /** "Küche voll in diesem Slot": the order goes in all the same. */
     @SerialName("over_capacity") val overCapacity: Boolean = false,
     @SerialName("dry_run") val dryRun: Boolean = false,
+    /** staff_place_address_request only: another device placed it first; [id] and [orderNumber] are that order. */
+    val already: Boolean = false,
 )
 
 /** Why staff_place_order refused, by its error code. */

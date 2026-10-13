@@ -1,10 +1,13 @@
 package de.hamzabistro.printstation.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
@@ -43,14 +46,14 @@ import kotlinx.coroutines.delay
 
 /**
  * Who is calling the shop's phone, over whatever screen is up: the number,
- * where it had its last delivery, and a button that opens "Neue Bestellung"
- * with the number in it. On top of the screen rather than above it, so no
- * order moves under a finger when the phone rings.
+ * big, where it had its last delivery, and one big button that opens
+ * "Telefon-Bestellung" with the number in it. On top of the screen rather
+ * than above it, so no order moves under a finger when the phone rings.
  *
  * Nothing opens by itself. A banner goes when it is used, put away, or a
  * few minutes old; several callers stack, the latest on top. [newOrderOpen]
- * is whether "Neue Bestellung" is the screen underneath: the button then
- * only takes the number, and only into an empty field.
+ * is whether an order form is the screen underneath: the button then only
+ * takes the number, and only into an empty field.
  */
 @Composable
 fun CallBanners(newOrderOpen: Boolean, onNewOrder: () -> Unit, modifier: Modifier = Modifier, order: NewOrderViewModel = viewModel()) {
@@ -80,16 +83,20 @@ internal fun CallBanners(
         }
     val shown = IncomingCalls.toShow(calls, dismissed, now)
     if (shown.isEmpty()) return
-    val phoneTyped = order.state.collectAsStateWithLifecycle().value.draft.phone.isNotBlank()
-    Column(modifier.statusBarsPadding().padding(8.dp).widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val underneath = order.state.collectAsStateWithLifecycle().value
+    val phoneTyped = underneath.draft.phone.isNotBlank()
+    // The order underneath is saved, or waits on its link: this call is a new one.
+    val fresh = !newOrderOpen || underneath.finished
+    Column(modifier.statusBarsPadding().padding(12.dp).widthIn(max = 960.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         for (call in shown) {
             key(call.id) {
                 CallBanner(
                     call,
                     lastAddress,
                     // With a number typed in the order underneath, there is nothing to offer but putting the banner away.
-                    action = if (!newOrderOpen) R.string.new_order_title else if (!phoneTyped) R.string.call_take_number else null,
+                    action = if (fresh) R.string.call_take_order else if (!phoneTyped) R.string.call_take_number else null,
                     onAction = {
+                        if (underneath.finished) order.reset()
                         order.takeNumber(call.phone)
                         dismissed = dismissed + call.id
                         onNewOrder()
@@ -115,25 +122,36 @@ private fun CallBanner(call: IncomingCall, lastAddress: suspend (String) -> Rece
                     null
                 }
         }
+    // Big, and with one big button: seen from across the kitchen, and hit without reading.
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        shadowElevation = 6.dp,
+        shape = MaterialTheme.shapes.large,
+        shadowElevation = 12.dp,
+        border = BorderStroke(3.dp, MaterialTheme.colorScheme.primary),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.call_from, PhoneNumbers.national(call.phone)),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                address?.let { Text(stringResource(R.string.call_last_address, it.line), style = MaterialTheme.typography.bodyMedium) }
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.call_ringing), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        stringResource(R.string.call_from, PhoneNumbers.national(call.phone)),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    address?.let { Text(stringResource(R.string.call_last_address, it.line), style = MaterialTheme.typography.headlineSmall) }
+                }
+                val putAway = stringResource(R.string.call_dismiss)
+                TextButton(onClick = onDismiss, modifier = Modifier.size(72.dp).semantics { contentDescription = putAway }) {
+                    Text("✕", style = MaterialTheme.typography.headlineMedium)
+                }
             }
-            if (action != null) Button(onClick = onAction) { Text(stringResource(action)) }
-            val putAway = stringResource(R.string.call_dismiss)
-            TextButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = putAway }) { Text("✕") }
+            if (action != null) {
+                Button(onClick = onAction, modifier = Modifier.fillMaxWidth().heightIn(min = 88.dp)) {
+                    Text(stringResource(action), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

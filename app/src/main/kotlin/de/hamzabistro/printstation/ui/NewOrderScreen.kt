@@ -5,6 +5,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.res.Resources
+import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -71,6 +74,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AddressCheck
+import de.hamzabistro.printstation.core.AddressRequest
 import de.hamzabistro.printstation.core.AddressStatus
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.BasketLine
@@ -89,6 +93,7 @@ import de.hamzabistro.printstation.core.PhoneOrderException
 import de.hamzabistro.printstation.core.PhoneOrderQuote
 import de.hamzabistro.printstation.core.PhoneOrders
 import de.hamzabistro.printstation.core.RecentAddress
+import de.hamzabistro.printstation.core.RequestedLink
 import de.hamzabistro.printstation.core.Selection
 import de.hamzabistro.printstation.core.StreetDelivery
 import de.hamzabistro.printstation.core.StreetDirectory
@@ -109,6 +114,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** What "Neue Bestellung" shows. */
 data class NewOrderState(
@@ -138,7 +144,31 @@ data class NewOrderState(
     val saving: Boolean = false,
     /** The order as saved: the screen says so and goes back. */
     val saved: PhoneOrderQuote? = null,
+    /** Where "Telefon-Bestellung" is, step by step. */
+    val step: CallStep = CallStep.NAME,
+    /** Telefon-Bestellung has set this order up as a phone delivery, once: what is chosen after stays chosen. */
+    val callStarted: Boolean = false,
+    /** The link texted to the caller, when the address goes by SMS. */
+    val link: RequestedLink? = null,
+    val linking: Boolean = false,
+    val linkError: String? = null,
+    /** When the caller typed the address now in the fields, through the link. */
+    val linkAddressAt: Instant? = null,
+    /** The basket is saved on the link and waits there for the address: placed by the tablet once it comes. */
+    val waiting: Boolean = false,
+    val savingWaiting: Boolean = false,
 ) {
+    /**
+     * The address goes by SMS and has not come yet — nor been typed after
+     * all: the order is saved to wait for it.
+     */
+    val awaitingLink: Boolean
+        get() = link != null && linkAddressAt == null && draft.delivery && !PhoneOrders.addressComplete(draft)
+
+    /** Saved, or waiting on its link: the next call starts a new order. */
+    val finished: Boolean
+        get() = step == CallStep.DONE || saved != null || waiting
+
     /** The price shown is the one for what is on the screen now. */
     val priced: Boolean
         get() = quote != null && quotedDraft == draft
@@ -161,6 +191,28 @@ data class NewOrderState(
 
 /** What check-address is asked once for: street, postcode, town. */
 private fun PhoneOrderDraft.addressKey(): List<String> = listOf(street.trim(), postalCode.trim(), city.trim())
+
+/** The steps of "Telefon-Bestellung", in order. */
+enum class CallStep {
+    NAME,
+    ADDRESS,
+    DISHES,
+    CONFIRM,
+
+    /** Saved, or waiting for the address. */
+    DONE,
+}
+
+/** A dish photo, decoded at a tile's size rather than the camera's. */
+private fun tile(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= TILE_PX && bounds.outHeight / (sample * 2) >= TILE_PX) sample *= 2
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+}
+
+private const val TILE_PX = 320
 
 /**
  * "Neue Bestellung" (#9): a phone or walk-in order typed in on the tablet,
@@ -383,7 +435,11 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 val saved = graph.phoneOrders.place(draft, minutes, quote.total, dryRun = false)
-                _state.update { it.copy(saving = false, saved = saved) }
+                _state.update { it.copy(saving = false, saved = saved, step = CallStep.DONE) }
+                // The address came through the link while the caller was on the line: the link is done.
+                val link = now.link
+                val order = saved.id
+                if (link != null && order != null) graph.scope.launch { runCatching { graph.addressRequests.close(link.id, order) } }
                 // On every device through Realtime anyway; here at once.
                 graph.queue.refresh()
             } catch (e: CancellationException) {
@@ -399,13 +455,128 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /** "Noch eine Bestellung": an empty form, the menu kept. */
+    /** "Noch eine Bestellung": an empty form, the menu kept. A link asked for and not used is cancelled, so it takes no address. */
     fun reset() {
         pricing?.cancel()
         suggesting?.cancel()
         remembering?.cancel()
         addressCheck?.cancel()
+        val now = _state.value
+        val unused = now.link?.takeIf { !now.waiting && now.saved == null }
+        if (unused != null) graph.scope.launch { runCatching { graph.addressRequests.cancel(unused.id) } }
         _state.update { NewOrderState(menu = it.menu) }
+    }
+
+    // -------------------------------------------------------------------
+    // Telefon-Bestellung: step by step, and the address by SMS
+    // -------------------------------------------------------------------
+
+    /** Opened from a call or the queue: a phone delivery, unless it was begun as something else. */
+    fun startCall() {
+        val now = _state.value
+        if (now.callStarted) return
+        _state.update { it.copy(callStarted = true) }
+        if (now.draft.lines.isNotEmpty() || now.link != null || now.saved != null || now.waiting) return
+        if (now.draft.source != OrderSource.PHONE || now.draft.fulfilment != Fulfilment.DELIVERY) {
+            edit { it.copy(source = OrderSource.PHONE, fulfilment = Fulfilment.DELIVERY) }
+        }
+    }
+
+    fun goTo(step: CallStep) = _state.update { it.copy(step = step) }
+
+    /**
+     * "SMS an den Anrufer senden": a link for the number in the form, sent
+     * from the phone in the shop; once more when there is one already.
+     */
+    fun sendLink() {
+        val now = _state.value
+        if (now.linking || now.draft.phone.isBlank()) return
+        _state.update { it.copy(linking = true, linkError = null) }
+        viewModelScope.launch {
+            try {
+                val link = now.link
+                if (link != null) graph.addressRequests.resend(link.id)
+                else {
+                    val made = graph.addressRequests.request(now.draft.phone, now.draft.name)
+                    _state.update { it.copy(link = made) }
+                }
+                graph.addressWatch.refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(linkError = failureText(app, e)) }
+            } finally {
+                _state.update { it.copy(linking = false) }
+            }
+        }
+    }
+
+    /**
+     * The link as the database has it. The caller's address goes into the
+     * fields the moment it arrives — checked and priced from there like one
+     * typed — unless the basket already waits on the link, where the tablet
+     * places it by itself.
+     */
+    fun linkRead(request: AddressRequest?) {
+        val now = _state.value
+        if (request == null || request.id != now.link?.id || now.waiting || now.saved != null) return
+        val address = request.address ?: return
+        if (request.addressAt == now.linkAddressAt) return
+        _state.update { it.copy(linkAddressAt = request.addressAt) }
+        edit {
+            it.copy(
+                fulfilment = Fulfilment.DELIVERY,
+                street = address.street,
+                postalCode = address.postalCode,
+                city = address.city.ifBlank { PhoneOrders.DEFAULT_CITY },
+                addressNote = address.addressNote,
+            )
+        }
+    }
+
+    /** "Speichern und auf die Adresse warten": the basket goes onto the link, for the tablet to place once the address is there. */
+    fun saveWaiting() {
+        val now = _state.value
+        val link = now.link ?: return
+        if (now.savingWaiting || now.waiting || now.draft.lines.isEmpty()) return
+        _state.update { it.copy(savingWaiting = true, error = null) }
+        viewModelScope.launch {
+            try {
+                graph.addressRequests.save(link.id, now.draft)
+                _state.update { it.copy(waiting = true, step = CallStep.DONE) }
+                graph.addressWatch.refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = failureText(app, e)) }
+            } finally {
+                _state.update { it.copy(savingWaiting = false) }
+            }
+        }
+    }
+
+    private val photoCache = mutableMapOf<String, ImageBitmap?>()
+    private val _photos = MutableStateFlow<Map<String, ImageBitmap?>>(emptyMap())
+
+    /** The dishes' photos, by URL, for the big tiles: a Döner is found faster by its picture than by its name. */
+    val photos: StateFlow<Map<String, ImageBitmap?>> = _photos.asStateFlow()
+
+    /** Fetches [url]'s photo once, small enough for a tile; null when there is none to show. */
+    fun loadPhoto(url: String) {
+        if (url.isBlank() || url in photoCache) return
+        photoCache[url] = null
+        viewModelScope.launch {
+            val bitmap =
+                try {
+                    graph.photoPreview(url)?.let { bytes -> withContext(Dispatchers.Default) { tile(bytes) } }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+            photoCache[url] = bitmap
+            _photos.update { it + (url to bitmap) }
+        }
     }
 
     private companion object {

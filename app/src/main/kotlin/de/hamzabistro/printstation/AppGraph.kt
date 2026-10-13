@@ -5,6 +5,10 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import de.hamzabistro.printstation.alarm.AlarmPlayer
+import de.hamzabistro.printstation.core.AddressRequestPlacer
+import de.hamzabistro.printstation.core.AddressRequestWatch
+import de.hamzabistro.printstation.core.AddressRequestsState
+import de.hamzabistro.printstation.core.AddressSmsSender
 import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.ApkDownload
@@ -19,6 +23,8 @@ import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrdersRealtime
+import de.hamzabistro.printstation.core.PhoneOrders
+import de.hamzabistro.printstation.core.SmsTransport
 import de.hamzabistro.printstation.core.RatingWatch
 import de.hamzabistro.printstation.core.RatingsState
 import de.hamzabistro.printstation.core.PrintStation
@@ -27,6 +33,7 @@ import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.SessionManager
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.StaffOrder
+import de.hamzabistro.printstation.core.SupabaseAddressRequestBackend
 import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabasePrintBackend
@@ -60,6 +67,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +76,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -297,6 +306,72 @@ class AppGraph(context: Context) {
 
     /** The last minutes' calls as read, kept fresh for as long as it is collected. */
     val liveCalls: Flow<CallsState> = merge(callRunner, callWatch.state)
+
+    // -----------------------------------------------------------------------
+    // The address by SMS
+    // -----------------------------------------------------------------------
+
+    /**
+     * The links texted to callers to type their address into, and the phone
+     * orders waiting for them (hamza-bistro-web:
+     * 20261013170000_address_requests).
+     */
+    val addressRequests = SupabaseAddressRequestBackend(config, http, sessions)
+
+    /** The last day's links, for the call order screens and the waiting cards. */
+    val addressWatch = AddressRequestWatch(addressRequests, logger)
+
+    /**
+     * How the texts with the address link go out — a gateway from the
+     * server, or a phone with a SIM — is not decided yet. Null: nothing here
+     * sends them, and the call screens do not offer "SMS an den Anrufer
+     * senden"; the link, the customer's page and the basket waiting for the
+     * address are in place for when something does. A transport running on
+     * another device, or on the server, would set [textingAvailable] instead.
+     */
+    val sms: SmsTransport? = null
+
+    /** Whether the call screens offer the link by SMS: something sends the texts. */
+    val textingAvailable: Boolean
+        get() = sms != null
+
+    /**
+     * Puts a waiting basket into the kitchen once its caller has typed the
+     * address, on the device that took it — with the minutes an incoming
+     * order would be offered: cooking, the ride to the ring, busy mode's.
+     */
+    private val addressPlacer =
+        AddressRequestPlacer(
+            requests = addressRequests,
+            orders = phoneOrders,
+            logger = logger,
+            minutes = { items, postalCode, zone ->
+                val travel = Eta.travelMinutes(postalCode, zone)
+                val busy = shopView.value.hours?.busyMinutes(Instant.now()) ?: 0
+                Eta.quote(Eta.prepMinutes(items, queue.state.value.prep), travel, busy).coerceIn(PhoneOrders.ETA_MIN, PhoneOrders.ETA_MAX)
+            },
+        )
+
+    private val textSender = sms?.let { AddressSmsSender(addressRequests, it, logger) }
+
+    /**
+     * Keeps [addressWatch] reading — and, beside it, places what has its
+     * address and sends what is to be texted from here — while anybody collects
+     * [liveAddressRequests], through sign-outs, as [callRunner] does.
+     */
+    private val addressRunner =
+        signedInRunner("The address links") {
+                addressWatch.reset()
+                coroutineScope {
+                    launch { addressPlacer.run(addressWatch.state) { sessions.account.value?.userId } }
+                    textSender?.let { sender -> launch { sender.run(addressWatch.state) } }
+                    addressWatch.run(realtime.changes(OrdersRealtime.Watch.ADDRESS_REQUESTS))
+                }
+            }
+            .shareIn(scope, SharingStarted.WhileSubscribed(5_000))
+
+    /** The last day's links as read, kept fresh — and acted on — for as long as it is collected. */
+    val liveAddressRequests: Flow<AddressRequestsState> = merge(addressRunner, addressWatch.state)
 
     // -----------------------------------------------------------------------
     // A newer build
