@@ -1000,10 +1000,11 @@
     <string name="call_order_sms">📱 Send the caller an SMS</string>
     <string name="call_order_sms_hint">Address not understood? The caller types it into their own phone.</string>
     <string name="call_order_sms_needs_phone">An SMS needs the phone number (step 1).</string>
+    <string name="call_order_sms_needs_mobile">That is a landline number: an SMS only goes to a mobile.</string>
     <string name="call_order_sms_sending">📱 SMS is being sent …</string>
     <string name="call_order_sms_sent">✓ SMS sent</string>
     <string name="call_order_sms_failed">✗ SMS not sent: %1$s</string>
-    <string name="call_order_sms_no_sender">✗ The SMS has not gone out: nothing is sending texts right now.</string>
+    <string name="call_order_sms_no_sender">✗ No phone has sent the SMS. Is the shop phone on, with “Send SMS links” switched on?</string>
     <string name="call_order_sms_again">Send again</string>
     <string name="call_order_link_failed">The SMS could not be asked for: %1$s</string>
     <string name="call_order_address_arrived">✓ Address from the caller: %1$s</string>
@@ -1042,4 +1043,9 @@
     <string name="address_problem_unchecked">The address could not be checked</string>
     <string name="address_problem_basket">A dish is sold out now</string>
     <string name="address_problem_other">The order could not be saved (%1$s)</string>
+    <string name="send_texts">Send SMS links</string>
+    <string name="send_texts_hint">For the phone with the shop\'s SIM card. When the tablet sends a caller a link to type their address into, this phone sends the SMS, from its own number. It does so in the background, also when it is not on shift. Android asks once whether the app may send SMS.</string>
+    <string name="send_texts_refused">Android did not allow sending SMS. If it never asked: open the App info of this app in the Android settings, tap ⋮ and “Allow restricted settings”, then switch this on again.</string>
+    <string name="running_texts_title">Sending SMS links</string>
+    <string name="running_texts_line">Sends the SMS links the tablet asks for</string>
 </resources>

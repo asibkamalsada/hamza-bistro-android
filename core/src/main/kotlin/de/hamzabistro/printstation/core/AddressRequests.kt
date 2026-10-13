@@ -100,7 +100,7 @@ data class AddressRequest(
 
 /** How the text with the link fares. */
 enum class SmsState {
-    /** Not sent yet: waiting for whatever sends the texts, or being sent. */
+    /** Not sent yet: waiting for the phone that sends texts, or being sent. */
     SENDING,
     SENT,
     FAILED,
@@ -152,7 +152,7 @@ object AddressRequests {
     /** A claim nobody answered for this long may be taken again, as claim_address_sms has it. */
     val CLAIM_FOR: Duration = 2.minutes
 
-    /** How long a text may wait to be sent before the tablet says that nothing sends it. */
+    /** How long a text may wait for a phone to send it before the tablet says that none does. */
     val NO_SENDER_AFTER: Duration = 45.seconds
 
     /** How far back the tablet reads: as long as the database keeps a request. */
@@ -200,7 +200,7 @@ object AddressRequests {
                 (it.smsClaimedAt == null || !it.smsClaimedAt.isAfter(now.minus(CLAIM_FOR.toJavaDuration())))
         }
 
-    /** Nobody has sent the text, nor said they could not, for [NO_SENDER_AFTER]: nothing is sending texts. */
+    /** Nobody has sent the text, nor said they could not, for [NO_SENDER_AFTER]: no phone in the shop sends texts. */
     fun unsent(request: AddressRequest, now: Instant): Boolean =
         request.sms == SmsState.SENDING && request.smsClaimedAt == null && !request.createdAt.isAfter(now.minus(NO_SENDER_AFTER.toJavaDuration()))
 
@@ -520,24 +520,15 @@ class AddressRequestPlacer(
 }
 
 /**
- * How a text with the address link goes out: a gateway, a phone with a SIM,
- * whatever is chosen — not decided yet. Answers null when the text went
- * out, or why not.
- */
-fun interface SmsTransport {
-    suspend fun send(phone: String, text: String): String?
-}
-
-/**
- * Wherever an [SmsTransport] runs: takes each text still to send (one
- * device claims it, so it goes once), hands it to the transport, and says
- * how it went — the database's side of it is claim_address_sms and
- * address_sms_result, whichever transport it is.
+ * On the phone that sends the shop's texts: takes each text still to send
+ * (one device claims it, so it goes once), hands it to [send], and says how
+ * it went. [send] answers null when the text went out, or why not.
  */
 class AddressSmsSender(
     private val backend: AddressRequestBackend,
-    private val transport: SmsTransport,
     private val logger: Logger,
+    private val enabled: () -> Boolean,
+    private val send: suspend (phone: String, text: String) -> String?,
     private val now: () -> Instant = Instant::now,
 ) {
     /** Sends what [state] holds each time it changes, and every [tick] for a claim that ran out. */
@@ -550,7 +541,7 @@ class AddressSmsSender(
                 wake.send(Unit)
             }
         }
-        for (ignored in wake) sendAll(state.value)
+        for (ignored in wake) if (enabled()) sendAll(state.value)
         error("the wake channel never closes")
     }
 
@@ -560,7 +551,7 @@ class AddressSmsSender(
                 val job = backend.claimSms(request.id) ?: continue
                 val error =
                     try {
-                        transport.send(job.phone, AddressRequests.smsText(job.token))
+                        send(job.phone, AddressRequests.smsText(job.token))
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

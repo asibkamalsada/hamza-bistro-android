@@ -40,6 +40,20 @@ object PhoneNumbers {
     /** Enough digits to be somebody's number, so its earlier addresses are worth asking for. */
     fun complete(phone: String): Boolean = normalise(phone).length >= COMPLETE_FROM
 
+    /**
+     * Whether a text sent to this number is read by the person who rang: a
+     * German mobile (015x, 016x, 017x), or a whole number from abroad,
+     * where only its own network knows what it is. To a German landline the
+     * network would ring back and read the link out, letter by letter.
+     */
+    fun textable(phone: String): Boolean {
+        val digits = normalise(phone)
+        return if (digits.startsWith("49")) MOBILE.matches("0" + digits.drop(2)) else complete(phone)
+    }
+
+    /** The number as any network takes it, wherever the phone is: "+491761234567". */
+    fun international(phone: String): String = "+" + normalise(phone)
+
     /** German mobile prefixes are four digits: 015x, 016x, 017x. */
     private val MOBILE = Regex("01[567]\\d{5,}")
 

@@ -145,13 +145,7 @@ private const val STEPS = 4
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CallOrderScreen(
-    onBack: () -> Unit,
-    onFullForm: () -> Unit,
-    model: NewOrderViewModel = viewModel(),
-    /** Whether "SMS an den Anrufer senden" is offered: only once something sends the texts ([AppGraph.sms]). */
-    texting: Boolean = (LocalContext.current.applicationContext as PrintStationApp).graph.textingAvailable,
-) {
+fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderViewModel = viewModel()) {
     val graph = (LocalContext.current.applicationContext as PrintStationApp).graph
     val state by model.state.collectAsStateWithLifecycle()
     val links by graph.liveAddressRequests.collectAsStateWithLifecycle(AddressRequestsState())
@@ -193,7 +187,7 @@ fun CallOrderScreen(
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when (state.step) {
                     CallStep.NAME -> NameStep(state, model)
-                    CallStep.ADDRESS -> AddressStep(state, model, link, texting)
+                    CallStep.ADDRESS -> AddressStep(state, model, link)
                     CallStep.DISHES -> DishesStep(state, model)
                     CallStep.CONFIRM -> ConfirmStep(state, model, link)
                     CallStep.DONE -> DoneStep(state, link, remember(graph) { LinkActions(graph) }, onDone = finish)
@@ -366,7 +360,7 @@ private fun NameStep(state: NewOrderState, model: NewOrderViewModel) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?, texting: Boolean) {
+private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?) {
     val draft = state.draft
     val outside = state.addressChecked && state.address?.outside == true
     val goOn = !draft.delivery || state.link != null || (PhoneOrders.addressComplete(draft) && !outside)
@@ -384,10 +378,8 @@ private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: Ad
         } else {
             TypedAddress(state, model, outside)
             HorizontalDivider()
-            if (texting || state.link != null) {
-                TextedAddress(state, model, link)
-                HorizontalDivider()
-            }
+            TextedAddress(state, model, link)
+            HorizontalDivider()
             OutlinedButton(onClick = { model.edit { it.copy(fulfilment = Fulfilment.PICKUP) } }, modifier = Modifier.heightIn(min = 56.dp)) {
                 Text(stringResource(R.string.call_order_pickup), style = MaterialTheme.typography.titleMedium)
             }
@@ -456,16 +448,24 @@ private fun TypedAddress(state: NewOrderState, model: NewOrderViewModel, outside
 @Composable
 private fun TextedAddress(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?) {
     val phone = state.draft.phone
+    // A landline would have the link read out to it: no text there.
+    val textable = PhoneNumbers.textable(phone)
     if (state.link == null) {
         BigButton(
             stringResource(R.string.call_order_sms),
             onClick = model::sendLink,
-            enabled = phone.isNotBlank() && !state.linking,
+            enabled = textable && !state.linking,
             tonal = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            stringResource(if (phone.isBlank()) R.string.call_order_sms_needs_phone else R.string.call_order_sms_hint),
+            stringResource(
+                when {
+                    phone.isBlank() -> R.string.call_order_sms_needs_phone
+                    !textable -> R.string.call_order_sms_needs_mobile
+                    else -> R.string.call_order_sms_hint
+                }
+            ),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -46,4 +46,23 @@ class PhoneNumbersTest {
         assertTrue(PhoneNumbers.complete("0176 1234567"))
         assertTrue(PhoneNumbers.complete("+49 176 1234567"))
     }
+
+    @Test
+    fun `a text goes to a mobile, not to a German landline`() {
+        for (mobile in listOf("0176 1234567", "+49 151 23456789", "0049 160 1234567", "+49 (0) 172 1234567")) assertTrue(PhoneNumbers.textable(mobile), mobile)
+        // Landlines, and the numbers that are neither: free, shared-cost, the network's own.
+        for (other in listOf("0341 1234567", "+49 30 123456", "0800 1234567", "0180 5123456", "032 123456789")) assertFalse(PhoneNumbers.textable(other), other)
+        // From abroad, only the caller's network knows: a whole number is tried.
+        assertTrue(PhoneNumbers.textable("+43 660 1234567"))
+        assertFalse(PhoneNumbers.textable("+43 660"))
+        assertFalse(PhoneNumbers.textable(""))
+        assertFalse(PhoneNumbers.textable("0176"))
+    }
+
+    @Test
+    fun `a text is sent to the number with its country in front`() {
+        assertEquals("+491761234567", PhoneNumbers.international("0176 1234567"))
+        assertEquals("+491761234567", PhoneNumbers.international("+49 (0) 176 1234567"))
+        assertEquals("+436601234567", PhoneNumbers.international("0043 660 1234567"))
+    }
 }
