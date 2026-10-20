@@ -384,6 +384,8 @@ private fun LazyListScope.reportItems(report: Report, words: ReportWords) {
     item(key = "rings") { Rings(report, words) }
     // Only once something came in by phone or at the counter (#9): otherwise it is all "Website".
     if (report.enteredByStaff) item(key = "sources") { Sources(report, words) }
+    // Only once a web order in the range carries a label (hamza-bistro-web 20261020120000).
+    if (report.knowsCameFrom) item(key = "came_from") { CameFrom(report, words) }
     item(key = "best") { BestSellers(report) }
     item(key = "grid") { BusyHours(report.grid) }
     item(key = "times") { Times(report, words) }
@@ -524,6 +526,33 @@ private fun sourceName(resources: Resources, source: String): String =
         OrderSource.COUNTER.wire -> resources.getString(R.string.report_source_counter)
         else -> source
     }
+
+/** Flyer, Google, Instagram, direkt: what each way in brought, and how many of them were new. */
+@Composable
+private fun CameFrom(report: Report, words: ReportWords) {
+    val resources = LocalResources.current
+    val most = report.cameFrom.maxOfOrNull { it.delivered } ?: 0
+    ReportSection(stringResource(R.string.report_came_from)) {
+        Line(stringResource(R.string.report_came_from_label), words.orders, stringResource(R.string.report_came_from_new), words.revenue, muted = true)
+        for (row in report.cameFrom) {
+            Line(cameFromName(resources, row.cameFrom), row.delivered.toString(), row.newCustomers.toString(), ReportText.euro(row.revenue))
+            if (most > 0) Bar(row.delivered.toDouble() / most)
+        }
+        Text(stringResource(R.string.report_came_from_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The labels worth a word of their own; any other is shown as the shop page stored it. */
+private fun cameFromName(resources: Resources, label: String?): String {
+    if (label == null) return resources.getString(R.string.report_came_from_unknown)
+    return when (label) {
+        "direct" -> resources.getString(R.string.report_came_from_direct)
+        "app" -> resources.getString(R.string.report_came_from_app)
+        "meta" -> resources.getString(R.string.report_came_from_meta)
+        "google-ads" -> resources.getString(R.string.report_came_from_google_ads)
+        else -> label
+    }
+}
 
 /** The top ten, by Menge or by Umsatz, and all of them a tap away. */
 @Composable

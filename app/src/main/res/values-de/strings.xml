@@ -967,6 +967,15 @@
     <string name="report_source_phone">Telefon</string>
     <string name="report_source_counter">Theke</string>
     <string name="report_source_extra">%1$s: %2$d hier gegessen, %3$d Gebühr erlassen</string>
+    <string name="report_came_from">Woher die Online-Bestellungen kommen</string>
+    <string name="report_came_from_label">Herkunft</string>
+    <string name="report_came_from_new">Neu</string>
+    <string name="report_came_from_unknown">Unbekannt</string>
+    <string name="report_came_from_direct">Direkt (getippt, Lesezeichen, WhatsApp)</string>
+    <string name="report_came_from_app">Installierte Shop-App</string>
+    <string name="report_came_from_meta">Facebook/Instagram</string>
+    <string name="report_came_from_google_ads">Google-Anzeige</string>
+    <string name="report_came_from_hint">Gelieferte Bestellungen. Neu: keine Lieferung an diese E-Mail in den 30 Tagen davor. Ein Link mit ?ref=name erscheint hier unter diesem Namen. Unbekannt: Bestellungen von vor dieser Zählung und nach einer Anmeldung mit Google.</string>
     <!-- The last crash, shown on the next start (CrashLog). -->
     <string name="crash_title">Die App wurde unerwartet beendet</string>
     <string name="crash_text">Beim letzten Mal hat sich die App von selbst geschlossen. Bitte kopiere den Text unten und schick ihn an den, der die App betreut, damit der Fehler behoben werden kann.</string>

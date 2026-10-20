@@ -87,6 +87,24 @@ data class ReportSource(
     @SerialName("fees_waived") val feesWaived: Int = 0,
 )
 
+/**
+ * Where the web orders came from (hamza-bistro-web
+ * 20261020120000_order_came_from.sql): one row per label the shop page
+ * stored, most delivered first. [placed] by the day placed; the rest count
+ * delivered orders.
+ */
+@Serializable
+data class ReportCameFrom(
+    /** "flyer", "google", "direct", a site's host, a link's own ?ref=; null when not known. */
+    @SerialName("came_from") val cameFrom: String? = null,
+    val placed: Int = 0,
+    val delivered: Int = 0,
+    /** Delivered orders by an email with no delivery still on record: none in the 30 days before. */
+    @SerialName("new_customers") val newCustomers: Int = 0,
+    val revenue: Double = 0.0,
+    @SerialName("average_basket") val averageBasket: Double? = null,
+)
+
 /** A dish sold; [revenue] is what its lines charged, before order-wide discounts. */
 @Serializable
 data class ReportDish(
@@ -268,10 +286,16 @@ data class Report(
     val ratings: ReportRatings? = null,
     /** Empty from a server before 20261004040000. */
     @SerialName("by_source") val bySource: List<ReportSource> = emptyList(),
+    /** Empty from a server before 20261020120000. */
+    @SerialName("came_from") val cameFrom: List<ReportCameFrom> = emptyList(),
 ) {
     /** Whether anything came in other than on the site: otherwise the split says nothing. */
     val enteredByStaff: Boolean
         get() = bySource.any { it.source != OrderSource.WEB && it.placed > 0 }
+
+    /** Whether any web order in the range says where it came from: otherwise it is all "unbekannt". */
+    val knowsCameFrom: Boolean
+        get() = cameFrom.any { it.cameFrom != null && it.placed > 0 }
 
     val range: ReportRange
         get() = ReportRange(LocalDate.parse(from), LocalDate.parse(to))

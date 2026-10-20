@@ -968,6 +968,15 @@
     <string name="report_source_phone">Phone</string>
     <string name="report_source_counter">Counter</string>
     <string name="report_source_extra">%1$s: %2$d eaten in, %3$d fee waived</string>
+    <string name="report_came_from">Where web orders came from</string>
+    <string name="report_came_from_label">Came from</string>
+    <string name="report_came_from_new">New</string>
+    <string name="report_came_from_unknown">Not known</string>
+    <string name="report_came_from_direct">Direct (typed, bookmark, WhatsApp)</string>
+    <string name="report_came_from_app">Installed shop app</string>
+    <string name="report_came_from_meta">Facebook/Instagram</string>
+    <string name="report_came_from_google_ads">Google ad</string>
+    <string name="report_came_from_hint">Delivered orders. New: no delivery to that email in the 30 days before. A link with ?ref=name shows up here under that name. Not known: orders from before this count began, and after a Google sign-in.</string>
     <!-- The last crash, shown on the next start (CrashLog). -->
     <string name="crash_title">The app closed unexpectedly</string>
     <string name="crash_text">Last time the app closed by itself. Please copy what is below and send it to whoever looks after the app, so it can be fixed.</string>
