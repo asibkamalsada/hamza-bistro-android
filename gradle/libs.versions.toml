@@ -3,7 +3,7 @@
 
 [versions]
 # AGP 9.3 needs Gradle 9.5 or later (gradle/wrapper) and brings Kotlin with it.
-agp = "9.3.3"
+agp = "9.5.0"
 kotlin = "2.4.20"
 coroutines = "1.11.0"
 serialization = "1.11.0"
