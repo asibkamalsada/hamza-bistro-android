@@ -4,10 +4,12 @@ import java.time.Instant
 import kotlinx.serialization.Serializable
 
 /**
- * What "Pausieren …" stops (hamza-bistro-web#72): everything, delivery, or
- * delivery to the outer rings — the shop_close() scope and rings each
- * choice sends (20261002180000_scoped_pause.sql). Collection stays open for
- * every choice but [ALL].
+ * What "Pausieren …" stops (hamza-bistro-web#72): everything, delivery,
+ * collection, or delivery to the outer rings — the shop_close() scope and
+ * rings each choice sends (20261002180000_scoped_pause.sql,
+ * 20261105120000_pickup_pause.sql). Collection stays open for every choice
+ * but [ALL] and [PICKUP]; delivery for every one but [ALL], [DELIVERY] and
+ * the rings named.
  */
 enum class PauseWhat(val scope: String, val rings: List<String>?) {
     /** "Alles": the shop closed, as before scopes. */
@@ -15,6 +17,9 @@ enum class PauseWhat(val scope: String, val rings: List<String>?) {
 
     /** "Nur Lieferung": collection only. */
     DELIVERY(ClosureScope.DELIVERY, null),
+
+    /** "Nur Abholung": delivery only. */
+    PICKUP(ClosureScope.PICKUP, null),
 
     /** "Weite Ringe": no delivery to far and edge. */
     FAR(ClosureScope.RINGS, listOf("far", "edge")),
@@ -32,6 +37,7 @@ enum class PauseWhat(val scope: String, val rings: List<String>?) {
         fun of(scope: String, rings: List<String>?): PauseWhat? =
             when (scope) {
                 ClosureScope.DELIVERY -> DELIVERY
+                ClosureScope.PICKUP -> PICKUP
                 ClosureScope.RINGS ->
                     when {
                         rings.orEmpty().contains("far") -> FAR
@@ -48,7 +54,20 @@ object ClosureScope {
     const val ALL = "all"
     const val DELIVERY = "delivery"
     const val RINGS = "rings"
+    const val PICKUP = "pickup"
 }
+
+/**
+ * A pause of collection running at a moment, while delivery goes on:
+ * pickup_paused_at() in 20261105120000_pickup_pause.sql and pickupPauseAt()
+ * on the site.
+ */
+data class PickupPause(
+    /** The end of the longest; null while somebody has to switch it back on. */
+    val until: Instant?,
+    /** Who paused — told to staff only. */
+    val by: String?,
+)
 
 /**
  * A pause of delivery running at a moment, while collection goes on:

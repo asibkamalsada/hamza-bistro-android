@@ -336,11 +336,13 @@
     <string name="shop_pause_what">Was pausieren?</string>
     <string name="shop_scope_all">Alles</string>
     <string name="shop_scope_delivery">Nur Lieferung</string>
+    <string name="shop_scope_pickup">Nur Abholung</string>
     <string name="shop_scope_far">Weite Ringe</string>
     <string name="shop_scope_edge">Nur Rand</string>
     <string name="shop_pause_for">%1$s pausieren für:</string>
     <string name="shop_close_for">Schließen für:</string>
     <string name="shop_paused_delivery">Abholung offen · Lieferung pausiert</string>
+    <string name="shop_paused_pickup">Lieferung offen · Abholung pausiert</string>
     <string name="shop_paused_far">Bestellungen werden angenommen · weite Ringe (far + edge) pausiert</string>
     <string name="shop_paused_edge">Bestellungen werden angenommen · Rand pausiert</string>
     <string name="shop_paused_rings">Bestellungen werden angenommen · %1$s pausiert</string>
@@ -349,6 +351,8 @@
     <string name="shop_paused_by">Pausiert von %1$s.</string>
     <string name="shop_busy_also">+%1$d Min. bis %2$s Uhr.</string>
     <string name="shop_delivery_on">Lieferung wieder an</string>
+    <string name="shop_pickup_on">Abholung wieder an</string>
+    <string name="shop_all_on">Wieder alles an</string>
     <string name="shop_break_now">Lieferpause %1$s–%2$s%3$s.</string>
     <string name="shop_break_soon">Lieferpause ab %1$s%2$s.</string>
     <plurals name="shop_preorders_inside">

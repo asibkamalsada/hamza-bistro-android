@@ -336,11 +336,13 @@
     <string name="shop_pause_what">What to pause?</string>
     <string name="shop_scope_all">Everything</string>
     <string name="shop_scope_delivery">Delivery only</string>
+    <string name="shop_scope_pickup">Pickup only</string>
     <string name="shop_scope_far">Far rings</string>
     <string name="shop_scope_edge">Edge only</string>
     <string name="shop_pause_for">Pause %1$s for:</string>
     <string name="shop_close_for">Close for:</string>
     <string name="shop_paused_delivery">Collection open · delivery paused</string>
+    <string name="shop_paused_pickup">Delivery open · collection paused</string>
     <string name="shop_paused_far">Taking orders · far rings (far + edge) paused</string>
     <string name="shop_paused_edge">Taking orders · edge paused</string>
     <string name="shop_paused_rings">Taking orders · %1$s paused</string>
@@ -349,6 +351,8 @@
     <string name="shop_paused_by">Paused by %1$s.</string>
     <string name="shop_busy_also">+%1$d min until %2$s.</string>
     <string name="shop_delivery_on">Delivery back on</string>
+    <string name="shop_pickup_on">Collection back on</string>
+    <string name="shop_all_on">Everything back on</string>
     <string name="shop_break_now">Delivery break %1$s–%2$s%3$s.</string>
     <string name="shop_break_soon">Delivery break from %1$s%2$s.</string>
     <plurals name="shop_preorders_inside">

@@ -107,6 +107,17 @@ class DeliveryPauseTest {
     }
 
     @Test
+    fun `a pause of collection leaves the shop open and delivery going`() {
+        val hours = ShopHours(openNow = true, closures = listOf(closure(1, "pickup", until = "12:45"), closure(2, "pickup", until = "13:00")))
+        assertEquals(ShopState.OPEN, hours.state(now))
+        assertNull(hours.closureAt(now))
+        assertNull(hours.deliveryPauseAt(now))
+        assertEquals(at("13:00"), hours.pickupPauseAt(now)?.until)
+        assertNull(hours.pickupPauseAt(at("13:00")))
+        assertEquals(PauseWhat.PICKUP, PauseWhat.of("pickup", null))
+    }
+
+    @Test
     fun `everything closed is still a closure while delivery is paused too`() {
         val hours = ShopHours(openNow = false, closures = listOf(closure(1, "delivery", until = null), closure(2, "all", until = "13:00")))
         assertEquals(ShopState.CLOSED, hours.state(now))
@@ -115,14 +126,15 @@ class DeliveryPauseTest {
     }
 
     @Test
-    fun `pauses only delivery, the far rings or the edge, and everything as before`() = runBlocking<Unit> {
+    fun `pauses only delivery, collection, the far rings or the edge, and everything as before`() = runBlocking<Unit> {
         test.token("access-1", "refresh-1")
-        repeat(4) { test.reply(200, """{"open_now":true,"closures":[],"preorders_inside":1}""") }
+        repeat(5) { test.reply(200, """{"open_now":true,"closures":[],"preorders_inside":1}""") }
 
         assertEquals(1, backend.close(at("13:00"), what = PauseWhat.DELIVERY).preordersInside)
         backend.close(at("13:00"), what = PauseWhat.FAR)
         backend.close(null, what = PauseWhat.EDGE)
         backend.close(at("13:00"))
+        backend.close(at("13:00"), what = PauseWhat.PICKUP)
 
         test.server.takeRequest()
         val delivery = test.server.takeRequest()
@@ -135,10 +147,11 @@ class DeliveryPauseTest {
         assertEquals("""{"p_until":null,"p_scope":"rings","p_rings":["edge"]}""", test.server.takeRequest().body!!.utf8())
         // Everything sends no scope, which every database takes.
         assertEquals("""{"p_until":"2026-10-02T11:00:00Z"}""", test.server.takeRequest().body!!.utf8())
+        assertEquals("""{"p_until":"2026-10-02T11:00:00Z","p_scope":"pickup"}""", test.server.takeRequest().body!!.utf8())
     }
 
     @Test
-    fun `a closure reads as one of the four choices, or as its rings`() {
+    fun `a closure reads as one of the five choices, or as its rings`() {
         assertEquals(PauseWhat.ALL, PauseWhat.of("all", null))
         assertEquals(PauseWhat.DELIVERY, PauseWhat.of("delivery", null))
         assertEquals(PauseWhat.FAR, PauseWhat.of("rings", listOf("edge", "far")))

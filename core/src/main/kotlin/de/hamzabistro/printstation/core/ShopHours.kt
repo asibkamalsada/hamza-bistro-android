@@ -16,7 +16,8 @@ import okhttp3.OkHttpClient
 
 /**
  * A stretch of time in which the shop takes no orders — or, with a [scope]
- * other than all (hamza-bistro-web#72), no deliveries, or none to some rings.
+ * other than all (hamza-bistro-web#72), no deliveries, none to some rings,
+ * or no collections.
  */
 @Serializable
 data class ShopClosure(
@@ -31,9 +32,13 @@ data class ShopClosure(
     /** For [ClosureScope.RINGS]: the rings not delivered to. */
     val rings: List<String>? = null,
 ) {
-    /** Whether it stops everything, rather than only delivery. */
+    /** Whether it stops everything, rather than only delivery or only collection. */
     val stopsAll: Boolean
-        get() = scope != ClosureScope.DELIVERY && scope != ClosureScope.RINGS
+        get() = scope != ClosureScope.DELIVERY && scope != ClosureScope.RINGS && scope != ClosureScope.PICKUP
+
+    /** Whether it stops delivery, or delivery to some rings, with collection open. */
+    val stopsDelivery: Boolean
+        get() = scope == ClosureScope.DELIVERY || scope == ClosureScope.RINGS
 
     fun covers(at: Instant): Boolean = !startsAt.isAfter(at) && (endsAt == null || endsAt.isAfter(at))
 }
@@ -168,13 +173,24 @@ data class ShopHours(
      * it lasts until the end of the longest.
      */
     fun deliveryPauseAt(now: Instant): DeliveryPause? {
-        val running = closures.filter { !it.stopsAll && it.covers(now) }
+        val running = closures.filter { it.stopsDelivery && it.covers(now) }
         if (running.isEmpty()) return null
         val scope = if (running.any { it.scope == ClosureScope.DELIVERY }) ClosureScope.DELIVERY else ClosureScope.RINGS
         val picked = running.filter { it.scope == scope }
         val until = if (picked.any { it.endsAt == null }) null else picked.maxOf { it.endsAt!! }
         val rings = if (scope == ClosureScope.RINGS) picked.flatMap { it.rings.orEmpty() }.distinct().sorted() else emptyList()
         return DeliveryPause(scope, rings, until, picked.firstNotNullOfOrNull { it.by })
+    }
+
+    /**
+     * The pause of collection running at [now], or null — delivery goes on.
+     * Where several overlap, it lasts until the end of the longest.
+     */
+    fun pickupPauseAt(now: Instant): PickupPause? {
+        val running = closures.filter { it.scope == ClosureScope.PICKUP && it.covers(now) }
+        if (running.isEmpty()) return null
+        val until = if (running.any { it.endsAt == null }) null else running.maxOf { it.endsAt!! }
+        return PickupPause(until, running.firstNotNullOfOrNull { it.by })
     }
 
     /**

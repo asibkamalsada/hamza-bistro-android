@@ -249,10 +249,13 @@ private fun shopChip(hours: ShopHours?, now: Instant): String {
         }
         ShopState.OUTSIDE -> stringResource(R.string.strip_outside)
         ShopState.OPEN -> {
-            val pause = hours.deliveryPauseAt(now)
+            val delivery = hours.deliveryPauseAt(now)
+            val pickup = hours.pickupPauseAt(now)
+            // The one that ends first, as the chip has room for one time.
+            val until = listOfNotNull(delivery?.until, pickup?.until).minOrNull()
             val base =
-                if (pause == null) stringResource(R.string.strip_open)
-                else pause.until?.let { stringResource(R.string.strip_paused_until, Format.clock(it)) } ?: stringResource(R.string.strip_paused)
+                if (delivery == null && pickup == null) stringResource(R.string.strip_open)
+                else until?.let { stringResource(R.string.strip_paused_until, Format.clock(it)) } ?: stringResource(R.string.strip_paused)
             hours.busyAt(now)?.let { stringResource(R.string.strip_busy, base, it.minutes) } ?: base
         }
     }

@@ -31,6 +31,7 @@ import de.hamzabistro.printstation.core.BreakNotice
 import de.hamzabistro.printstation.core.Busy
 import de.hamzabistro.printstation.core.DeliveryPause
 import de.hamzabistro.printstation.core.PauseWhat
+import de.hamzabistro.printstation.core.PickupPause
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.ShopState
 import java.time.Duration
@@ -45,7 +46,7 @@ data class ShopView(
     val busy: Boolean = false,
 )
 
-/** What the line's buttons do. [what] is everything, or only delivery or the outer rings. */
+/** What the line's buttons do. [what] is everything, or only delivery, collection or the outer rings. */
 interface ShopActions {
     fun pause(minutes: Long, what: PauseWhat)
 
@@ -53,7 +54,7 @@ interface ShopActions {
 
     fun closeForGood(what: PauseWhat)
 
-    /** Ends every closure running now — a pause of delivery too: "Lieferung wieder an". */
+    /** Ends every closure running now — a pause of delivery or collection too: "Lieferung wieder an". */
     fun open()
 
     /** Busy mode: every promise [minutes] longer, for [duration], or the rest of the day when null. */
@@ -69,9 +70,10 @@ interface ShopActions {
  * second saying for how long; opening again is one.
  *
  * While open, "Pausieren …" first asks what (hamza-bistro-web#72): Alles ·
- * Nur Lieferung · Weite Ringe (far + edge) · Nur Rand (edge). A pause of
- * delivery leaves the shop open for collection; the line says what is
- * paused, and "Lieferung wieder an" ends it. A weekly delivery break
+ * Nur Lieferung · Nur Abholung · Weite Ringe (far + edge) · Nur Rand (edge).
+ * A pause of delivery leaves the shop open for collection, and a pause of
+ * collection open for delivery; the line says what is paused, and
+ * "Lieferung wieder an" / "Abholung wieder an" ends it. A weekly delivery break
  * (web#112) is said after the line while it runs, and shortly before.
  *
  * [onHours] opens the week's hours and the closures planned ahead; without
@@ -88,6 +90,7 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
     var busyStep by remember { mutableStateOf<BusyStep?>(null) }
     val busy = hours.busyAt(now)
     val pause = hours.deliveryPauseAt(now)?.takeIf { state == ShopState.OPEN }
+    val pickupPause = hours.pickupPauseAt(now)?.takeIf { state == ShopState.OPEN }
 
     val colors =
         when (state) {
@@ -115,7 +118,7 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            pause?.by?.let {
+            (pause?.by ?: pickupPause?.by)?.let {
                 Text(stringResource(R.string.shop_paused_by, it), style = MaterialTheme.typography.bodySmall)
             }
             busy?.by?.takeIf { state == ShopState.OPEN }?.let {
@@ -183,8 +186,8 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
                         OutlinedButton(onClick = { pauseStep = if (state == ShopState.OPEN) PauseStep.What else PauseStep.HowLong(PauseWhat.ALL) }) {
                             Text(stringResource(if (state == ShopState.OPEN) R.string.shop_pause else R.string.shop_close))
                         }
-                        if (pause != null) {
-                            Button(onClick = actions::open, enabled = !shop.busy) { Text(stringResource(R.string.shop_delivery_on)) }
+                        resumeLabel(pause != null, pickupPause != null)?.let { label ->
+                            Button(onClick = actions::open, enabled = !shop.busy) { Text(stringResource(label)) }
                         }
                         if (state == ShopState.OPEN) {
                             OutlinedButton(onClick = { busyStep = BusyStep.HowMuch }) { Text(stringResource(R.string.shop_busy)) }
@@ -207,11 +210,25 @@ private sealed interface PauseStep {
     data class HowLong(val what: PauseWhat) : PauseStep
 }
 
-/** "Alles" / "Nur Lieferung" / "Weite Ringe" / "Nur Rand". */
+/**
+ * What the button that ends the running pauses says — it ends every one,
+ * like shop_open(): "Lieferung wieder an", "Abholung wieder an", or with
+ * both paused "Wieder alles an". Null while nothing is paused.
+ */
+private fun resumeLabel(delivery: Boolean, pickup: Boolean): Int? =
+    when {
+        delivery && pickup -> R.string.shop_all_on
+        delivery -> R.string.shop_delivery_on
+        pickup -> R.string.shop_pickup_on
+        else -> null
+    }
+
+/** "Alles" / "Nur Lieferung" / "Nur Abholung" / "Weite Ringe" / "Nur Rand". */
 internal fun whatLabel(what: PauseWhat): Int =
     when (what) {
         PauseWhat.ALL -> R.string.shop_scope_all
         PauseWhat.DELIVERY -> R.string.shop_scope_delivery
+        PauseWhat.PICKUP -> R.string.shop_scope_pickup
         PauseWhat.FAR -> R.string.shop_scope_far
         PauseWhat.EDGE -> R.string.shop_scope_edge
     }
@@ -233,7 +250,8 @@ private fun durationLabel(duration: Duration?): Int =
 /**
  * "Bestellungen werden angenommen — bis 20:00 Uhr." and the like; with busy
  * mode on, "… — bis 20:00 Uhr · +30 Min. bis 20:15 Uhr."; with delivery
- * paused, "Abholung offen · Lieferung pausiert bis 19:30 Uhr." instead. A
+ * paused, "Abholung offen · Lieferung pausiert bis 19:30 Uhr." instead, and
+ * with collection paused "Lieferung offen · Abholung pausiert bis …". A
  * delivery break running or near is said after it: "Lieferpause
  * 12:45–14:00 (Freitagsgebet)."
  */
@@ -241,9 +259,13 @@ private fun shopLine(context: Context, hours: ShopHours, state: ShopState, now: 
     when (state) {
         ShopState.OPEN -> {
             val busy = hours.busyAt(now)
+            val pauses =
+                listOfNotNull(
+                    hours.pickupPauseAt(now)?.let { pickupLine(context, it) },
+                    hours.deliveryPauseAt(now)?.let { pausedLine(context, it) },
+                )
             val line =
-                hours.deliveryPauseAt(now)?.let { pause ->
-                    val paused = pausedLine(context, pause)
+                pauses.takeIf { it.isNotEmpty() }?.joinToString(" ")?.let { paused ->
                     busy?.let { "$paused ${context.getString(R.string.shop_busy_also, it.minutes, Format.clock(it.until))}" } ?: paused
                 }
                     ?: run {
@@ -272,6 +294,13 @@ private fun pausedLine(context: Context, pause: DeliveryPause): String {
             PauseWhat.EDGE -> context.getString(R.string.shop_paused_edge)
             else -> context.getString(R.string.shop_paused_rings, pause.rings.joinToString(", "))
         }
+    return pause.until?.let { context.getString(R.string.shop_paused_until, what, Format.clock(it)) }
+        ?: context.getString(R.string.shop_paused_for_good, what)
+}
+
+/** "Lieferung offen · Abholung pausiert bis 19:30 Uhr." */
+private fun pickupLine(context: Context, pause: PickupPause): String {
+    val what = context.getString(R.string.shop_paused_pickup)
     return pause.until?.let { context.getString(R.string.shop_paused_until, what, Format.clock(it)) }
         ?: context.getString(R.string.shop_paused_for_good, what)
 }

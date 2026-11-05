@@ -108,6 +108,12 @@ class QueueStatusTest {
         compose.onNodeWithText("30 min", substring = true).performClick()
         compose.waitForIdle()
         check("pause 30 ${PauseWhat.DELIVERY}" in calls) { calls.toString() }
+        // And collection alone, the other way round.
+        compose.onNodeWithText("Pause…").performClick()
+        compose.onNodeWithText("Pickup only").performClick()
+        compose.onNodeWithText("30 min", substring = true).performClick()
+        compose.waitForIdle()
+        check("pause 30 ${PauseWhat.PICKUP}" in calls) { calls.toString() }
     }
 
     @Test
