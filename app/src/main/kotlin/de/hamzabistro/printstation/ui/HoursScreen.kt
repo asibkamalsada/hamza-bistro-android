@@ -108,6 +108,8 @@ data class HoursState(
     val planDay: LocalDate = LocalDate.of(1970, 1, 1),
     val planFrom: Int = 14 * 60,
     val planUntil: Int = 17 * 60,
+    /** What the planned pause stops: everything, or only delivery or the outer rings. */
+    val planWhat: PauseWhat = PauseWhat.ALL,
     val planBusy: Boolean = false,
     val planMessage: Message? = null,
     /** The shop's settings as last read; null until read, and on a database without them. */
@@ -243,6 +245,8 @@ class HoursViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setPlanUntil(minutes: Int) = _state.update { it.copy(planUntil = minutes, planMessage = null) }
 
+    fun setPlanWhat(what: PauseWhat) = _state.update { it.copy(planWhat = what, planMessage = null) }
+
     /** A pause of a few hours on one day, as "Pausen" on the site: whole days are special days. */
     fun addClosure() {
         val plan = _state.value
@@ -258,7 +262,7 @@ class HoursViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val closed =
                 attempt(app, { error -> _state.update { it.copy(planMessage = Message(error, error = true)) } }) {
-                    graph.shop.close(until, from)
+                    graph.shop.close(until, from, plan.planWhat)
                 }
             if (closed != null) {
                 show(closed)
@@ -411,7 +415,7 @@ class HoursViewModel(application: Application) : AndroidViewModel(application) {
     /** The form starts on tomorrow afternoon, as on the site. */
     private fun resetPlan() {
         val tomorrow = SpecialCalendar.today(Instant.now()).plusDays(1)
-        _state.update { it.copy(planDay = tomorrow, planFrom = 14 * 60, planUntil = 17 * 60) }
+        _state.update { it.copy(planDay = tomorrow, planFrom = 14 * 60, planUntil = 17 * 60, planWhat = PauseWhat.ALL) }
     }
 
     companion object {
@@ -744,8 +748,10 @@ private fun PauseRow(context: Context, closure: ShopClosure, now: Instant, hours
 /**
  * "Pausen": a few hours planned on one day, as on the site — an afternoon
  * without a driver. Whole days and other hours are special days; the
- * pauses themselves are listed with them.
+ * pauses themselves are listed with them. Like the switch, it asks what:
+ * everything, or only delivery (collection stays open), or the outer rings.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Pauses(state: HoursState, hours: HoursViewModel) {
     val context = LocalContext.current
@@ -758,6 +764,14 @@ private fun Pauses(state: HoursState, hours: HoursViewModel) {
             OutlinedButton(onClick = { pickTime(context, state.planFrom, closing = false, onPicked = hours::setPlanFrom) }) { Text(minutesText(state.planFrom)) }
             Text(stringResource(R.string.hours_plan_until))
             OutlinedButton(onClick = { pickTime(context, state.planUntil, closing = true, onPicked = hours::setPlanUntil) }) { Text(minutesText(state.planUntil)) }
+        }
+        Text(stringResource(R.string.shop_pause_what), style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (what in PauseWhat.entries) {
+                val label = @Composable { Text(stringResource(whatLabel(what))) }
+                if (what == state.planWhat) Button(onClick = { hours.setPlanWhat(what) }, content = { label() })
+                else OutlinedButton(onClick = { hours.setPlanWhat(what) }, content = { label() })
+            }
         }
         Button(onClick = hours::addClosure, enabled = !state.planBusy) {
             Text(stringResource(if (state.planBusy) R.string.please_wait else R.string.hours_plan_add))
