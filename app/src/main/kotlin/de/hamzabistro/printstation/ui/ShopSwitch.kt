@@ -68,7 +68,7 @@ interface ShopActions {
  * same line as above the queue on /orders. Closing takes two taps, the
  * second saying for how long; opening again is one.
  *
- * While open, "Pausieren …" first asks what (hamza-bistro-web#72): Alles ·
+ * "Pausieren …" (outside the hours "Schließen …") first asks what (hamza-bistro-web#72): Alles ·
  * Nur Lieferung · Weite Ringe (far + edge) · Nur Rand (edge). A pause of
  * delivery leaves the shop open for collection; the line says what is
  * paused, and "Lieferung wieder an" ends it. A weekly delivery break
@@ -179,8 +179,9 @@ fun ShopSwitch(shop: ShopView, now: Instant, actions: ShopActions, onHours: (() 
                         TextButton(onClick = { busyStep = null }) { Text(stringResource(R.string.shop_keep_open)) }
                     }
                     else -> {
-                        // Outside the hours there is nothing but everything to close.
-                        OutlinedButton(onClick = { pauseStep = if (state == ShopState.OPEN) PauseStep.What else PauseStep.HowLong(PauseWhat.ALL) }) {
+                        // Open or outside the hours alike: everything, or only
+                        // delivery (collection stays open), or the outer rings.
+                        OutlinedButton(onClick = { pauseStep = PauseStep.What }) {
                             Text(stringResource(if (state == ShopState.OPEN) R.string.shop_pause else R.string.shop_close))
                         }
                         if (pause != null) {

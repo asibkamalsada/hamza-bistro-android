@@ -160,6 +160,20 @@ class QueueStatusTest {
     }
 
     @Test
+    fun outsideTheHoursClosingStillAsksWhat() {
+        val outside = ShopView(ShopHours(openNow = false, nextOpen = now.plus(Duration.ofHours(1))))
+        draw(QueueStatus(shop = outside, now = now, kitchen = kitchen))
+        compose.onNodeWithTag(STRIP_TAG).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Close…").performClick()
+        compose.onNodeWithText("Everything").assertIsDisplayed()
+        compose.onNodeWithText("Delivery only").performClick()
+        compose.onNodeWithText("Rest of today").performClick()
+        compose.waitForIdle()
+        check("today ${PauseWhat.DELIVERY}" in calls) { calls.toString() }
+    }
+
+    @Test
     fun offShiftTheBarStartsTheShift() {
         draw(QueueStatus(shop = open, now = now, onShift = false, alarmMissing = listOf("Notifications")))
         compose.onNodeWithText("Not on shift — no alarm").assertIsDisplayed()
