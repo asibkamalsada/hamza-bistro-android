@@ -48,6 +48,9 @@ private val shots: List<TillShot> by lazy {
         TillShot("05-dine-in", f.basket(6).copy(dineIn = true)),
         TillShot("06-basket-up", f.basket(6), on = { it.phone }, act = { onNodeWithText("Zur Kasse", substring = true).performClick() }),
         TillShot("07-category", f.basket(3), act = { onAllNodesWithText("Döner").onFirst().performClick() }),
+        TillShot("07-category-sold-out", f.basket(3), act = {
+            onNodeWithText("Grillgerichte").performClick()
+        }),
         TillShot("08-options", f.basket(3), act = { onAllNodesWithText("Big Döner").onFirst().performClick() }),
         TillShot("09-pay", f.at(TillStep.PAY)),
         TillShot("10-pay-twelve", f.at(TillStep.PAY, f.sale(12).copy(dineIn = true))),

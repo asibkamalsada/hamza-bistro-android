@@ -353,13 +353,16 @@ private fun TillTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, co
         onClick = onClick,
         enabled = orderable,
         colors =
-            if (count > 0) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        modifier = modifier.fillMaxWidth().alpha(if (orderable) 1f else 0.6f).testTag(TILL_TILE_TAG),
+            CardDefaults.cardColors(
+                containerColor = if (count > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        modifier = modifier.fillMaxWidth().testTag(TILL_TILE_TAG),
     ) {
         Column(Modifier.fillMaxSize()) {
             if (photo != null) {
-                Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().weight(1f))
+                Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().weight(1f).alpha(if (orderable) 1f else 0.4f))
             }
             Column(
                 if (photo != null) Modifier.padding(horizontal = 10.dp, vertical = 6.dp) else Modifier.weight(1f).padding(10.dp),
@@ -462,9 +465,18 @@ private fun TillOptionGroup(group: OptionGroup, chosen: List<Long>, onToggle: (M
                     onClick = { onToggle(option) },
                     enabled = option.available,
                     shape = MaterialTheme.shapes.medium,
-                    color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.alpha(if (option.available) 1f else 0.6f),
+                    color =
+                        when {
+                            on -> MaterialTheme.colorScheme.primary
+                            option.available -> MaterialTheme.colorScheme.surfaceContainerHigh
+                            else -> MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                    contentColor =
+                        when {
+                            on -> MaterialTheme.colorScheme.onPrimary
+                            option.available -> MaterialTheme.colorScheme.onSurface
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 ) {
                     Column(Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Center) {
                         Text(label, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
@@ -507,8 +519,8 @@ private fun TillBasketBelow(state: TillState, model: TillActions, onClear: () ->
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TillWhere(state, model, onClear, Modifier.weight(1f))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            TillWhere(state, model, onClear, Modifier.weight(0.9f))
+            Column(Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 TillUnderLines(state, list)
                 TillRingUp(state, model, Modifier.fillMaxWidth())
             }
@@ -631,10 +643,12 @@ private fun TillQty(text: String, words: String, onClick: () -> Unit) {
 @Composable
 private fun TillUnderLines(state: TillState, list: LazyListState) {
     if (state.lines.isEmpty()) return
-    val hidden by remember(list) {
+    // Cut off by no more than its margin, a line is all there.
+    val margin = with(LocalDensity.current) { 6.dp.roundToPx() }
+    val hidden by remember(list, margin) {
         derivedStateOf {
             val view = list.layoutInfo
-            val last = view.visibleItemsInfo.lastOrNull { it.offset + it.size <= view.viewportEndOffset }
+            val last = view.visibleItemsInfo.lastOrNull { it.offset + it.size <= view.viewportEndOffset + margin }
             if (last == null) 0 else view.totalItemsCount - 1 - last.index
         }
     }
@@ -646,6 +660,7 @@ private fun TillUnderLines(state: TillState, list: LazyListState) {
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = 12.dp),
         )
         if (deal != null) Text(stringResource(R.string.new_order_deal) + "  " + Format.euro(-deal), fontSize = 17.sp)
     }
@@ -657,18 +672,21 @@ private fun TillRingUp(state: TillState, model: TillActions, modifier: Modifier)
     Button(
         onClick = model::ringUp,
         enabled = state.lines.isNotEmpty() && !state.busy,
-        // The total stays readable while the sale is on its way.
-        colors =
-            ButtonDefaults.buttonColors(
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
+        colors = tillTotalColors(),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
         modifier = modifier.heightIn(min = 72.dp).testTag(TILL_RING_UP_TAG),
     ) {
         TillButtonWords(stringResource(R.string.till_ring_up), Format.euro(CounterSales.euros(state.totalCents)))
     }
 }
+
+/** The total stays readable while its button waits. */
+@Composable
+private fun tillTotalColors() =
+    ButtonDefaults.buttonColors(
+        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
 /** A button's words at its left, its amount, bigger, at its right. */
 @Composable
@@ -685,6 +703,7 @@ private fun TillToBasket(state: TillState, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = count > 0,
+        colors = tillTotalColors(),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 64.dp),
     ) {

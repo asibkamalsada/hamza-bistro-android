@@ -468,7 +468,8 @@ private fun TillReceiptNotes(state: TillState, sale: CounterSale, model: TillAct
 @Composable
 private fun TillCode(receipt: CounterReceipt, side: Dp) {
     QrImage(receipt.link, stringResource(R.string.till_qr), side)
-    Text(stringResource(R.string.till_scan), fontSize = 18.sp, lineHeight = 24.sp, textAlign = TextAlign.Center)
+    // In training it is said below, or beside: no receipt.
+    if (!receipt.training) Text(stringResource(R.string.till_scan), fontSize = 18.sp, lineHeight = 24.sp, textAlign = TextAlign.Center)
 }
 
 /** What the receipt says about its signature, in short. */
