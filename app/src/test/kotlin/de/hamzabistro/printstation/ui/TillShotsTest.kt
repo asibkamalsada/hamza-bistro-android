@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -64,6 +65,21 @@ private val shots: List<TillShot> by lazy {
         TillShot("22-done-print-failed", f.done(receipt("signed")), f.view.copy(printError = notPrinted)),
         TillShot("23-abort", f.at(TillStep.PAY), act = { onNodeWithText("Verkauf abbrechen").performClick() }),
         TillShot("24-open-sales", f.basket(5).copy(open = f.openSales)),
+        TillShot("24-open-sales-up", f.basket(5).copy(open = f.openSales), act = { onNodeWithText("Ansehen", substring = true).performClick() }),
+        TillShot("39-clear", f.basket(5), act = {
+            if (it.phone) onNodeWithText("Zur Kasse", substring = true).performClick()
+            onNodeWithContentDescription("Alles löschen").performClick()
+        }),
+        TillShot("40-options-chosen", f.basket(3), act = {
+            onAllNodesWithText("Big Döner").onFirst().performClick()
+            for (option in listOf("Kräutersoße", "Scharfe Soße")) onNodeWithText(option).performClick()
+        }),
+        TillShot("41-offline-basket-up", f.basket(6).copy(problem = TillProblem.Offline(false)), on = { it.phone }, act = {
+            onNodeWithText("Zur Kasse", substring = true).performClick()
+        }),
+        TillShot("42-off-empty", f.off),
+        TillShot("43-done-stopped-waiting", f.done(receipt("pending")).copy(stoppedWaiting = true)),
+        TillShot("44-done-exact", f.done(receipt("signed"), given = "")),
         TillShot("25-open-one", f.empty.copy(open = f.openSales.takeLast(1))),
         TillShot("26-offline", f.basket(5).copy(problem = TillProblem.Offline(false))),
         TillShot("27-offline-unsure-cash", f.at(TillStep.CASH).copy(given = "50", problem = TillProblem.Offline(true))),
@@ -88,7 +104,8 @@ private val shots: List<TillShot> by lazy {
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35])
+// Of the versions the app runs on, the one whose stand-in colours come closest to the tablet's own.
+@Config(sdk = [33])
 class TillShotsTest(private val device: TillDevice, private val name: String) {
     private val shot = shots.first { it.name == name }
     private val compose = createComposeRule()

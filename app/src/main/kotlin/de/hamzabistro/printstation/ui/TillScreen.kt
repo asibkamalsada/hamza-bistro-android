@@ -324,7 +324,7 @@ internal fun TillContent(state: TillState, view: TillView, photos: Map<String, I
         TillAsk(
             title = stringResource(R.string.till_abort_title, sale.number),
             text = stringResource(R.string.till_abort_text),
-            yes = stringResource(R.string.till_abort_yes),
+            yes = stringResource(R.string.till_abort),
             onDismiss = { aborting = false },
         ) {
             aborting = false

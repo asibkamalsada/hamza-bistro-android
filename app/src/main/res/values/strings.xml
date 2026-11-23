@@ -1066,7 +1066,7 @@
     <string name="till_no_split">The tax split of this basket cannot be worked out. Tell the owner.</string>
     <string name="till_dismissed">The signature of this sale was given up. Abort it and ring it up again.</string>
     <string name="till_empty">Tap the dishes.</string>
-    <string name="till_dishes">Dishes</string>
+    <string name="till_dishes">← Dishes</string>
     <string name="till_to_basket">Basket ➜</string>
     <string name="till_takeaway">Takeaway</string>
     <string name="till_dine_in">Eat here</string>
@@ -1084,7 +1084,6 @@
     <string name="till_abort">Abort the sale</string>
     <string name="till_abort_title">Abort sale #%1$d?</string>
     <string name="till_abort_text">Only if no money was taken. With a card: first check in the card app that nothing was charged. The abort is recorded.</string>
-    <string name="till_abort_yes">Abort</string>
     <string name="till_park">Finish later</string>
     <string name="till_cash_title">Cash</string>
     <string name="till_exact">Exact</string>
@@ -1105,7 +1104,7 @@
     <string name="till_next">Next sale ➜</string>
     <string name="till_receipt_signed">✓ Signed</string>
     <string name="till_receipt_pending">Waiting for the signature …</string>
-    <string name="till_receipt_outage">The TSE does not answer. The sale is recorded, the receipt says so, and the signature follows by itself.</string>
+    <string name="till_receipt_outage">The TSE does not answer. The sale is recorded, and the signature follows by itself.</string>
     <string name="till_receipt_late">Signed later: the TSE did not answer at first. The receipt says so.</string>
     <string name="till_receipt_training">Training: not a receipt</string>
     <string name="till_receipt_test">TSE test environment: not a valid receipt</string>
@@ -1120,7 +1119,7 @@
     <string name="till_clear_title">Empty the whole basket?</string>
     <string name="till_open_title">Open sales</string>
     <string name="till_open_show">Show ➜</string>
-    <string name="till_open_stale_short">from an earlier day, finish first</string>
+    <string name="till_open_stale_short">from an earlier day</string>
     <string name="till_open_card_short">card payment started</string>
     <string name="till_to_pay">To pay</string>
     <string name="till_given_exact">exact</string>
@@ -1128,8 +1127,8 @@
     <string name="till_missing">Still missing</string>
     <string name="till_key_delete">Delete a digit</string>
     <plurals name="till_basket">
-        <item quantity="one">%1$d dish · %2$s</item>
-        <item quantity="other">%1$d dishes · %2$s</item>
+        <item quantity="one">%1$d dish</item>
+        <item quantity="other">%1$d dishes</item>
     </plurals>
     <plurals name="till_open_count">
         <item quantity="one">%1$d open sale</item>

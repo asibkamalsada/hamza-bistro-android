@@ -1065,7 +1065,7 @@
     <string name="till_no_split">Für diesen Warenkorb lässt sich die Steuer nicht aufteilen. Bitte dem Inhaber sagen.</string>
     <string name="till_dismissed">Die Signatur dieses Verkaufs wurde aufgegeben. Abbrechen und neu kassieren.</string>
     <string name="till_empty">Gerichte antippen.</string>
-    <string name="till_dishes">Gerichte</string>
+    <string name="till_dishes">← Gerichte</string>
     <string name="till_to_basket">Zur Kasse ➜</string>
     <string name="till_takeaway">Mitnehmen</string>
     <string name="till_dine_in">Hier essen</string>
@@ -1083,7 +1083,6 @@
     <string name="till_abort">Verkauf abbrechen</string>
     <string name="till_abort_title">Verkauf #%1$d abbrechen?</string>
     <string name="till_abort_text">Nur wenn kein Geld genommen wurde. Bei Karte: erst in der Karten-App nachsehen, dass nichts abgebucht ist. Der Abbruch wird aufgezeichnet.</string>
-    <string name="till_abort_yes">Abbrechen</string>
     <string name="till_park">Später abschließen</string>
     <string name="till_cash_title">Bar</string>
     <string name="till_exact">Passend</string>
@@ -1104,7 +1103,7 @@
     <string name="till_next">Nächster Verkauf ➜</string>
     <string name="till_receipt_signed">✓ Signiert</string>
     <string name="till_receipt_pending">Warte auf die Signatur …</string>
-    <string name="till_receipt_outage">Die TSE antwortet nicht. Der Verkauf ist aufgezeichnet, der Beleg sagt es, und die Signatur kommt von selbst nach.</string>
+    <string name="till_receipt_outage">Die TSE antwortet nicht. Der Verkauf ist aufgezeichnet, die Signatur kommt von selbst nach.</string>
     <string name="till_receipt_late">Nachträglich signiert: Die TSE hat erst nicht geantwortet. Der Beleg sagt es.</string>
     <string name="till_receipt_training">Training: kein Beleg</string>
     <string name="till_receipt_test">TSE-Testumgebung: kein gültiger Beleg</string>
@@ -1119,7 +1118,7 @@
     <string name="till_clear_title">Alle Gerichte löschen?</string>
     <string name="till_open_title">Offene Verkäufe</string>
     <string name="till_open_show">Ansehen ➜</string>
-    <string name="till_open_stale_short">von einem früheren Tag, zuerst erledigen</string>
+    <string name="till_open_stale_short">von einem früheren Tag</string>
     <string name="till_open_card_short">Kartenzahlung begonnen</string>
     <string name="till_to_pay">Zu zahlen</string>
     <string name="till_given_exact">passend</string>
@@ -1127,8 +1126,8 @@
     <string name="till_missing">Es fehlen noch</string>
     <string name="till_key_delete">Ziffer löschen</string>
     <plurals name="till_basket">
-        <item quantity="one">%1$d Gericht · %2$s</item>
-        <item quantity="other">%1$d Gerichte · %2$s</item>
+        <item quantity="one">%1$d Gericht</item>
+        <item quantity="other">%1$d Gerichte</item>
     </plurals>
     <plurals name="till_open_count">
         <item quantity="one">%1$d offener Verkauf</item>

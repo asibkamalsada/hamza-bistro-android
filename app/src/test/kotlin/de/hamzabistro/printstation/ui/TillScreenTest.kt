@@ -105,7 +105,7 @@ class TillScreenTest {
     fun onAPhoneTheBasketIsOneTapAway() {
         till.add(BasketLine(doener, 2))
         open()
-        compose.onNodeWithText("2 dishes · " + Format.euro(15.0)).assertIsDisplayed()
+        compose.onNodeWithText("2 dishes").assertIsDisplayed().assertTextContains(Format.euro(15.0))
         compose.onNodeWithText("Basket ➜").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag(TILL_RING_UP_TAG).assertIsDisplayed().assertIsEnabled()

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -64,7 +67,7 @@ import de.hamzabistro.printstation.core.TillState
 // along the bottom, always in reach.
 
 @Composable
-private fun TillPage(state: TillState, model: TillActions, bottom: @Composable RowScope.() -> Unit, content: @Composable (wide: Boolean) -> Unit) {
+private fun TillPage(state: TillState, model: TillActions, bottom: @Composable RowScope.() -> Unit, content: @Composable BoxWithConstraintsScope.(wide: Boolean) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         state.problem?.let { TillProblemCard(it, model::dismissProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) { content(maxWidth >= TILL_WIDE_FROM) }
@@ -100,19 +103,21 @@ private fun TillButton(
     size: TextUnit = 20.sp,
 ) {
     val big = modifier.heightIn(min = height)
-    val padding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+    val padding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+    val shape = RoundedCornerShape(32.dp)
     val label: @Composable RowScope.() -> Unit = {
         Text(text, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
     when (tone) {
-        TillTone.MAIN -> Button(onClick, big, enabled, contentPadding = padding, content = label)
-        TillTone.TONAL -> FilledTonalButton(onClick, big, enabled, contentPadding = padding, content = label)
-        TillTone.QUIET -> OutlinedButton(onClick, big, enabled, contentPadding = padding, content = label)
+        TillTone.MAIN -> Button(onClick, big, enabled, shape, contentPadding = padding, content = label)
+        TillTone.TONAL -> FilledTonalButton(onClick, big, enabled, shape, contentPadding = padding, content = label)
+        TillTone.QUIET -> OutlinedButton(onClick, big, enabled, shape, contentPadding = padding, content = label)
         TillTone.NO ->
             OutlinedButton(
                 onClick,
                 big,
                 enabled,
+                shape,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 contentPadding = padding,
                 content = label,
@@ -187,8 +192,8 @@ private fun TillHow(state: TillState, sale: CounterSale, model: TillActions) {
     TillAmount(stringResource(R.string.till_to_pay), sale.total)
     if (state.declined) TillNote(stringResource(R.string.till_declined), bad = true)
     Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        TillButton(stringResource(R.string.till_cash), model::chooseCash, Modifier.weight(1f), !state.busy, height = 128.dp, size = 30.sp)
-        TillButton(stringResource(R.string.till_card), model::chooseCard, Modifier.weight(1f), !state.busy, height = 128.dp, size = 30.sp)
+        TillButton(stringResource(R.string.till_cash), model::chooseCash, Modifier.weight(1f), !state.busy, height = 144.dp, size = 32.sp)
+        TillButton(stringResource(R.string.till_card), model::chooseCard, Modifier.weight(1f), !state.busy, height = 144.dp, size = 32.sp)
     }
 }
 
@@ -205,9 +210,9 @@ private fun TillSaleLines(sale: CounterSale) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Text("${line.qty}×", fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 40.dp))
             Column(Modifier.weight(1f)) {
-                Text(line.name, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+                Text(line.name, style = TILL_NAME)
                 if (line.options.isNotEmpty()) {
-                    Text(line.options.joinToString(", "), fontSize = 15.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(line.options.joinToString(", "), style = TILL_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.width(8.dp))
@@ -230,16 +235,20 @@ internal fun TillCashPane(state: TillState, sale: CounterSale, model: TillAction
             TillButton(stringResource(R.string.till_cash_paid), model::cashPaid, Modifier.weight(1f), state.cashReady && !state.busy, height = 72.dp, size = 24.sp)
         },
     ) { wide ->
+        // The keys are as big as the room allows, so there is nothing to scroll to.
+        val roomy = maxWidth >= 600.dp
+        val sums = if (wide) 0.dp else with(LocalDensity.current) { (if (roomy) 220.sp else 110.sp).toDp() + 24.dp }
+        val key = ((maxHeight - sums - 84.dp) / 6).coerceIn(48.dp, 76.dp)
         if (wide) {
             Row(Modifier.fillMaxSize()) {
                 TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillChange(state, sale, big = true) }
                 VerticalDivider()
-                TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillGiven(state, sale, model) }
+                TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillGiven(state, sale, model, key) }
             }
         } else {
             TillColumn(Modifier.fillMaxSize()) {
-                TillChange(state, sale, big = false)
-                TillGiven(state, sale, model)
+                TillChange(state, sale, big = roomy)
+                TillGiven(state, sale, model, key)
             }
         }
     }
@@ -270,14 +279,14 @@ private fun TillChange(state: TillState, sale: CounterSale, big: Boolean) {
 @Composable
 private fun TillSum(label: String, amount: String, size: TextUnit, color: Color = MaterialTheme.colorScheme.onSurface) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 20.sp, lineHeight = 24.sp, color = color, modifier = Modifier.weight(1f))
+        Text(label, fontSize = 22.sp, lineHeight = 26.sp, color = color, modifier = Modifier.weight(1f))
         Text(amount, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
     }
 }
 
 /** The notes somebody is likely to hand over, and keys for anything else: the tablet's keyboard would cover half of it all. */
 @Composable
-private fun TillGiven(state: TillState, sale: CounterSale, model: TillActions) {
+private fun TillGiven(state: TillState, sale: CounterSale, model: TillActions, height: Dp) {
     // A digit after a note starts over; it does not go on from the note's.
     var note by remember(sale.id) { mutableStateOf(false) }
     fun give(text: String) {
@@ -289,18 +298,15 @@ private fun TillGiven(state: TillState, sale: CounterSale, model: TillActions) {
         note = false
         model.setGiven(tillTyped(before, key))
     }
-    Column(Modifier.fillMaxWidth().widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val exact = stringResource(R.string.till_exact) to ""
-        val notes = listOf(exact) + CounterSales.notes(CounterSales.cents(sale.total)).map { Format.euro(CounterSales.euros(it)).replace(",00", "") to tillPlain(it) }
-        for (row in notes.chunked(3)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((words, text) in row) {
-                    TillButton(words, { give(text) }, Modifier.weight(1f), tone = if (state.given == text) TillTone.MAIN else TillTone.TONAL, height = 56.dp)
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+    Column(Modifier.fillMaxWidth().widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        fun tone(text: String) = if (state.given == text) TillTone.MAIN else TillTone.TONAL
+        TillButton(stringResource(R.string.till_exact), { give("") }, Modifier.fillMaxWidth(), tone = tone(""), height = height)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (cents in CounterSales.notes(CounterSales.cents(sale.total))) {
+                val text = tillPlain(cents)
+                TillButton("$text €", { give(text) }, Modifier.weight(1f), tone = tone(text), height = height)
             }
         }
-        Spacer(Modifier)
         val delete = stringResource(R.string.till_key_delete)
         for (row in listOf("789", "456", "123", ",0⌫")) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -309,7 +315,7 @@ private fun TillGiven(state: TillState, sale: CounterSale, model: TillActions) {
                         onClick = { type(key) },
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp).semantics { if (key == TILL_DELETE) contentDescription = delete },
+                        modifier = Modifier.weight(1f).heightIn(min = height).semantics { if (key == TILL_DELETE) contentDescription = delete },
                     ) {
                         Box(contentAlignment = Alignment.Center) { Text(key.toString(), fontSize = 26.sp, fontWeight = FontWeight.SemiBold) }
                     }
@@ -348,8 +354,8 @@ internal fun TillCardPane(state: TillState, sale: CounterSale, model: TillAction
         state,
         model,
         bottom = {
-            TillButton(stringResource(R.string.till_card_declined), model::cardDeclined, Modifier.weight(1f), !state.busy, TillTone.NO, height = 88.dp, size = 22.sp)
-            TillButton(stringResource(R.string.till_card_paid), model::cardPaid, Modifier.weight(1f), !state.busy, height = 88.dp, size = 22.sp)
+            TillButton(stringResource(R.string.till_card_declined), model::cardDeclined, Modifier.weight(1f), !state.busy, TillTone.NO, height = 88.dp, size = 20.sp)
+            TillButton(stringResource(R.string.till_card_paid), model::cardPaid, Modifier.weight(1f), !state.busy, height = 88.dp, size = 20.sp)
         },
     ) {
         TillColumn(Modifier.fillMaxSize()) {
@@ -389,9 +395,10 @@ internal fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, m
                 TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillCode(receipt, 300.dp) }
             }
         } else {
+            val code = if (maxWidth >= 600.dp) 320.dp else 220.dp
             TillColumn(Modifier.fillMaxSize()) {
                 TillPaid(state, sale, view, model)
-                if (receipt != null) TillCode(receipt, 220.dp)
+                if (receipt != null) TillCode(receipt, code)
             }
         }
     }
@@ -405,7 +412,7 @@ private fun TillPaid(state: TillState, sale: CounterSale, view: TillView, model:
         TillAmount(stringResource(R.string.till_paid, method), sale.total)
     } else {
         // The money is in the till; what is still to do is the change.
-        Text(stringResource(R.string.till_paid, method) + " · " + Format.euro(sale.total), fontSize = 20.sp, lineHeight = 26.sp, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.till_paid, method) + " · " + Format.euro(sale.total), fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(R.string.till_change), fontSize = 20.sp, lineHeight = 26.sp, color = MaterialTheme.colorScheme.primary)
             Text(

@@ -40,6 +40,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -123,8 +124,8 @@ internal enum class TillLayout {
 }
 
 /** What a basket line, a dish and an amount are called by: read at arm's length. */
-private val NAME = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, hyphens = Hyphens.Auto)
-private val SMALL = TextStyle(fontSize = 15.sp, lineHeight = 19.sp)
+internal val TILL_NAME = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, hyphens = Hyphens.Auto)
+internal val TILL_SMALL = TextStyle(fontSize = 15.sp, lineHeight = 19.sp)
 
 @Composable
 internal fun TillDishesPane(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions) {
@@ -212,7 +213,7 @@ private fun TillShop(
     modifier: Modifier,
 ) {
     Box(modifier) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        Column(Modifier.fillMaxSize()) {
             TillOpenBar(state, model, onOpenSales)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
@@ -265,7 +266,7 @@ private fun TillMenu(
         TillGrid(shown, menu, lines, photos, onPhoto, rail, onTap, modifier)
     }
     if (rail) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(
                 Modifier.width(140.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -276,8 +277,9 @@ private fun TillMenu(
         }
     } else {
         Column {
+            // To the screen's edge: what is cut off there is scrolled to.
             Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 for (name in categories) TillCategory(name, category == name, Modifier) { category = name }
@@ -322,13 +324,14 @@ private fun TillGrid(
     onTap: (MenuDish, List<OptionGroup>) -> Unit,
     modifier: Modifier,
 ) {
-    // One height for all, two lines of name and the price whatever the font size: the tiles line up, photo or not.
-    val height = with(LocalDensity.current) { 78.dp + (NAME.lineHeight * 2).toDp() + PRICE_LINE.toDp() }
+    // One height for all, photo or not, with room for the name whatever the font size: the tiles line up. A long name
+    // takes its third line from the photo.
+    val height = with(LocalDensity.current) { 80.dp + (TILL_NAME.lineHeight * 2).toDp() + PRICE_LINE.toDp() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 150.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(top = if (rail) 8.dp else 0.dp, bottom = 8.dp),
+        contentPadding = if (rail) PaddingValues(vertical = 8.dp) else PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp),
         modifier = modifier,
     ) {
         items(dishes, key = { it.id }) { dish ->
@@ -350,7 +353,7 @@ private fun TillTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, co
         colors =
             if (count > 0) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        modifier = modifier.fillMaxWidth().alpha(if (orderable) 1f else 0.5f).testTag(TILL_TILE_TAG),
+        modifier = modifier.fillMaxWidth().alpha(if (orderable) 1f else 0.6f).testTag(TILL_TILE_TAG),
     ) {
         Column(Modifier.fillMaxSize()) {
             if (photo != null) {
@@ -360,7 +363,7 @@ private fun TillTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, co
                 if (photo != null) Modifier.padding(horizontal = 10.dp, vertical = 6.dp) else Modifier.weight(1f).padding(10.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(dish.name, style = NAME, maxLines = if (photo != null) 2 else 4, overflow = TextOverflow.Ellipsis)
+                Text(dish.name, style = TILL_NAME, maxLines = if (photo != null) 3 else 4, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (orderable) Format.euro(dish.price) else stringResource(R.string.new_order_sold_out),
@@ -415,28 +418,24 @@ private fun TillOptions(dish: MenuDish, groups: List<OptionGroup>, onDismiss: ()
                 }
                 HorizontalDivider()
                 val stepper: @Composable () -> Unit = { TillStepper(qty, dish.name) { qty = it.coerceIn(1, PhoneOrders.MAX_QTY) } }
-                // A phone has no room for it in the bar.
-                if (!roomy) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.new_order_qty), fontSize = 18.sp, modifier = Modifier.weight(1f))
-                        stepper()
-                    }
-                }
-                BottomBar {
-                    BigButton(stringResource(R.string.cancel_back), onClick = onDismiss, outlined = true)
-                    if (roomy) stepper()
+                val add: @Composable (Modifier) -> Unit = { modifier ->
                     Button(
                         onClick = { onAdd(line) },
                         enabled = OptionRules.invalid(groups, chosen).isEmpty(),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                        modifier = Modifier.weight(1f).heightIn(min = 64.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                        modifier = modifier.heightIn(min = 64.dp),
                     ) {
                         TillButtonWords(stringResource(R.string.call_order_add), Format.euro(line.unitPrice * qty), big = false)
                     }
                 }
+                BottomBar {
+                    BigButton(stringResource(R.string.cancel_back), onClick = onDismiss, outlined = true)
+                    if (!roomy) Spacer(Modifier.weight(1f))
+                    stepper()
+                    if (roomy) add(Modifier.weight(1f))
+                }
+                // A phone has no room for all of it in one row.
+                if (!roomy) add(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp))
             }
         }
     }
@@ -463,7 +462,7 @@ private fun TillOptionGroup(group: OptionGroup, chosen: List<Long>, onToggle: (M
                     shape = MaterialTheme.shapes.medium,
                     color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.alpha(if (option.available) 1f else 0.5f),
+                    modifier = Modifier.alpha(if (option.available) 1f else 0.6f),
                 ) {
                     Column(Modifier.heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
                         Text(label, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Medium)
@@ -483,7 +482,7 @@ private fun TillOptionGroup(group: OptionGroup, chosen: List<Long>, onToggle: (M
 @Composable
 private fun TillBasket(state: TillState, model: TillActions, onClear: () -> Unit, modifier: Modifier) {
     Column(modifier) {
-        TillWhere(state, model, onClear, Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 2.dp))
+        TillWhere(state, model, onClear, Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp))
         TillLines(state, model, Modifier.weight(1f).fillMaxWidth())
         HorizontalDivider()
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -597,12 +596,12 @@ private fun TillLine(line: BasketLine, onQty: (Int) -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row {
-                Text(line.dish.name, style = NAME, modifier = Modifier.weight(1f))
+                Text(line.dish.name, style = TILL_NAME, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
-                Text(Format.euro(line.unitPrice * line.qty), style = NAME, maxLines = 1)
+                Text(Format.euro(line.unitPrice * line.qty), style = TILL_NAME, maxLines = 1)
             }
             if (line.options.isNotEmpty()) {
-                Text(line.options.joinToString(", ") { it.name }, style = SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(line.options.joinToString(", ") { it.name }, style = TILL_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -610,7 +609,16 @@ private fun TillLine(line: BasketLine, onQty: (Int) -> Unit) {
 
 @Composable
 private fun TillQty(text: String, words: String, onClick: () -> Unit) {
-    FilledTonalIconButton(onClick = onClick, shape = MaterialTheme.shapes.medium, modifier = Modifier.size(48.dp).semantics { contentDescription = words }) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        colors =
+            IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        modifier = Modifier.size(48.dp).semantics { contentDescription = words },
+    ) {
         Text(text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -657,14 +665,10 @@ private fun TillToBasket(state: TillState, onClick: () -> Unit) {
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 64.dp),
     ) {
-        Text(
-            pluralStringResource(R.plurals.till_basket, count, count, Format.euro(CounterSales.euros(state.totalCents))),
-            fontSize = 18.sp,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(pluralStringResource(R.plurals.till_basket, count, count), fontSize = 16.sp, lineHeight = 20.sp, maxLines = 1)
+            Text(Format.euro(CounterSales.euros(state.totalCents)), fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
         Spacer(Modifier.width(8.dp))
         Text(stringResource(R.string.till_to_basket), fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
@@ -687,7 +691,7 @@ private fun TillOpenBar(state: TillState, model: TillActions, onShow: () -> Unit
         shape = MaterialTheme.shapes.medium,
         color = if (stale || card) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
         contentColor = if (stale || card) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp),
     ) {
         Row(Modifier.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             val what =
