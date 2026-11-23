@@ -51,8 +51,9 @@ class StartupTest {
                 MenuViewModel(app),
                 CashUpViewModel(app),
                 ReportViewModel(app),
+                TillViewModel(app),
             )
-        check(made.size == 10)
+        check(made.size == 11)
     }
 
     @Test

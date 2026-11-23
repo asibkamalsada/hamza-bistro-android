@@ -37,6 +37,8 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp.coroutines)
     implementation(libs.kotlinx.serialization.json)
+    // The receipt's QR code, and nothing else of it: R8 drops the rest.
+    implementation(libs.zxing.core)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

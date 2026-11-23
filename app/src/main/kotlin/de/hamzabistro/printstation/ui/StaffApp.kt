@@ -45,6 +45,9 @@ enum class StaffScreen {
     /** This device, who hears about orders, the printers, the address check. */
     SETTINGS,
 
+    /** "Kasse": a sale at the counter, rung up, paid and signed (hamza-bistro-web#225). */
+    TILL,
+
     /** "Neue Bestellung": a phone or walk-in order, typed in (#9). */
     NEW_ORDER,
 
@@ -89,7 +92,18 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
         remember(account, label, update, install) {
             DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME, update, install)
         }
-    StaffDrawer(drawer, enabled = screen == StaffScreen.QUEUE, issues, header, onOpen = { screen = it }, onInstall = { staff.install(it) }) {
+    // Whether there is a till, and what is open on it: once signed in, and whenever the drawer is opened.
+    val till by staff.till.collectAsStateWithLifecycle()
+    LaunchedEffect(account?.userId, drawer.isOpen) { if (account != null) staff.lookAtTill() }
+    StaffDrawer(
+        drawer,
+        enabled = screen == StaffScreen.QUEUE,
+        issues,
+        header,
+        onOpen = { screen = it },
+        onInstall = { staff.install(it) },
+        till = till,
+    ) {
         Box(Modifier.fillMaxSize()) {
             when (screen) {
                 StaffScreen.QUEUE ->
@@ -101,6 +115,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                 StaffScreen.MENU -> MenuScreen(onBack = back)
                 StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
                 StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
+                StaffScreen.TILL -> TillScreen(onBack = back)
                 StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
                 StaffScreen.CALL_ORDER -> CallOrderScreen(onBack = back, onFullForm = { screen = StaffScreen.NEW_ORDER })
             }

@@ -249,7 +249,7 @@ private fun StepPage(number: Int, title: String, bottom: @Composable RowScope.()
 
 /** The buttons along the bottom: "Zurück" as wide as it needs, the step's own button the rest. */
 @Composable
-private fun BottomBar(content: @Composable RowScope.() -> Unit) {
+internal fun BottomBar(content: @Composable RowScope.() -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -268,7 +268,7 @@ private fun StepHeading(number: Int, title: String) {
 
 /** A button big enough to hit without looking twice. */
 @Composable
-private fun BigButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, outlined: Boolean = false, tonal: Boolean = false) {
+internal fun BigButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, outlined: Boolean = false, tonal: Boolean = false) {
     val label: @Composable RowScope.() -> Unit = {
         Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
@@ -302,7 +302,7 @@ private fun BigField(
 
 /** A line that says how something went: green for done, red for wrong. */
 @Composable
-private fun StatusLine(text: String, good: Boolean = false, bad: Boolean = false) {
+internal fun StatusLine(text: String, good: Boolean = false, bad: Boolean = false) {
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
@@ -729,7 +729,7 @@ private fun DishTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, co
 /** The dish's choices over the whole screen, as big tiles, with how many: the site's options dialog, for a finger. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OptionsPanel(dish: MenuDish, groups: List<OptionGroup>, onDismiss: () -> Unit, onAdd: (BasketLine) -> Unit) {
+internal fun OptionsPanel(dish: MenuDish, groups: List<OptionGroup>, onDismiss: () -> Unit, onAdd: (BasketLine) -> Unit) {
     var chosen by remember(dish.id) { mutableStateOf(OptionRules.preset(groups)) }
     var qty by remember(dish.id) { mutableIntStateOf(1) }
     val valid = OptionRules.invalid(groups, chosen).isEmpty()
@@ -793,7 +793,7 @@ private fun OptionsPanel(dish: MenuDish, groups: List<OptionGroup>, onDismiss: (
 }
 
 @Composable
-private fun BigStepper(value: Int, onChange: (Int) -> Unit) {
+internal fun BigStepper(value: Int, onChange: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(onClick = { onChange(value - 1) }, modifier = Modifier.size(64.dp), contentPadding = PaddingValues(0.dp)) {
             Text("−", style = MaterialTheme.typography.headlineMedium)
@@ -906,7 +906,7 @@ private fun BigBreakdown(quote: PhoneOrderQuote) {
 }
 
 @Composable
-private fun BigPriceLine(label: String, amount: Double, big: Boolean = false) {
+internal fun BigPriceLine(label: String, amount: Double, big: Boolean = false) {
     val style = if (big) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = style, fontWeight = if (big) FontWeight.Bold else null, modifier = Modifier.weight(1f))

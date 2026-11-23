@@ -13,6 +13,7 @@ composeBom = "2026.09.00"
 activity = "1.13.0"
 lifecycle = "2.11.0"
 robolectric = "4.17"
+zxing = "3.5.3"
 junit4 = "4.13.2"
 
 [libraries]
@@ -37,6 +38,7 @@ compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 

@@ -23,6 +23,11 @@ object Format {
     /** "18:32". */
     fun clock(at: Instant): String = CLOCK.format(at.atZone(AlarmPolicy.LEIPZIG))
 
+    private val DAY = DateTimeFormatter.ofPattern("dd.MM.")
+
+    /** "22.11.". */
+    fun day(at: Instant): String = DAY.format(at.atZone(AlarmPolicy.LEIPZIG))
+
     /** "22:00", for a time of day with no date. */
     fun time(at: LocalTime): String = CLOCK.format(at)
 
