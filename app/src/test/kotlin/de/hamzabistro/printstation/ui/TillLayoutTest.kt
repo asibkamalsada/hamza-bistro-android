@@ -115,8 +115,8 @@ class TillLayoutTest(private val device: TillDevice) {
         val layouts = mutableListOf<TextLayoutResult>()
         val node = compose.onNode(hasText(text), useUnmergedTree = true).fetchSemanticsNode()
         node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
-        val layout = layouts.single()
-        return layout.isLineEllipsized(layout.lineCount - 1)
+        // What the words need on their one line, and what they have: the layout does not say it was ellipsized.
+        return layouts.single().multiParagraph.maxIntrinsicWidth > node.size.width + 1
     }
 
     @Test
