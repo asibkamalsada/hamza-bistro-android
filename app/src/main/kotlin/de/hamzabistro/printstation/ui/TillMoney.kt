@@ -67,7 +67,12 @@ import de.hamzabistro.printstation.core.TillState
 // along the bottom, always in reach.
 
 @Composable
-private fun TillPage(state: TillState, model: TillActions, bottom: @Composable RowScope.() -> Unit, content: @Composable BoxWithConstraintsScope.(wide: Boolean) -> Unit) {
+private fun TillPage(
+    state: TillState,
+    model: TillActions,
+    bottom: @Composable RowScope.() -> Unit,
+    content: @Composable BoxWithConstraintsScope.(wide: Boolean) -> Unit,
+) {
     Column(Modifier.fillMaxSize()) {
         state.problem?.let { TillProblemCard(it, model::dismissProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) { content(maxWidth >= TILL_WIDE_FROM) }
@@ -107,7 +112,15 @@ private fun TillButton(
     val padding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
     val shape = RoundedCornerShape(32.dp)
     val label: @Composable RowScope.() -> Unit = {
-        Text(text, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+        Text(
+            text,
+            fontSize = size,
+            lineHeight = size * 1.2f,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
     when (tone) {
         TillTone.MAIN -> Button(onClick, big, enabled, shape, contentPadding = padding, content = label)
@@ -420,7 +433,13 @@ private fun TillPaid(state: TillState, sale: CounterSale, view: TillView, size: 
         TillAmount(stringResource(R.string.till_paid, method), sale.total, size)
     } else {
         // The money is in the till; what is still to do is the change.
-        Text(stringResource(R.string.till_paid, method) + " · " + Format.euro(sale.total), fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Text(
+            stringResource(R.string.till_paid, method) + " · " + Format.euro(sale.total),
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(R.string.till_change), fontSize = 20.sp, lineHeight = 26.sp, color = MaterialTheme.colorScheme.primary)
             Text(

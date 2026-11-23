@@ -1085,7 +1085,6 @@
     <string name="till_abort_title">Abort sale #%1$d?</string>
     <string name="till_abort_text">Only if no money was taken. With a card: first check in the card app that nothing was charged. The abort is recorded.</string>
     <string name="till_park">Finish later</string>
-    <string name="till_cash_title">Cash</string>
     <string name="till_exact">Exact</string>
     <string name="till_given">Given</string>
     <string name="till_cash_paid">✓ Paid in cash</string>
@@ -1126,6 +1125,7 @@
     <string name="till_change">Change</string>
     <string name="till_missing">Still missing</string>
     <string name="till_key_delete">Delete a digit</string>
+    <string name="till_more_below">↓ %1$d more</string>
     <plurals name="till_basket">
         <item quantity="one">%1$d dish</item>
         <item quantity="other">%1$d dishes</item>

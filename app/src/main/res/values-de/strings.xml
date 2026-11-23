@@ -1084,7 +1084,6 @@
     <string name="till_abort_title">Verkauf #%1$d abbrechen?</string>
     <string name="till_abort_text">Nur wenn kein Geld genommen wurde. Bei Karte: erst in der Karten-App nachsehen, dass nichts abgebucht ist. Der Abbruch wird aufgezeichnet.</string>
     <string name="till_park">Später abschließen</string>
-    <string name="till_cash_title">Bar</string>
     <string name="till_exact">Passend</string>
     <string name="till_given">Gegeben</string>
     <string name="till_cash_paid">✓ Bar bezahlt</string>
@@ -1125,6 +1124,7 @@
     <string name="till_change">Rückgeld</string>
     <string name="till_missing">Es fehlen noch</string>
     <string name="till_key_delete">Ziffer löschen</string>
+    <string name="till_more_below">↓ %1$d weitere</string>
     <plurals name="till_basket">
         <item quantity="one">%1$d Gericht</item>
         <item quantity="other">%1$d Gerichte</item>

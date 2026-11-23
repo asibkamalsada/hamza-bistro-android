@@ -83,6 +83,8 @@ class TillLayoutTest(private val device: TillDevice) {
         }
         assertWhole(hasTestTag(TILL_RING_UP_TAG), "Kassieren")
         assertWhole(hasText("Mitnehmen"), "Mitnehmen")
+        // And that there is more of it than shows is said.
+        assertWhole(hasText("weitere", substring = true), "what is further down")
     }
 
     @Test

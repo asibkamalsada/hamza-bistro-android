@@ -52,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -482,12 +483,13 @@ private fun TillOptionGroup(group: OptionGroup, chosen: List<Long>, onToggle: (M
 /** A column: where it is eaten on top, the lines, and "Kassieren" below, always in reach. */
 @Composable
 private fun TillBasket(state: TillState, model: TillActions, onClear: () -> Unit, modifier: Modifier) {
+    val list = rememberLazyListState()
     Column(modifier) {
         TillWhere(state, model, onClear, Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp))
-        TillLines(state, model, Modifier.weight(1f).fillMaxWidth())
+        TillLines(state, model, list, Modifier.weight(1f).fillMaxWidth())
         HorizontalDivider()
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            TillDeal(state)
+            TillUnderLines(state, list)
             TillRingUp(state, model, Modifier.fillMaxWidth())
         }
     }
@@ -496,8 +498,9 @@ private fun TillBasket(state: TillState, model: TillActions, onClear: () -> Unit
 /** Across the whole width: the lines above, everything else in one row. */
 @Composable
 private fun TillBasketBelow(state: TillState, model: TillActions, onClear: () -> Unit, modifier: Modifier) {
+    val list = rememberLazyListState()
     Column(modifier) {
-        TillLines(state, model, Modifier.weight(1f).fillMaxWidth())
+        TillLines(state, model, list, Modifier.weight(1f).fillMaxWidth())
         HorizontalDivider()
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -506,7 +509,7 @@ private fun TillBasketBelow(state: TillState, model: TillActions, onClear: () ->
         ) {
             TillWhere(state, model, onClear, Modifier.weight(1f))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                TillDeal(state)
+                TillUnderLines(state, list)
                 TillRingUp(state, model, Modifier.fillMaxWidth())
             }
         }
@@ -537,14 +540,13 @@ private fun TillWhere(state: TillState, model: TillActions, onClear: () -> Unit,
 }
 
 @Composable
-private fun TillLines(state: TillState, model: TillActions, modifier: Modifier) {
+private fun TillLines(state: TillState, model: TillActions, list: LazyListState, modifier: Modifier) {
     if (state.lines.isEmpty()) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.till_empty), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
-    val list = rememberLazyListState()
     FollowTheTap(state.lines, list)
     LazyColumn(modifier, state = list) {
         itemsIndexed(state.lines, key = { _, line -> "${line.dish.id}:${line.options.joinToString(",") { it.id.toString() }}" }) { index, line ->
@@ -624,14 +626,28 @@ private fun TillQty(text: String, words: String, onClick: () -> Unit) {
     }
 }
 
-/** The deal of the day, once the database has taken it off. */
+/** How many lines are further down, so none is forgotten; and the deal of the day, once the database has taken it off. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TillDeal(state: TillState) {
-    val deal = state.price?.dealDiscount ?: 0.0
-    if (!state.priced || deal <= 0 || state.lines.isEmpty()) return
-    Row {
-        Text(stringResource(R.string.new_order_deal), fontSize = 17.sp, modifier = Modifier.weight(1f))
-        Text(Format.euro(-deal), fontSize = 17.sp)
+private fun TillUnderLines(state: TillState, list: LazyListState) {
+    if (state.lines.isEmpty()) return
+    val hidden by remember(list) {
+        derivedStateOf {
+            val view = list.layoutInfo
+            val last = view.visibleItemsInfo.lastOrNull { it.offset + it.size <= view.viewportEndOffset }
+            if (last == null) 0 else view.totalItemsCount - 1 - last.index
+        }
+    }
+    val deal = state.price?.dealDiscount?.takeIf { state.priced && it > 0 }
+    if (hidden <= 0 && deal == null) return
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            if (hidden > 0) stringResource(R.string.till_more_below, hidden) else "",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (deal != null) Text(stringResource(R.string.new_order_deal) + "  " + Format.euro(-deal), fontSize = 17.sp)
     }
 }
 
@@ -758,7 +774,14 @@ internal fun OpenSaleCard(sale: CounterSale, enabled: Boolean, onResume: () -> U
     ) {
         BoxWithConstraints(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             val goOn: @Composable (Modifier) -> Unit = { modifier ->
-                Text(stringResource(R.string.till_resume), fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = modifier)
+                Text(
+                    stringResource(R.string.till_resume),
+                    fontSize = 18.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.End,
+                    modifier = modifier,
+                )
             }
             if (maxWidth >= 480.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
