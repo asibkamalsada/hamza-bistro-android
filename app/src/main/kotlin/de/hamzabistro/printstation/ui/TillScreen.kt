@@ -390,6 +390,8 @@ internal fun tillProblemText(context: Context, problem: TillProblem): String =
 private fun TillDishesPane(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillViewModel) {
     var picking by remember { mutableStateOf<MenuDish?>(null) }
     var basketUp by rememberSaveable { mutableStateOf(false) }
+    // The next customer starts with the dishes.
+    LaunchedEffect(state.lines.isEmpty()) { if (state.lines.isEmpty()) basketUp = false }
     val menu = view.menu
     val tap: (MenuDish, List<OptionGroup>) -> Unit = { dish, groups ->
         // Nothing to choose: in the basket with one tap.
