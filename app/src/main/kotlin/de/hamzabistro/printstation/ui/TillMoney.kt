@@ -184,9 +184,10 @@ internal fun TillPayPane(state: TillState, sale: CounterSale, model: TillActions
         if (wide) {
             Row(Modifier.fillMaxSize()) {
                 val scroll = rememberScrollState()
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 24.dp, vertical = 16.dp)) { TillSaleLines(sale) }
-                    if (scroll.canScrollForward) TillMoreBelow(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = 24.dp, vertical = 16.dp)) { TillSaleLines(sale) }
+                    // Its row stays where it is once everything fits by scrolling: the lines must not jump.
+                    if (scroll.maxValue > 0) TillMoreBelow(scroll.canScrollForward)
                 }
                 VerticalDivider()
                 TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillHow(state, sale, model) }
@@ -213,18 +214,18 @@ private fun TillHow(state: TillState, sale: CounterSale, model: TillActions) {
     }
 }
 
-/** Over the lines' end, so none of them is thought to be missing. */
+/** Under lines that go on, so none of them is thought to be missing. */
 @Composable
-private fun TillMoreBelow(modifier: Modifier) {
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.secondaryContainer, modifier = modifier) {
-        Text(
-            stringResource(R.string.till_more),
-            fontSize = 16.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-        )
-    }
+private fun TillMoreBelow(more: Boolean) {
+    HorizontalDivider()
+    Text(
+        if (more) stringResource(R.string.till_more) else "",
+        fontSize = 16.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp),
+    )
 }
 
 /** What was rung up, as the database priced it. */
@@ -434,7 +435,7 @@ internal fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, m
             TillColumn(Modifier.fillMaxSize()) {
                 TillPaid(state, sale, view, if (roomy || receipt == null) 64.sp else 44.sp)
                 // Held out to the customer: before everything that is only for the till.
-                if (receipt != null) TillCode(receipt, if (roomy) 320.dp else 220.dp)
+                if (receipt != null) TillCode(receipt, if (roomy) 320.dp else 196.dp)
                 TillReceiptNotes(state, sale, model)
             }
         }
