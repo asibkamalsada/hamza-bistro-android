@@ -3,65 +3,50 @@ package de.hamzabistro.printstation.ui
 import android.app.Application
 import android.content.Context
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -70,17 +55,11 @@ import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.BasketLine
 import de.hamzabistro.printstation.core.CounterError
-import de.hamzabistro.printstation.core.CounterPayment
-import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.CounterSale
 import de.hamzabistro.printstation.core.CounterSales
-import de.hamzabistro.printstation.core.MenuDish
 import de.hamzabistro.printstation.core.NeedsServerUpdateException
-import de.hamzabistro.printstation.core.OptionGroup
-import de.hamzabistro.printstation.core.OptionRules
 import de.hamzabistro.printstation.core.OrderMenu
 import de.hamzabistro.printstation.core.PrinterException
-import de.hamzabistro.printstation.core.Qr
 import de.hamzabistro.printstation.core.Till
 import de.hamzabistro.printstation.core.TillProblem
 import de.hamzabistro.printstation.core.TillState
@@ -292,8 +271,8 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
     }
 }
 
-/** From this width on, the basket stands beside the dishes. */
-private val BASKET_BESIDE_FROM = 720.dp
+/** From this width on there is room beside the thing somebody works on: the basket, the sale's lines, the keys. */
+internal val TILL_WIDE_FROM = 840.dp
 
 /**
  * "Kasse": a sale at the counter. Tap dishes, "Kassieren", Bar or Karte, the
@@ -305,18 +284,21 @@ fun TillScreen(onBack: () -> Unit, model: TillViewModel = viewModel()) {
     val view by model.view.collectAsStateWithLifecycle()
     val photos by model.photos.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { model.look() }
-    val sale = state.sale
-    LaunchedEffect(sale?.id, state.step) { if (state.step == TillStep.DONE) model.awaitReceipt() }
+    LaunchedEffect(state.sale?.id, state.step) { if (state.step == TillStep.DONE) model.awaitReceipt() }
     TillContent(state, view, photos, model, onBack)
 }
 
-/** The Kasse as it is drawn: what it shows, and what its taps do. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The Kasse as it is drawn: what it shows, and what its taps do.
+ *
+ * Not [Zoomed] like the call screens: at a till, how much is on the screen at
+ * once counts as much as how big it is. Its own text is set bigger instead,
+ * and grows with the device's font size.
+ */
 @Composable
 internal fun TillContent(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions, onBack: () -> Unit) {
     val sale = state.sale
-    var aborting by remember { mutableStateOf(false) }
-
+    var aborting by remember(sale?.id) { mutableStateOf(false) }
     val leave = {
         // A sale that is paid is over; an open one stays where it is.
         if (state.step == TillStep.DONE) model.next()
@@ -324,92 +306,150 @@ internal fun TillContent(state: TillState, view: TillView, photos: Map<String, I
     }
     BackHandler { if (state.step == TillStep.CASH) model.back() else leave() }
 
-    Zoomed {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.till_title), fontWeight = FontWeight.Bold) },
-                    navigationIcon = { TextButton(onClick = leave) { Text("✕", style = MaterialTheme.typography.titleLarge) } },
-                    actions = {
-                        if (state.step == TillStep.DISHES) {
-                            FilterChip(
-                                selected = state.training,
-                                onClick = { model.setTraining(!state.training) },
-                                enabled = !state.off,
-                                label = { Text(stringResource(R.string.till_training)) },
-                                modifier = Modifier.padding(end = 12.dp),
-                            )
-                        }
-                    },
-                )
-            },
-        ) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding)) {
-                if (state.training || sale?.training == true) TillStrip(stringResource(R.string.till_training_strip))
-                state.problem?.let { TillProblemCard(it, onDismiss = model::dismissProblem) }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when (state.step) {
-                        TillStep.DISHES ->
-                            when (state.available) {
-                                false -> TillMessage(stringResource(R.string.till_unavailable))
-                                else -> TillDishesPane(state, view, photos, model)
-                            }
-                        TillStep.PAY -> if (sale != null) TillPayPane(state, sale, model, onAbort = { aborting = true })
-                        TillStep.CASH -> if (sale != null) TillCashPane(state, sale, model)
-                        TillStep.CARD -> if (sale != null) TillCardPane(state, sale, model)
-                        TillStep.DONE -> if (sale != null) TillDonePane(state, sale, view, model)
-                    }
-                    if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(12.dp))
-                }
+    Scaffold(topBar = { TillHeader(state, model, onLeave = leave) }) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when (state.step) {
+                TillStep.DISHES ->
+                    if (state.available == false) TillMessage(stringResource(R.string.till_unavailable))
+                    else TillDishesPane(state, view, photos, model)
+                TillStep.PAY -> if (sale != null) TillPayPane(state, sale, model, onAbort = { aborting = true })
+                TillStep.CASH -> if (sale != null) TillCashPane(state, sale, model)
+                TillStep.CARD -> if (sale != null) TillCardPane(state, sale, model)
+                TillStep.DONE -> if (sale != null) TillDonePane(state, sale, view, model)
             }
         }
     }
 
     if (aborting && sale != null && state.step == TillStep.PAY) {
-        AlertDialog(
-            onDismissRequest = { aborting = false },
-            title = { Text(stringResource(R.string.till_abort_title, sale.number)) },
-            text = { Text(stringResource(R.string.till_abort_text), style = MaterialTheme.typography.titleMedium) },
-            confirmButton = {
-                Button(onClick = {
-                    aborting = false
-                    model.abort()
-                }) { Text(stringResource(R.string.till_abort_yes)) }
-            },
-            dismissButton = { TextButton(onClick = { aborting = false }) { Text(stringResource(R.string.cancel_back)) } },
-        )
+        TillAsk(
+            title = stringResource(R.string.till_abort_title, sale.number),
+            text = stringResource(R.string.till_abort_text),
+            yes = stringResource(R.string.till_abort_yes),
+            onDismiss = { aborting = false },
+        ) {
+            aborting = false
+            model.abort()
+        }
     }
 }
 
-/** A line across the top that cannot be missed. */
+/**
+ * One slim bar: out, where this is, and — in the bar's own colour, so it
+ * cannot be missed and takes no room — that it is only training, and why.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TillStrip(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onTertiaryContainer,
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.tertiaryContainer).padding(8.dp),
-    )
+private fun TillHeader(state: TillState, model: TillActions, onLeave: () -> Unit) {
+    val sale = state.sale
+    val training = state.training || sale?.training == true
+    val strip =
+        when {
+            !training -> null
+            state.off -> stringResource(R.string.till_off_strip)
+            else -> stringResource(R.string.till_training_strip)
+        }
+    Surface(
+        color = if (training) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface,
+        contentColor = if (training) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface,
+    ) {
+        BoxWithConstraints(Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
+            val wide = maxWidth >= TILL_WIDE_FROM
+            Column {
+                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val close = stringResource(R.string.till_close)
+                    IconButton(onClick = onLeave, modifier = Modifier.size(52.dp).semantics { contentDescription = close }) {
+                        Text("✕", style = MaterialTheme.typography.titleLarge)
+                    }
+                    Text(
+                        if (sale == null) stringResource(R.string.till_title) else stringResource(R.string.till_sale, sale.number),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = if (wide) Modifier else Modifier.weight(1f),
+                    )
+                    if (wide) TillStrip(strip.orEmpty(), Modifier.weight(1f).padding(horizontal = 16.dp))
+                    // Off, there is nothing to choose: the bar says why.
+                    if (state.step == TillStep.DISHES && !state.off && state.available != false) {
+                        FilterChip(
+                            selected = state.training,
+                            onClick = { model.setTraining(!state.training) },
+                            label = {
+                                Text(
+                                    stringResource(if (state.training) R.string.till_training_end else R.string.till_training),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            },
+                        )
+                    }
+                }
+                if (!wide && strip != null) TillStrip(strip, Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+                // The same height at rest, so nothing moves under a finger.
+                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                else HorizontalDivider(thickness = 4.dp, color = MaterialTheme.colorScheme.surface)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TillStrip(text: String, modifier: Modifier) {
+    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = modifier)
 }
 
 @Composable
 private fun TillMessage(text: String) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(text, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(text, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 640.dp))
     }
 }
 
+/** What went wrong; gone with a tap, or with the next thing done. */
 @Composable
-private fun TillProblemCard(problem: TillProblem, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable(onClick = onDismiss),
+internal fun TillProblemCard(problem: TillProblem, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val text = tillProblemText(LocalContext.current, problem)
+    val dismiss = stringResource(R.string.till_dismiss)
+    Surface(
+        onClick = onDismiss,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shadowElevation = 6.dp,
+        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive },
     ) {
-        Text(tillProblemText(context, problem), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
+        Row(Modifier.heightIn(min = 56.dp).padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                "✕",
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(min = 56.dp).semantics { contentDescription = dismiss },
+            )
+        }
     }
+}
+
+/** Asked before something that cannot be taken back. */
+@Composable
+internal fun TillAsk(title: String, text: String?, yes: String, onDismiss: () -> Unit, onYes: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = text?.let { { Text(it, style = MaterialTheme.typography.titleMedium) } },
+        confirmButton = {
+            Button(
+                onClick = onYes,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+                modifier = Modifier.heightIn(min = 52.dp),
+            ) {
+                Text(yes, style = MaterialTheme.typography.titleMedium)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 52.dp)) {
+                Text(stringResource(R.string.cancel_back), style = MaterialTheme.typography.titleMedium)
+            }
+        },
+    )
 }
 
 /** What went wrong, for the person at the counter. */
@@ -436,357 +476,3 @@ internal fun tillProblemText(context: Context, problem: TillProblem): String =
                 }
             )
     }
-
-// ---------------------------------------------------------------------------
-// Tapping dishes
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun TillDishesPane(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions) {
-    var picking by remember { mutableStateOf<MenuDish?>(null) }
-    var basketUp by rememberSaveable { mutableStateOf(false) }
-    // The next customer starts with the dishes.
-    LaunchedEffect(state.lines.isEmpty()) { if (state.lines.isEmpty()) basketUp = false }
-    val menu = view.menu
-    val tap: (MenuDish, List<OptionGroup>) -> Unit = { dish, groups ->
-        // Nothing to choose: in the basket with one tap.
-        if (groups.isEmpty()) model.add(BasketLine(dish, 1)) else picking = dish
-    }
-    Box(Modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val beside = maxWidth >= BASKET_BESIDE_FROM
-            if (beside) {
-                Row(Modifier.fillMaxSize()) {
-                    Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        TillNotices(state, model)
-                        TillDishes(menu, view.menuError, state, photos, model, tap)
-                    }
-                    TillBasket(state, model, Modifier.width(360.dp).fillMaxHeight())
-                }
-            } else {
-                Column(Modifier.fillMaxSize()) {
-                    if (basketUp && state.lines.isNotEmpty()) {
-                        TillBasket(state, model, Modifier.weight(1f).fillMaxWidth())
-                    } else {
-                        Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            TillNotices(state, model)
-                            TillDishes(menu, view.menuError, state, photos, model, tap)
-                        }
-                    }
-                    HorizontalDivider()
-                    val count = state.lines.sumOf { it.qty }
-                    BottomBar {
-                        BigButton(
-                            if (basketUp && count > 0) stringResource(R.string.till_dishes)
-                            else pluralStringResource(R.plurals.till_basket, count, count, Format.euro(CounterSales.euros(state.totalCents))),
-                            onClick = { basketUp = !basketUp },
-                            enabled = count > 0,
-                            outlined = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        // Where it is eaten is asked beside it, in the basket: there first.
-                        if (!basketUp) BigButton(stringResource(R.string.till_to_basket), onClick = { basketUp = true }, enabled = count > 0)
-                    }
-                }
-            }
-        }
-        val dish = picking
-        if (dish != null && menu != null) {
-            val groups = remember(dish, menu) { OptionRules.groups(dish, menu.groups) }
-            OptionsPanel(dish, groups, onDismiss = { picking = null }) {
-                model.add(it)
-                picking = null
-            }
-        }
-    }
-}
-
-@Composable
-private fun TillDishes(
-    menu: OrderMenu?,
-    error: String?,
-    state: TillState,
-    photos: Map<String, ImageBitmap?>,
-    model: TillActions,
-    onTap: (MenuDish, List<OptionGroup>) -> Unit,
-) {
-    when {
-        menu != null -> DishGrid(menu, state.lines, photos, model::loadPhoto, onTap)
-        error != null ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatusLine(stringResource(R.string.new_order_menu_failed, error), bad = true)
-                BigButton(stringResource(R.string.retry), onClick = model::loadMenu, outlined = true)
-            }
-        else ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircularProgressIndicator()
-                Text(stringResource(R.string.new_order_menu_loading), style = MaterialTheme.typography.titleLarge)
-            }
-    }
-}
-
-/** The till is off, and the sales somebody has to see to. */
-@Composable
-private fun TillNotices(state: TillState, model: TillActions) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-        if (state.off) StatusLine(stringResource(R.string.till_off))
-        for (sale in state.open) OpenSaleCard(sale, enabled = !state.busy) { model.resume(sale) }
-    }
-}
-
-/** A sale rung up and not finished, here or on another device. */
-@Composable
-internal fun OpenSaleCard(sale: CounterSale, enabled: Boolean, onResume: () -> Unit) {
-    Card(
-        onClick = onResume,
-        enabled = enabled,
-        colors =
-            if (sale.stale) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(if (sale.training) R.string.till_open_training else R.string.till_open_sale, sale.number, Format.euro(sale.total)),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                val at = sale.openedAt?.let { if (sale.stale) Format.day(it) + " " + Format.clock(it) else Format.clock(it) }.orEmpty()
-                Text(
-                    listOfNotNull(at.ifEmpty { null }, sale.openedOn?.ifEmpty { null }, sale.openedBy.ifEmpty { null }).joinToString(" · "),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                if (sale.cardPending) Text(stringResource(R.string.till_card_pending), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                if (sale.stale) Text(stringResource(R.string.till_open_stale), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            }
-            Text(stringResource(R.string.till_resume), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun TillBasket(state: TillState, model: TillActions, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.lines.isEmpty()) {
-                Text(stringResource(R.string.till_empty), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            state.lines.forEachIndexed { index, line ->
-                Column {
-                    Text(line.dish.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    if (line.options.isNotEmpty()) Text(line.options.joinToString(", ") { it.name }, style = MaterialTheme.typography.titleMedium)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(Format.euro(line.unitPrice * line.qty), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        BigStepper(line.qty) { model.setQty(index, it) }
-                    }
-                }
-                HorizontalDivider()
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TillWhereChip(stringResource(R.string.till_takeaway), !state.dineIn, Modifier.weight(1f)) { model.setDineIn(false) }
-            TillWhereChip(stringResource(R.string.till_dine_in), state.dineIn, Modifier.weight(1f)) { model.setDineIn(true) }
-        }
-        val price = state.price
-        if (state.priced && price != null && price.dealDiscount > 0) BigPriceLine(stringResource(R.string.new_order_deal), -price.dealDiscount)
-        BigPriceLine(stringResource(R.string.new_order_total), CounterSales.euros(state.totalCents), big = true)
-        BigButton(
-            stringResource(R.string.till_ring_up, Format.euro(CounterSales.euros(state.totalCents))),
-            onClick = model::ringUp,
-            enabled = state.lines.isNotEmpty() && !state.busy,
-            modifier = Modifier.fillMaxWidth().testTag(TILL_RING_UP_TAG),
-        )
-        if (state.lines.isNotEmpty()) {
-            TextButton(onClick = model::clear, enabled = !state.busy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text(stringResource(R.string.till_clear))
-            }
-        }
-    }
-}
-
-const val TILL_RING_UP_TAG = "till-ring-up"
-
-@Composable
-private fun TillWhereChip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
-        modifier = modifier.heightIn(min = 52.dp),
-    )
-}
-
-// ---------------------------------------------------------------------------
-// The money
-// ---------------------------------------------------------------------------
-
-/** A step about one sale: its number and amount on top, what to tap below. */
-@Composable
-private fun TillSalePage(sale: CounterSale, caption: String, content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(stringResource(R.string.till_sale, sale.number), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(caption, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        Text(Format.euro(sale.total), style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        content()
-    }
-}
-
-@Composable
-private fun TillPayPane(state: TillState, sale: CounterSale, model: TillActions, onAbort: () -> Unit) {
-    TillSalePage(sale, stringResource(if (sale.dineIn) R.string.till_dine_in else R.string.till_takeaway)) {
-        if (state.declined) StatusLine(stringResource(R.string.till_declined), bad = true)
-        Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            BigButton(stringResource(R.string.till_cash), onClick = model::chooseCash, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 110.dp))
-            BigButton(stringResource(R.string.till_card), onClick = model::chooseCard, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 110.dp))
-        }
-        Column(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (line in sale.lines) {
-                val name = if (line.options.isEmpty()) line.name else "${line.name} (${line.options.joinToString(", ")})"
-                BigPriceLine("${line.qty}× $name", line.price * line.qty)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onAbort, enabled = !state.busy, modifier = Modifier.heightIn(min = 56.dp)) { Text(stringResource(R.string.till_abort)) }
-            OutlinedButton(onClick = model::park, enabled = !state.busy, modifier = Modifier.heightIn(min = 56.dp)) { Text(stringResource(R.string.till_park)) }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TillCashPane(state: TillState, sale: CounterSale, model: TillActions) {
-    val total = CounterSales.cents(sale.total)
-    TillSalePage(sale, stringResource(R.string.till_cash_title)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = { model.setGiven("") }, modifier = Modifier.heightIn(min = 60.dp)) {
-                Text(stringResource(R.string.till_exact), style = MaterialTheme.typography.titleLarge)
-            }
-            for (note in CounterSales.notes(total)) {
-                OutlinedButton(onClick = { model.setGiven(tillPlain(note)) }, modifier = Modifier.heightIn(min = 60.dp)) {
-                    Text(Format.euro(CounterSales.euros(note)), style = MaterialTheme.typography.titleLarge)
-                }
-            }
-        }
-        OutlinedTextField(
-            value = state.given,
-            onValueChange = model::setGiven,
-            label = { Text(stringResource(R.string.till_given)) },
-            textStyle = MaterialTheme.typography.headlineMedium,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
-        )
-        val change = state.changeCents
-        if (change != null) {
-            Text(
-                stringResource(R.string.till_change, Format.euro(CounterSales.euros(change))),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = toneColor(Tone.OK),
-            )
-        } else if (state.given.isNotBlank()) {
-            StatusLine(stringResource(R.string.till_not_enough), bad = true)
-        }
-        BigButton(
-            stringResource(R.string.till_cash_paid),
-            onClick = model::cashPaid,
-            enabled = state.cashReady && !state.busy,
-            modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp).heightIn(min = 88.dp),
-        )
-        OutlinedButton(onClick = model::back, enabled = !state.busy, modifier = Modifier.heightIn(min = 56.dp)) { Text(stringResource(R.string.cancel_back)) }
-    }
-}
-
-/** "20" or "12,50": an amount as it would be typed. */
-private fun tillPlain(cents: Long): String = if (cents % 100 == 0L) "${cents / 100}" else "${cents / 100},${(cents % 100).toString().padStart(2, '0')}"
-
-@Composable
-private fun TillCardPane(state: TillState, sale: CounterSale, model: TillActions) {
-    TillSalePage(sale, stringResource(R.string.till_card_title)) {
-        Text(stringResource(R.string.till_card_text), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 720.dp))
-        Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            BigButton(stringResource(R.string.till_card_declined), onClick = model::cardDeclined, enabled = !state.busy, outlined = true, modifier = Modifier.weight(1f).heightIn(min = 110.dp))
-            BigButton(stringResource(R.string.till_card_paid), onClick = model::cardPaid, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 110.dp))
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// The receipt
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, model: TillActions) {
-    val method = stringResource(if (sale.payment == CounterPayment.CARD) R.string.pay_card else R.string.pay_cash)
-    TillSalePage(sale, stringResource(R.string.till_paid, method)) {
-        state.changeCents?.takeIf { it > 0 && sale.payment == CounterPayment.CASH }?.let {
-            Text(
-                stringResource(R.string.till_change, Format.euro(CounterSales.euros(it))),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = toneColor(Tone.OK),
-            )
-        }
-        val receipt = sale.receipt
-        if (receipt == null) {
-            StatusLine(stringResource(R.string.till_no_receipt))
-        } else {
-            TillReceiptState(receipt, state.stoppedWaiting)
-            QrImage(receipt.link, stringResource(R.string.till_qr))
-            Text(stringResource(R.string.till_scan), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        }
-        view.printError?.let { StatusLine(it, bad = true) }
-        if (view.printed) StatusLine(stringResource(R.string.till_printed), good = true)
-        Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            BigButton(
-                stringResource(if (view.printing) R.string.till_printing else R.string.till_print),
-                onClick = model::printReceipt,
-                // Unsigned, there is no receipt: on paper it would look like one.
-                enabled = model.canPrint && !view.printing && sale.orderId != null && receipt != null,
-                outlined = true,
-                modifier = Modifier.weight(1f),
-            )
-            BigButton(stringResource(R.string.till_next), onClick = model::next, enabled = !state.busy, modifier = Modifier.weight(1f))
-        }
-        if (!model.canPrint) Text(stringResource(R.string.till_no_printer), style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-/** What the receipt says about its signature, in short. */
-@Composable
-private fun TillReceiptState(receipt: CounterReceipt, stoppedWaiting: Boolean) {
-    when {
-        receipt.training -> StatusLine(stringResource(R.string.till_receipt_training))
-        receipt.signed && receipt.outage -> StatusLine(stringResource(R.string.till_receipt_late))
-        receipt.signed -> StatusLine(stringResource(R.string.till_receipt_signed), good = true)
-        receipt.pending && !receipt.outage && !stoppedWaiting ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircularProgressIndicator(Modifier.size(28.dp))
-                Text(stringResource(R.string.till_receipt_pending), style = MaterialTheme.typography.titleLarge)
-            }
-        // The sale stands: the receipt says the TSE did not answer, and the signature follows.
-        else -> StatusLine(stringResource(R.string.till_receipt_outage), bad = true)
-    }
-    if (receipt.env == "TEST") StatusLine(stringResource(R.string.till_receipt_test))
-}
-
-/** A QR code, black on white whatever the theme, with the border it needs. */
-@Composable
-internal fun QrImage(text: String, description: String) {
-    val qr = remember(text) { Qr.of(text) }
-    Canvas(
-        Modifier.size(240.dp).background(Color.White).padding(16.dp).semantics { contentDescription = description }
-    ) {
-        val side = size.minDimension / qr.size
-        for (row in 0 until qr.size) {
-            for (column in 0 until qr.size) {
-                if (qr.dark(row, column)) drawRect(Color.Black, Offset(column * side, row * side), Size(side, side))
-            }
-        }
-    }
-}

@@ -1068,9 +1068,9 @@
     <string name="till_empty">Tap the dishes.</string>
     <string name="till_dishes">Dishes</string>
     <string name="till_to_basket">Basket ➜</string>
-    <string name="till_takeaway">🛍 Takeaway</string>
-    <string name="till_dine_in">🍽 Eat here</string>
-    <string name="till_ring_up">Ring up · %1$s</string>
+    <string name="till_takeaway">Takeaway</string>
+    <string name="till_dine_in">Eat here</string>
+    <string name="till_ring_up">Ring up</string>
     <string name="till_clear">Empty the basket</string>
     <string name="till_open_sale">Open sale #%1$d · %2$s</string>
     <string name="till_open_training">Open training #%1$d · %2$s</string>
@@ -1078,8 +1078,8 @@
     <string name="till_card_pending">A card payment was started: check the card app</string>
     <string name="till_resume">Go on ➜</string>
     <string name="till_sale">Sale #%1$d</string>
-    <string name="till_cash">💶 Cash</string>
-    <string name="till_card">💳 Card</string>
+    <string name="till_cash">Cash</string>
+    <string name="till_card">Card</string>
     <string name="till_declined">The card was declined. Nothing is booked.</string>
     <string name="till_abort">Abort the sale</string>
     <string name="till_abort_title">Abort sale #%1$d?</string>
@@ -1088,15 +1088,13 @@
     <string name="till_park">Finish later</string>
     <string name="till_cash_title">Cash</string>
     <string name="till_exact">Exact</string>
-    <string name="till_given">Given (€)</string>
-    <string name="till_change">Change: %1$s</string>
-    <string name="till_not_enough">That is not enough.</string>
+    <string name="till_given">Given</string>
     <string name="till_cash_paid">✓ Paid in cash</string>
     <string name="till_card_title">Type this amount into the card app</string>
     <string name="till_card_text">Tap “Card paid” only once the card app says that it was paid. Not sure? Check there first.</string>
     <string name="till_card_paid">✓ Card paid</string>
     <string name="till_card_declined">✕ Declined</string>
-    <string name="till_paid">Paid · %1$s</string>
+    <string name="till_paid">✓ Paid · %1$s</string>
     <string name="till_no_receipt">This sale is not signed, so there is no receipt to scan.</string>
     <string name="till_qr">QR code of the receipt</string>
     <string name="till_scan">The customer scans this for the receipt.</string>
@@ -1113,8 +1111,28 @@
     <string name="till_receipt_test">TSE test environment: not a valid receipt</string>
     <string name="till_print_old">This server cannot print receipts yet: print-ticket needs its update.</string>
     <string name="till_print_failed">The receipt did not print: %1$s. Printer on, paper in?</string>
+    <string name="till_close">Close the till</string>
+    <string name="till_dismiss">Hide the message</string>
+    <string name="till_training_end">End training</string>
+    <string name="till_off_strip">TRAINING – the till is off: signing is not switched on</string>
+    <string name="till_one_less">One %1$s less</string>
+    <string name="till_one_more">One %1$s more</string>
+    <string name="till_clear_title">Empty the whole basket?</string>
+    <string name="till_open_title">Open sales</string>
+    <string name="till_open_show">Show ➜</string>
+    <string name="till_open_stale_short">from an earlier day, finish first</string>
+    <string name="till_open_card_short">card payment started</string>
+    <string name="till_to_pay">To pay</string>
+    <string name="till_given_exact">exact</string>
+    <string name="till_change">Change</string>
+    <string name="till_missing">Still missing</string>
+    <string name="till_key_delete">Delete a digit</string>
     <plurals name="till_basket">
         <item quantity="one">%1$d dish · %2$s</item>
         <item quantity="other">%1$d dishes · %2$s</item>
+    </plurals>
+    <plurals name="till_open_count">
+        <item quantity="one">%1$d open sale</item>
+        <item quantity="other">%1$d open sales</item>
     </plurals>
 </resources>

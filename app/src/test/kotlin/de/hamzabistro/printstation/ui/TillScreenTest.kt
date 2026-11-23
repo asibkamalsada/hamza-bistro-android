@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -63,11 +64,18 @@ class TillScreenTest {
         till.add(BasketLine(cola, 1))
         open()
         compose.onNodeWithText("Döner").assertIsDisplayed()
-        compose.onNodeWithText("Ring up · " + Format.euro(17.5)).assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithText("🍽 Eat here").performClick()
+        compose.onNodeWithTag(TILL_RING_UP_TAG).assertIsDisplayed().assertIsEnabled().assertTextContains(Format.euro(17.5))
+        compose.onNodeWithText("Eat here").performClick()
         compose.waitForIdle()
         assertTrue(till.state.value.dineIn)
-        compose.onNodeWithText("🍽 Eat here").assertIsSelected()
+        compose.onNodeWithText("Eat here").assertIsSelected()
+        compose.onNodeWithContentDescription("One Döner more").performClick()
+        compose.waitForIdle()
+        assertEquals(3, till.state.value.lines.first().qty)
+        // Asked first: the bin is beside the other buttons.
+        compose.onNodeWithContentDescription("Empty the basket").performClick()
+        compose.waitForIdle()
+        assertEquals(2, till.state.value.lines.size)
         compose.onNodeWithText("Empty the basket").performClick()
         compose.waitForIdle()
         assertTrue(till.state.value.lines.isEmpty())
@@ -101,7 +109,7 @@ class TillScreenTest {
         compose.onNodeWithText("Basket ➜").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag(TILL_RING_UP_TAG).assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithText("🛍 Takeaway").assertIsDisplayed()
+        compose.onNodeWithText("Takeaway").assertIsDisplayed()
     }
 
     @Test
@@ -126,6 +134,20 @@ class TillScreenTest {
     fun theReceiptIsAQrCode() {
         compose.setContent { AppTheme { QrImage("https://www.hamzabistro.de/beleg/0123456789abcdef0123456789abcdef", "QR") } }
         compose.onNodeWithContentDescription("QR").assertIsDisplayed()
+    }
+
+    @Test
+    fun theKeysTypeAnAmountAndNothingElse() {
+        fun typed(keys: String, from: String = "") = keys.fold(from) { given, key -> tillTyped(given, key) }
+        assertEquals("20", typed("20"))
+        assertEquals("12,5", typed("12,5"))
+        // A third digit after the comma, a second comma: not taken.
+        assertEquals("12,50", typed("12,,505"))
+        assertEquals("0,5", typed(",5"))
+        assertEquals("5", typed("05"))
+        assertEquals("1", typed("⌫⌫", from = "123"))
+        assertEquals("", typed("⌫", from = ""))
+        assertEquals("1234", typed("12345"))
     }
 
     @Test
