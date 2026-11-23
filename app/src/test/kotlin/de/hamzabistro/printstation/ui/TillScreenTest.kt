@@ -50,7 +50,8 @@ class TillScreenTest {
     @After fun empty() = till.clear()
 
     private fun open() {
-        compose.setContent { AppTheme { TillScreen(onBack = {}) } }
+        val model = TillViewModel(app)
+        compose.setContent { AppTheme { TillScreen(onBack = {}, model = model) } }
         compose.waitForIdle()
     }
 
@@ -75,6 +76,8 @@ class TillScreenTest {
     fun withNobodySignedInNothingIsSoldAndTheScreenSaysSo() {
         till.add(BasketLine(doener, 1))
         open()
+        till.dismissProblem()
+        compose.waitForIdle()
         compose.onNodeWithTag(TILL_RING_UP_TAG).performClick()
         compose.waitUntil(timeoutMillis = 10_000) { till.state.value.problem != null && !till.state.value.busy }
         compose.waitForIdle()
