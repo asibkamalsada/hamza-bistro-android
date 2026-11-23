@@ -104,12 +104,60 @@ data class TillView(
     val printError: String? = null,
 )
 
+/** What the Kasse's screen can be asked to do: [TillViewModel] does it, a drawing in a test only notes it. */
+interface TillActions {
+    /** Whether there is a printer to print the receipt on. */
+    val canPrint: Boolean
+
+    fun loadPhoto(url: String)
+
+    fun loadMenu()
+
+    fun add(line: BasketLine)
+
+    fun setQty(index: Int, qty: Int)
+
+    fun setDineIn(dineIn: Boolean)
+
+    fun setTraining(training: Boolean)
+
+    fun clear()
+
+    fun ringUp()
+
+    fun resume(sale: CounterSale)
+
+    fun chooseCash()
+
+    fun chooseCard()
+
+    fun setGiven(text: String)
+
+    fun cashPaid()
+
+    fun cardPaid()
+
+    fun cardDeclined()
+
+    fun back()
+
+    fun abort()
+
+    fun park()
+
+    fun next()
+
+    fun dismissProblem()
+
+    fun printReceipt()
+}
+
 /**
  * The Kasse's screen over [Till], which is the process's, not the screen's:
  * a sale being paid is not lost by leaving the screen. Every step runs
  * outside the screen's own life, on the main thread like the taps.
  */
-class TillViewModel(application: Application) : AndroidViewModel(application) {
+class TillViewModel(application: Application) : AndroidViewModel(application), TillActions {
     private val app = application
     private val graph = (application as PrintStationApp).graph
     private val till: Till = graph.till
@@ -124,7 +172,7 @@ class TillViewModel(application: Application) : AndroidViewModel(application) {
 
     private var pricing: Job? = null
 
-    fun loadPhoto(url: String) = dishPhotos.load(url)
+    override fun loadPhoto(url: String) = dishPhotos.load(url)
 
     /** On every visit: whether the till is on, what is open, and what has sold out since. */
     fun look() {
@@ -132,7 +180,7 @@ class TillViewModel(application: Application) : AndroidViewModel(application) {
         loadMenu()
     }
 
-    fun loadMenu() {
+    override fun loadMenu() {
         _view.update { it.copy(menuError = null) }
         viewModelScope.launch {
             val menu = attempt(app, { error -> _view.update { it.copy(menuError = error) } }) { graph.phoneOrders.menu() } ?: return@launch
@@ -140,21 +188,21 @@ class TillViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun add(line: BasketLine) {
+    override fun add(line: BasketLine) {
         till.add(line)
         reprice()
     }
 
-    fun setQty(index: Int, qty: Int) {
+    override fun setQty(index: Int, qty: Int) {
         till.setQty(index, qty)
         reprice()
     }
 
-    fun setDineIn(dineIn: Boolean) = till.setDineIn(dineIn)
+    override fun setDineIn(dineIn: Boolean) = till.setDineIn(dineIn)
 
-    fun setTraining(training: Boolean) = till.setTraining(training)
+    override fun setTraining(training: Boolean) = till.setTraining(training)
 
-    fun clear() = till.clear()
+    override fun clear() = till.clear()
 
     /** Asked once the tapping pauses: the menu's sum is shown meanwhile. */
     private fun reprice() {
@@ -166,46 +214,46 @@ class TillViewModel(application: Application) : AndroidViewModel(application) {
             }
     }
 
-    fun ringUp() = step {
+    override fun ringUp() = step {
         till.ringUp()
         // The price moved: the new one is on the screen before the next tap.
         if (till.state.value.problem == TillProblem.Refused(CounterError.TOTAL_CHANGED)) till.reprice()
     }
 
-    fun resume(sale: CounterSale) = till.resume(sale)
+    override fun resume(sale: CounterSale) = till.resume(sale)
 
-    fun chooseCash() = till.chooseCash()
+    override fun chooseCash() = till.chooseCash()
 
-    fun chooseCard() = step { till.chooseCard() }
+    override fun chooseCard() = step { till.chooseCard() }
 
-    fun setGiven(text: String) = till.setGiven(text)
+    override fun setGiven(text: String) = till.setGiven(text)
 
-    fun cashPaid() = step { till.cashPaid() }
+    override fun cashPaid() = step { till.cashPaid() }
 
-    fun cardPaid() = step { till.cardPaid() }
+    override fun cardPaid() = step { till.cardPaid() }
 
-    fun cardDeclined() = step { till.cardDeclined() }
+    override fun cardDeclined() = step { till.cardDeclined() }
 
-    fun back() = step { till.back() }
+    override fun back() = step { till.back() }
 
-    fun abort() = step { till.abort() }
+    override fun abort() = step { till.abort() }
 
-    fun park() = step { till.park() }
+    override fun park() = step { till.park() }
 
-    fun next() {
+    override fun next() {
         _view.update { it.copy(printed = false, printError = null) }
         step { till.next() }
     }
 
-    fun dismissProblem() = till.dismissProblem()
+    override fun dismissProblem() = till.dismissProblem()
 
     suspend fun awaitReceipt() = till.awaitReceipt()
 
-    val canPrint: Boolean
+    override val canPrint: Boolean
         get() = graph.settings.printer != null
 
     /** The customer's receipt on this device's printer. */
-    fun printReceipt() {
+    override fun printReceipt() {
         val order = till.state.value.sale?.orderId ?: return
         if (_view.value.printing) return
         _view.update { it.copy(printing = true, printed = false, printError = null) }
@@ -251,7 +299,6 @@ private val BASKET_BESIDE_FROM = 720.dp
  * "Kasse": a sale at the counter. Tap dishes, "Kassieren", Bar or Karte, the
  * receipt. See [Till] for what is recorded when, and where.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TillScreen(onBack: () -> Unit, model: TillViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -260,6 +307,14 @@ fun TillScreen(onBack: () -> Unit, model: TillViewModel = viewModel()) {
     LaunchedEffect(Unit) { model.look() }
     val sale = state.sale
     LaunchedEffect(sale?.id, state.step) { if (state.step == TillStep.DONE) model.awaitReceipt() }
+    TillContent(state, view, photos, model, onBack)
+}
+
+/** The Kasse as it is drawn: what it shows, and what its taps do. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TillContent(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions, onBack: () -> Unit) {
+    val sale = state.sale
     var aborting by remember { mutableStateOf(false) }
 
     val leave = {
@@ -387,7 +442,7 @@ internal fun tillProblemText(context: Context, problem: TillProblem): String =
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun TillDishesPane(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillViewModel) {
+private fun TillDishesPane(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions) {
     var picking by remember { mutableStateOf<MenuDish?>(null) }
     var basketUp by rememberSaveable { mutableStateOf(false) }
     // The next customer starts with the dishes.
@@ -452,7 +507,7 @@ private fun TillDishes(
     error: String?,
     state: TillState,
     photos: Map<String, ImageBitmap?>,
-    model: TillViewModel,
+    model: TillActions,
     onTap: (MenuDish, List<OptionGroup>) -> Unit,
 ) {
     when {
@@ -472,7 +527,7 @@ private fun TillDishes(
 
 /** The till is off, and the sales somebody has to see to. */
 @Composable
-private fun TillNotices(state: TillState, model: TillViewModel) {
+private fun TillNotices(state: TillState, model: TillActions) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
         if (state.off) StatusLine(stringResource(R.string.till_off))
         for (sale in state.open) OpenSaleCard(sale, enabled = !state.busy) { model.resume(sale) }
@@ -511,7 +566,7 @@ internal fun OpenSaleCard(sale: CounterSale, enabled: Boolean, onResume: () -> U
 }
 
 @Composable
-private fun TillBasket(state: TillState, model: TillViewModel, modifier: Modifier) {
+private fun TillBasket(state: TillState, model: TillActions, modifier: Modifier) {
     Column(modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.lines.isEmpty()) {
@@ -582,7 +637,7 @@ private fun TillSalePage(sale: CounterSale, caption: String, content: @Composabl
 }
 
 @Composable
-private fun TillPayPane(state: TillState, sale: CounterSale, model: TillViewModel, onAbort: () -> Unit) {
+private fun TillPayPane(state: TillState, sale: CounterSale, model: TillActions, onAbort: () -> Unit) {
     TillSalePage(sale, stringResource(if (sale.dineIn) R.string.till_dine_in else R.string.till_takeaway)) {
         if (state.declined) StatusLine(stringResource(R.string.till_declined), bad = true)
         Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -604,7 +659,7 @@ private fun TillPayPane(state: TillState, sale: CounterSale, model: TillViewMode
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TillCashPane(state: TillState, sale: CounterSale, model: TillViewModel) {
+private fun TillCashPane(state: TillState, sale: CounterSale, model: TillActions) {
     val total = CounterSales.cents(sale.total)
     TillSalePage(sale, stringResource(R.string.till_cash_title)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -651,7 +706,7 @@ private fun TillCashPane(state: TillState, sale: CounterSale, model: TillViewMod
 private fun tillPlain(cents: Long): String = if (cents % 100 == 0L) "${cents / 100}" else "${cents / 100},${(cents % 100).toString().padStart(2, '0')}"
 
 @Composable
-private fun TillCardPane(state: TillState, sale: CounterSale, model: TillViewModel) {
+private fun TillCardPane(state: TillState, sale: CounterSale, model: TillActions) {
     TillSalePage(sale, stringResource(R.string.till_card_title)) {
         Text(stringResource(R.string.till_card_text), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 720.dp))
         Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -666,7 +721,7 @@ private fun TillCardPane(state: TillState, sale: CounterSale, model: TillViewMod
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, model: TillViewModel) {
+private fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, model: TillActions) {
     val method = stringResource(if (sale.payment == CounterPayment.CARD) R.string.pay_card else R.string.pay_cash)
     TillSalePage(sale, stringResource(R.string.till_paid, method)) {
         state.changeCents?.takeIf { it > 0 && sale.payment == CounterPayment.CASH }?.let {
