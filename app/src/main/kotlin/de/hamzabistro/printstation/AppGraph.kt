@@ -13,6 +13,7 @@ import de.hamzabistro.printstation.core.AddressSmsSender
 import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.ApkDownload
+import de.hamzabistro.printstation.core.BestsellerRanking
 import de.hamzabistro.printstation.core.CallWatch
 import de.hamzabistro.printstation.core.CallsState
 import de.hamzabistro.printstation.core.CounterDevice
@@ -39,6 +40,7 @@ import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabaseCounterBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
+import de.hamzabistro.printstation.core.SupabaseDishSalesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIncomingCallsBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
@@ -151,6 +153,9 @@ class AppGraph(context: Context) {
 
     /** The Kasse: one for the process, so a sale being paid outlives its screen. Keeps nothing on the device. */
     val till = Till(counter, newId = { UUID.randomUUID().toString() }, logger)
+
+    /** The dishes the Kasse shows first: worked out once a day from what was sold. */
+    val bestsellers = BestsellerRanking(SupabaseDishSalesBackend(config, http, sessions), now = Instant::now, logger = logger)
 
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 

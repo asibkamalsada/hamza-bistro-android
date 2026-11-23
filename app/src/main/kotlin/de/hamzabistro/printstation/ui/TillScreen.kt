@@ -48,12 +48,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.BasketLine
+import de.hamzabistro.printstation.core.Bestsellers
 import de.hamzabistro.printstation.core.CounterError
 import de.hamzabistro.printstation.core.CounterSale
 import de.hamzabistro.printstation.core.CounterSales
@@ -65,19 +68,24 @@ import de.hamzabistro.printstation.core.TillProblem
 import de.hamzabistro.printstation.core.TillState
 import de.hamzabistro.printstation.core.TillStep
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The menu to tap from, at the board's prices, and how the receipt's printing goes. */
 data class TillView(
     val menu: OrderMenu? = null,
     val menuError: String? = null,
+    /** The dishes to show first, the best seller of the day first: ids, as [Bestsellers] ranks them. */
+    val bestsellers: List<Long> = emptyList(),
     val printing: Boolean = false,
     val printed: Boolean = false,
     val printError: String? = null,
@@ -161,11 +169,33 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
 
     override fun loadMenu() {
         _view.update { it.copy(menuError = null) }
+        val ranking = ranking()
         viewModelScope.launch {
             val menu = attempt(app, { error -> _view.update { it.copy(menuError = error) } }) { graph.phoneOrders.menu() } ?: return@launch
-            _view.update { it.copy(menu = CounterSales.boardMenu(menu)) }
+            // Waited for, so no tile moves once there are some; not for long: the dishes come first.
+            val best = withTimeoutOrNull(BESTSELLERS_WAIT_MS) { ranking.await() } ?: graph.bestsellers.known
+            _view.update { it.copy(menu = CounterSales.boardMenu(menu), bestsellers = if (it.menu == null || idle()) best else it.bestsellers) }
         }
     }
+
+    /**
+     * Another day, another ranking: a tablet may stand on this screen for
+     * days. Never while somebody is tapping dishes.
+     */
+    fun rank() {
+        // The first one comes with the menu.
+        if (_view.value.menu == null) return
+        val ranking = ranking()
+        viewModelScope.launch {
+            val best = ranking.await()
+            if (idle()) _view.update { it.copy(bestsellers = best) }
+        }
+    }
+
+    /** Outlives the screen: what is read late is there for the next visit. */
+    private fun ranking(): Deferred<List<Long>> = graph.scope.async { graph.bestsellers.today() }
+
+    private fun idle(): Boolean = till.state.value.lines.isEmpty()
 
     override fun add(line: BasketLine) {
         till.add(line)
@@ -221,7 +251,10 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
 
     override fun next() {
         _view.update { it.copy(printed = false, printError = null) }
-        step { till.next() }
+        step {
+            till.next()
+            rank()
+        }
     }
 
     override fun dismissProblem() = till.dismissProblem()
@@ -268,6 +301,7 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
 
     private companion object {
         const val PRICE_PAUSE_MS = 300L
+        const val BESTSELLERS_WAIT_MS = 1_500L
     }
 }
 
@@ -284,6 +318,7 @@ fun TillScreen(onBack: () -> Unit, model: TillViewModel = viewModel()) {
     val view by model.view.collectAsStateWithLifecycle()
     val photos by model.photos.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { model.look() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.rank() }
     LaunchedEffect(state.sale?.id, state.step) { if (state.step == TillStep.DONE) model.awaitReceipt() }
     TillContent(state, view, photos, model, onBack)
 }

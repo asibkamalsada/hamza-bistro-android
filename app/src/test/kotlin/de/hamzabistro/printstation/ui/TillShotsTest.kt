@@ -42,6 +42,8 @@ private val shots: List<TillShot> by lazy {
     val notPrinted = "Der Beleg wurde nicht gedruckt: Drucker nicht gefunden. Drucker an, Papier drin?"
     listOf(
         TillShot("01-empty", f.empty),
+        TillShot("01-empty-bestsellers", f.empty, f.ranked),
+        TillShot("03-five-lines-bestsellers", f.basket(5), f.ranked),
         TillShot("02-one-line", f.basket(1, deal = 0.0)),
         TillShot("03-five-lines", f.basket(5)),
         TillShot("04-twelve-lines", f.basket(12)),
