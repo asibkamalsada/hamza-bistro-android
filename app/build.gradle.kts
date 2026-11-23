@@ -97,6 +97,8 @@ android {
             it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
             it.outputs.dir(layout.buildDirectory.dir("kasse-shots"))
             it.maxHeapSize = "2g"
+            // CI is where they run: its log says what failed, not only where.
+            it.testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         }
     }
 

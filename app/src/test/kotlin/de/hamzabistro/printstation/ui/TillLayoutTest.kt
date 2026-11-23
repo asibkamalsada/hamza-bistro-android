@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.core.CounterReceipt
@@ -111,12 +112,14 @@ class TillLayoutTest(private val device: TillDevice) {
         assertTrue(cutShort("Mitnehmen"))
     }
 
+    /** Whether [text], one line of it, needs more room than it has: an ellipsis is not said in its layout. */
     private fun cutShort(text: String): Boolean {
         val layouts = mutableListOf<TextLayoutResult>()
         val node = compose.onNode(hasText(text), useUnmergedTree = true).fetchSemanticsNode()
-        node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
-        // What the words need on their one line, and what they have: the layout does not say it was ellipsized.
-        return layouts.single().multiParagraph.maxIntrinsicWidth > node.size.width + 1
+        compose.runOnIdle { node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts) }
+        val input = layouts.single().layoutInput
+        val needs = TextMeasurer(input.fontFamilyResolver, input.density, input.layoutDirection).measure(text, input.style, maxLines = 1, softWrap = false)
+        return needs.size.width > node.size.width + 1
     }
 
     @Test
