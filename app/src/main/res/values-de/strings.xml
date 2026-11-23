@@ -1124,6 +1124,7 @@
     <string name="till_change">Rückgeld</string>
     <string name="till_missing">Es fehlen noch</string>
     <string name="till_key_delete">Ziffer löschen</string>
+    <string name="till_more">↓ weitere</string>
     <string name="till_more_below">↓ %1$d weitere</string>
     <plurals name="till_basket">
         <item quantity="one">%1$d Gericht</item>

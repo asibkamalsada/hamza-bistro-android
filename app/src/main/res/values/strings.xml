@@ -1125,6 +1125,7 @@
     <string name="till_change">Change</string>
     <string name="till_missing">Still missing</string>
     <string name="till_key_delete">Delete a digit</string>
+    <string name="till_more">↓ more</string>
     <string name="till_more_below">↓ %1$d more</string>
     <plurals name="till_basket">
         <item quantity="one">%1$d dish</item>

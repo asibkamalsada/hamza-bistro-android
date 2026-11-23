@@ -77,7 +77,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.Hyphens
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -129,7 +128,7 @@ internal enum class TillLayout {
 }
 
 /** What a basket line, a dish and an amount are called by: read at arm's length. */
-internal val TILL_NAME = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold, hyphens = Hyphens.Auto, lineBreak = LineBreak.Paragraph)
+internal val TILL_NAME = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold, hyphens = Hyphens.Auto)
 internal val TILL_SMALL = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, letterSpacing = 0.sp)
 
 @Composable
@@ -370,7 +369,7 @@ private fun TillTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, co
                 Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().weight(1f).alpha(if (orderable) 1f else 0.4f))
             }
             Column(
-                if (photo != null) Modifier.padding(horizontal = 8.dp, vertical = 6.dp) else Modifier.weight(1f).padding(8.dp),
+                if (photo != null) Modifier.padding(horizontal = 6.dp, vertical = 6.dp) else Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(dish.name, style = TILL_NAME, maxLines = 4, overflow = TextOverflow.Ellipsis)

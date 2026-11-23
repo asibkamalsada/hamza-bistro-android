@@ -183,8 +183,10 @@ internal fun TillPayPane(state: TillState, sale: CounterSale, model: TillActions
     ) { wide ->
         if (wide) {
             Row(Modifier.fillMaxSize()) {
-                Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
-                    TillSaleLines(sale)
+                val scroll = rememberScrollState()
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 24.dp, vertical = 16.dp)) { TillSaleLines(sale) }
+                    if (scroll.canScrollForward) TillMoreBelow(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
                 }
                 VerticalDivider()
                 TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillHow(state, sale, model) }
@@ -208,6 +210,20 @@ private fun TillHow(state: TillState, sale: CounterSale, model: TillActions) {
     Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         TillButton(stringResource(R.string.till_cash), model::chooseCash, Modifier.weight(1f), !state.busy, height = 144.dp, size = 32.sp)
         TillButton(stringResource(R.string.till_card), model::chooseCard, Modifier.weight(1f), !state.busy, height = 144.dp, size = 32.sp)
+    }
+}
+
+/** Over the lines' end, so none of them is thought to be missing. */
+@Composable
+private fun TillMoreBelow(modifier: Modifier) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.secondaryContainer, modifier = modifier) {
+        Text(
+            stringResource(R.string.till_more),
+            fontSize = 16.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+        )
     }
 }
 
