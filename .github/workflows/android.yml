@@ -59,6 +59,16 @@ jobs:
       - name: App tests
         run: ./gradlew :app:testDebugUnitTest
 
+      # The Kasse as it is drawn, every state on tablet and phone: to look
+      # at, and most of all when a test says it does not fit.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: kasse-shots
+          path: app/build/kasse-shots/*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Lint
         run: ./gradlew :app:lintDebug
 

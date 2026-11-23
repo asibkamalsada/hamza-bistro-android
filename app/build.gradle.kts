@@ -89,6 +89,17 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // The Kasse's pictures (TillShotsTest), for somebody to look at:
+            // drawn as the device would, and an output of the tests, so a run
+            // the build cache answers brings them along.
+            it.systemProperty("roborazzi.test.record", "true")
+            it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
+            it.outputs.dir(layout.buildDirectory.dir("kasse-shots"))
+            it.maxHeapSize = "2g"
+            // CI is where they run: its log says what failed, not only where.
+            it.testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
     }
 
     lint {
@@ -112,6 +123,7 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
