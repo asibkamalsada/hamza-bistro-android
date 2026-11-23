@@ -1,6 +1,7 @@
 package de.hamzabistro.printstation.ui
 
 import android.app.Application
+import android.os.Looper
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** "Kasse": drawn for a tablet and a phone, and where the drawer leads to it. */
@@ -79,7 +81,11 @@ class TillScreenTest {
         till.dismissProblem()
         compose.waitForIdle()
         compose.onNodeWithTag(TILL_RING_UP_TAG).performClick()
-        compose.waitUntil(timeoutMillis = 10_000) { till.state.value.problem != null && !till.state.value.busy }
+        compose.waitUntil(timeoutMillis = 10_000) {
+            // The answer comes back to the main thread, which this test is on.
+            shadowOf(Looper.getMainLooper()).idle()
+            till.state.value.problem != null && !till.state.value.busy
+        }
         compose.waitForIdle()
         assertEquals(TillStep.DISHES, till.state.value.step)
         assertEquals(null, till.state.value.sale)
