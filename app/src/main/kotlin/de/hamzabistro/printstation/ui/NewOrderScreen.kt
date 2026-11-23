@@ -114,7 +114,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /** What "Neue Bestellung" shows. */
 data class NewOrderState(
@@ -204,7 +203,7 @@ enum class CallStep {
 }
 
 /** A dish photo, decoded at a tile's size rather than the camera's. */
-private fun tile(bytes: ByteArray): ImageBitmap? {
+internal fun tile(bytes: ByteArray): ImageBitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     var sample = 1
@@ -555,29 +554,13 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private val photoCache = mutableMapOf<String, ImageBitmap?>()
-    private val _photos = MutableStateFlow<Map<String, ImageBitmap?>>(emptyMap())
+    private val dishPhotos = DishPhotos(graph, viewModelScope)
 
     /** The dishes' photos, by URL, for the big tiles: a Döner is found faster by its picture than by its name. */
-    val photos: StateFlow<Map<String, ImageBitmap?>> = _photos.asStateFlow()
+    val photos: StateFlow<Map<String, ImageBitmap?>> = dishPhotos.photos
 
     /** Fetches [url]'s photo once, small enough for a tile; null when there is none to show. */
-    fun loadPhoto(url: String) {
-        if (url.isBlank() || url in photoCache) return
-        photoCache[url] = null
-        viewModelScope.launch {
-            val bitmap =
-                try {
-                    graph.photoPreview(url)?.let { bytes -> withContext(Dispatchers.Default) { tile(bytes) } }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    null
-                }
-            photoCache[url] = bitmap
-            _photos.update { it + (url to bitmap) }
-        }
-    }
+    fun loadPhoto(url: String) = dishPhotos.load(url)
 
     private companion object {
         const val PRICE_PAUSE_MS = 600L

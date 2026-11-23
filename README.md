@@ -319,6 +319,17 @@ edge):
   reading (the phone number and the route still open). A delivered order
   that was delayed says so: "fällig 18:45 · verschoben +10 Min."; a
   delivered one says how it was paid: "Bezahlt: Bar / Karte / unbekannt".
+- **Kasse** — a sale at the counter: tap the dishes, *Mitnehmen* or *Hier
+  essen*, **Kassieren**, then *Bar* (what was given, the change) or *Karte*
+  (the amount for the card app; booked only with "Karte bezahlt"), then the
+  receipt as a QR code or on the printer. The shop's database is the till
+  and signs the sale; this app is an **online input device and keeps nothing
+  about a sale** — a device that could record one offline would be a till of
+  its own. So without a connection it says so and refuses, a second tap is
+  the same sale (the app makes its id once per basket), and a sale left open
+  is found again on any device, after a restart too. Not in the drawer on a
+  database without the till (`20261123100000_counter_sales` in
+  hamza-bistro-web); training only while the server's signing is off.
 - **Kassensturz** — for today or a day picked: per driver (account and
   device name), how many orders, cash, card and unknown, with the order
   numbers behind each sum a tap away, and **Teilen** as plain text through

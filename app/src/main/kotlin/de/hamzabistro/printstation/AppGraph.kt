@@ -15,6 +15,7 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.ApkDownload
 import de.hamzabistro.printstation.core.CallWatch
 import de.hamzabistro.printstation.core.CallsState
+import de.hamzabistro.printstation.core.CounterDevice
 import de.hamzabistro.printstation.core.DeviceReport
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.FilePrintLog
@@ -25,28 +26,30 @@ import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrdersRealtime
 import de.hamzabistro.printstation.core.PhoneOrders
-import de.hamzabistro.printstation.core.RatingWatch
-import de.hamzabistro.printstation.core.RatingsState
 import de.hamzabistro.printstation.core.PrintStation
 import de.hamzabistro.printstation.core.PrinterException
 import de.hamzabistro.printstation.core.QueueState
+import de.hamzabistro.printstation.core.RatingWatch
+import de.hamzabistro.printstation.core.RatingsState
 import de.hamzabistro.printstation.core.SessionManager
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.SupabaseAddressRequestBackend
 import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
-import de.hamzabistro.printstation.core.SupabasePrintBackend
+import de.hamzabistro.printstation.core.SupabaseCounterBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIncomingCallsBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
-import de.hamzabistro.printstation.core.SupabasePhoneOrderBackend
 import de.hamzabistro.printstation.core.SupabaseOpsBackend
+import de.hamzabistro.printstation.core.SupabasePhoneOrderBackend
+import de.hamzabistro.printstation.core.SupabasePrintBackend
 import de.hamzabistro.printstation.core.SupabaseRatingsBackend
 import de.hamzabistro.printstation.core.SupabaseShopBackend
 import de.hamzabistro.printstation.core.SupabaseStaffBackend
+import de.hamzabistro.printstation.core.Till
 import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.core.UpdateInstaller
 import de.hamzabistro.printstation.printer.BlePrinter
@@ -60,6 +63,7 @@ import de.hamzabistro.printstation.ui.ShopView
 import de.hamzabistro.printstation.update.AndroidApkInstaller
 import java.io.File
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
@@ -142,6 +146,12 @@ class AppGraph(context: Context) {
     /** "Neue Bestellung": phone and walk-in orders, typed in on the tablet (#9). */
     val phoneOrders = SupabasePhoneOrderBackend(config, http, sessions)
 
+    /** The database's till, which the Kasse is an input device of (hamza-bistro-web#225). */
+    val counter = SupabaseCounterBackend(config, http, sessions, ::counterDevice)
+
+    /** The Kasse: one for the process, so a sale being paid outlives its screen. Keeps nothing on the device. */
+    val till = Till(counter, newId = { UUID.randomUUID().toString() }, logger)
+
     val realtime = OrdersRealtime(config, http, sessions, logger, monotonic)
 
     /** The customers' problem reports: ☰ → "Reklamationen" (hamza-bistro-web#88). */
@@ -220,6 +230,10 @@ class AppGraph(context: Context) {
         if (device.role != Role.STAFF || !device.onShift) return null
         return DeviceReport(settings.stationId, deviceLabel(), device.alarm.newOrders.wire, BuildConfig.VERSION_NAME)
     }
+
+    /** This device as the till records it. */
+    private fun counterDevice() =
+        CounterDevice(settings.stationId, deviceLabel(), Build.MANUFACTURER.orEmpty(), Build.MODEL.orEmpty(), BuildConfig.VERSION_NAME)
 
     /**
      * What this device is called on the site — on "Wer von Bestellungen
@@ -472,6 +486,14 @@ class AppGraph(context: Context) {
         printLog.markDone(listOf(order.id))
         runCatching { backend.finish(order.id, true) }
         queue.refresh()
+    }
+
+    /** The customer's receipt of a counter sale's order, on this device's printer. */
+    suspend fun printReceipt(order: String) {
+        val chosen = settings.printer ?: throw PrinterException("no printer chosen")
+        val receipt = backend.receipt(order, TICKET_LANG) ?: throw PrinterException("there is no receipt for this sale")
+        withTimeoutOrNull(TICKET_TIMEOUT) { printer(chosen.address).print(receipt) }
+            ?: throw PrinterException("the printer did not answer")
     }
 
     /**

@@ -67,6 +67,13 @@ interface PrintBackend {
 
     /** The test ticket, for choosing a printer. */
     suspend fun testTicket(lang: String): ByteArray
+
+    /**
+     * The customer's receipt of a delivered order, with its TSE part, or null
+     * when there is none to print. Throws [NeedsServerUpdateException] when
+     * print-ticket only knows kitchen tickets.
+     */
+    suspend fun receipt(order: String, lang: String): ByteArray?
 }
 
 /**
@@ -159,7 +166,22 @@ class SupabasePrintBackend internal constructor(
             put("lang", lang)
         }) ?: throw BackendException(404, "print-ticket has no test ticket")
 
-    private suspend fun printTicket(body: JsonObject): ByteArray? {
+    /**
+     * A print-ticket from before the receipt ignores the flag and sends the
+     * kitchen's ticket, so the answer has to say what it is.
+     */
+    override suspend fun receipt(order: String, lang: String): ByteArray? =
+        printTicket(
+            buildJsonObject {
+                put("order", order)
+                put("lang", lang)
+                put("receipt", true)
+            }
+        ) { response ->
+            if (response.header("X-Ticket") != "receipt") throw NeedsServerUpdateException(CounterSales.MIGRATION)
+        }
+
+    private suspend fun printTicket(body: JsonObject, check: (Response) -> Unit = {}): ByteArray? {
         val url = rest.endpoint("functions/v1/print-ticket").build()
         return rest.call({ it.url(url).post(body.toRequestBody()) }) { response ->
             when {
@@ -169,7 +191,10 @@ class SupabasePrintBackend internal constructor(
                     throw rest.rejected(response.code, response.body.string(), "print-ticket")
                 response.header("Content-Type")?.startsWith("application/octet-stream") != true ->
                     throw BackendException(response.code, "print-ticket did not answer with a ticket")
-                else -> readTicket(response)
+                else -> {
+                    check(response)
+                    readTicket(response)
+                }
             }
         }
     }

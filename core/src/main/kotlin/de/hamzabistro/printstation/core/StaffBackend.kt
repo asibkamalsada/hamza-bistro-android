@@ -336,9 +336,12 @@ internal class ColumnLadder(private val selects: List<String>) {
             try {
                 return block(selects[at])
             } catch (e: BackendException) {
+                val missing = missingColumnName(e.message)
+                // A filter's column, not one of the list's: whoever filters by it knows what to do.
+                if (missing != null && missing !in selects[at].split(",")) throw e
                 if (!e.missingColumn || at == selects.lastIndex) throw e
                 // Another read may have stepped down meanwhile; never back up.
-                val next = next(at, missingColumnName(e.message))
+                val next = next(at, missing)
                 if (level < next) level = next
             }
         }

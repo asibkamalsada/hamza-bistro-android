@@ -31,6 +31,7 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AppRelease
 import de.hamzabistro.printstation.core.InstallState
 import de.hamzabistro.printstation.core.IssuesState
+import de.hamzabistro.printstation.core.TillState
 import kotlinx.coroutines.launch
 
 /**
@@ -51,7 +52,8 @@ data class DrawerHeader(
  * from the left edge, closed with back, a tap beside it or a choice. The
  * same modal drawer on a tablet as on a phone: the queue's three columns
  * keep the whole width, and the screens behind it are rarely needed while
- * orders come in. "Reklamationen" only on a database that has them, with
+ * orders come in. "Kasse" only on a database that has a till, with the
+ * sales left open on it; "Reklamationen" only on a database that has them, with
  * the number open on it — and on ☰ too ([MenuButton]).
  */
 @Composable
@@ -62,6 +64,7 @@ fun StaffDrawer(
     header: DrawerHeader,
     onOpen: (StaffScreen) -> Unit,
     onInstall: (AppRelease) -> Unit = {},
+    till: TillState = TillState(),
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -75,8 +78,13 @@ fun StaffDrawer(
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
                     Header(header, onInstall)
                     HorizontalDivider(Modifier.padding(horizontal = 28.dp, vertical = 8.dp))
-                    for (entry in drawerEntries(issues)) {
-                        val count = if (entry.screen == StaffScreen.ISSUES) issues.count else 0
+                    for (entry in drawerEntries(issues, till)) {
+                        val count =
+                            when (entry.screen) {
+                                StaffScreen.ISSUES -> issues.count
+                                StaffScreen.TILL -> till.open.size
+                                else -> 0
+                            }
                         NavigationDrawerItem(
                             icon = { Icon(painterResource(entry.icon), contentDescription = null) },
                             label = { Text(stringResource(entry.label)) },
@@ -135,8 +143,10 @@ private fun Header(header: DrawerHeader, onInstall: (AppRelease) -> Unit) {
 
 private class DrawerEntry(val screen: StaffScreen, @StringRes val label: Int, @DrawableRes val icon: Int)
 
-private fun drawerEntries(issues: IssuesState): List<DrawerEntry> =
+private fun drawerEntries(issues: IssuesState, till: TillState): List<DrawerEntry> =
     listOfNotNull(
+        // Only on a database that has a till.
+        DrawerEntry(StaffScreen.TILL, R.string.till_title, R.drawable.ic_till).takeIf { till.available == true },
         DrawerEntry(StaffScreen.HISTORY, R.string.history_title, R.drawable.ic_history),
         DrawerEntry(StaffScreen.ISSUES, R.string.issues_title, R.drawable.ic_issues).takeIf { issues.available == true },
         DrawerEntry(StaffScreen.CASH_UP, R.string.cash_up_title, R.drawable.ic_cash_up),

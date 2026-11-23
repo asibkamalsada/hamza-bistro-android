@@ -6,18 +6,18 @@ import androidx.lifecycle.viewModelScope
 import de.hamzabistro.printstation.AppGraph
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.core.AlarmDecision
+import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.AppRelease
-import de.hamzabistro.printstation.core.InstallState
-import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.CancelReason
 import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.FailedEmail
-import de.hamzabistro.printstation.core.OrderStatus
-import de.hamzabistro.printstation.core.OrderStep
-import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.InstallState
+import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.Kitchen
 import de.hamzabistro.printstation.core.KitchenSlot
 import de.hamzabistro.printstation.core.OpsHealth
+import de.hamzabistro.printstation.core.OrderStatus
+import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.Payment
 import de.hamzabistro.printstation.core.PaymentMethod
@@ -25,6 +25,7 @@ import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.StaffQueue
+import de.hamzabistro.printstation.core.TillState
 import de.hamzabistro.printstation.core.UpdateChecker
 import de.hamzabistro.printstation.core.UpdateState
 import de.hamzabistro.printstation.queue.Pending
@@ -163,6 +164,14 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
      */
     val issues: StateFlow<IssuesState> =
         graph.liveIssues.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IssuesState())
+
+    /** The Kasse: whether there is one, and what is open on it. */
+    val till: StateFlow<TillState> = graph.till.state
+
+    /** Asks for both. A failure keeps what was known. */
+    fun lookAtTill() {
+        viewModelScope.launch { graph.till.refresh() }
+    }
 
     private val kitchenRead = MutableStateFlow<List<KitchenSlot>?>(null)
 
