@@ -691,7 +691,8 @@ private fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, mo
             BigButton(
                 stringResource(if (view.printing) R.string.till_printing else R.string.till_print),
                 onClick = model::printReceipt,
-                enabled = model.canPrint && !view.printing && sale.orderId != null,
+                // Unsigned, there is no receipt: on paper it would look like one.
+                enabled = model.canPrint && !view.printing && sale.orderId != null && receipt != null,
                 outlined = true,
                 modifier = Modifier.weight(1f),
             )

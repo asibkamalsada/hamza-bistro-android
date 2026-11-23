@@ -60,12 +60,29 @@ class SupabaseHistoryBackend internal constructor(
     /** [StaffOrder.HISTORY_COLUMNS], or [StaffOrder.COLUMNS] on a database before phone orders. */
     private val columns = ColumnLadder(listOf(StaffOrder.HISTORY_COLUMNS, StaffOrder.COLUMNS))
 
-    override suspend fun recent(): List<StaffOrder> = columns.read { recent(it) }
+    /**
+     * Test orders — a training sale in the Kasse among them — count nowhere,
+     * so they are in neither list, as on the site. False on a database
+     * without is_test (20261009160000_test_orders), which has none.
+     */
+    @Volatile private var testsMarked = true
 
-    private suspend fun recent(columns: String): List<StaffOrder> {
+    private suspend fun <T> withoutTests(read: suspend (testsMarked: Boolean) -> T): T =
+        try {
+            read(testsMarked)
+        } catch (e: BackendException) {
+            if (!testsMarked || !e.missingColumn || ColumnLadder.missingColumnName(e.message) != "is_test") throw e
+            testsMarked = false
+            read(false)
+        }
+
+    override suspend fun recent(): List<StaffOrder> = withoutTests { marked -> columns.read { recent(it, marked) } }
+
+    private suspend fun recent(columns: String, testsMarked: Boolean): List<StaffOrder> {
         val url =
             rest.endpoint("rest/v1/orders")
                 .addQueryParameter("select", columns)
+                .apply { if (testsMarked) addQueryParameter("is_test", "eq.false") }
                 .addQueryParameter("order", "created_at.desc")
                 .addQueryParameter("limit", HISTORY_LIMIT.toString())
                 .build()
@@ -76,13 +93,16 @@ class SupabaseHistoryBackend internal constructor(
         }
     }
 
-    override suspend fun takings(now: Instant): Takings {
+    override suspend fun takings(now: Instant): Takings = withoutTests { takings(now, it) }
+
+    private suspend fun takings(now: Instant, testsMarked: Boolean): Takings {
         val midnight = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
         val url =
             rest.endpoint("rest/v1/orders")
                 .addQueryParameter("select", "total")
                 .addQueryParameter("status", "eq.delivered")
                 .addQueryParameter("created_at", "gte.$midnight")
+                .apply { if (testsMarked) addQueryParameter("is_test", "eq.false") }
                 .build()
         val rows =
             rest.call({ it.url(url).get() }) { response ->

@@ -35,8 +35,26 @@ class HistoryTest {
         assertEquals("created_at.desc", request.url.queryParameter("order"))
         assertEquals("50", request.url.queryParameter("limit"))
         assertEquals(StaffOrder.HISTORY_COLUMNS, request.url.queryParameter("select"))
-        // Every order, not only the open ones.
+        // Every order, not only the open ones — but no tests.
         assertEquals(null, request.url.queryParameter("status"))
+        assertEquals("eq.false", request.url.queryParameter("is_test"))
+    }
+
+    @Test
+    fun `reads without the test filter on a database that does not mark tests, and keeps to that`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(400, """{"code":"42703","message":"column orders.is_test does not exist"}""")
+        test.reply(200, "[]")
+        test.reply(200, """[{"total":5.0}]""")
+        assertEquals(emptyList(), backend.recent())
+        assertEquals(Takings(1, 5.0), backend.takings(at("2026-10-02T10:30:00Z")))
+
+        test.server.takeRequest()
+        assertEquals("eq.false", test.server.takeRequest().url.queryParameter("is_test"))
+        val again = test.server.takeRequest()
+        assertEquals(null, again.url.queryParameter("is_test"))
+        assertEquals(StaffOrder.HISTORY_COLUMNS, again.url.queryParameter("select"), "its columns are all there")
+        assertEquals(null, test.server.takeRequest().url.queryParameter("is_test"))
     }
 
     @Test
@@ -69,6 +87,7 @@ class HistoryTest {
         assertEquals("total", request.url.queryParameter("select"))
         assertEquals("eq.delivered", request.url.queryParameter("status"))
         assertEquals("gte.2026-10-01T22:00:00Z", request.url.queryParameter("created_at"))
+        assertEquals("eq.false", request.url.queryParameter("is_test"))
     }
 
     @Test
