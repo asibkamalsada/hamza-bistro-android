@@ -128,8 +128,8 @@ internal enum class TillLayout {
 }
 
 /** What a basket line, a dish and an amount are called by: read at arm's length. */
-internal val TILL_NAME = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, hyphens = Hyphens.Auto)
-internal val TILL_SMALL = TextStyle(fontSize = 15.sp, lineHeight = 19.sp)
+internal val TILL_NAME = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold, hyphens = Hyphens.Auto)
+internal val TILL_SMALL = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, letterSpacing = 0.sp)
 
 @Composable
 internal fun TillDishesPane(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions) {

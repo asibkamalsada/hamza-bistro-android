@@ -1,5 +1,8 @@
 package de.hamzabistro.printstation.ui
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -13,6 +16,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.TillState
 import de.hamzabistro.printstation.core.TillStep
@@ -96,12 +101,22 @@ class TillLayoutTest(private val device: TillDevice) {
             compose.onNodeWithText("Zur Kasse", substring = true).performClick()
             compose.waitForIdle()
         }
-        for (text in listOf("Mitnehmen", "Hier essen", "Kassieren")) {
-            val layouts = mutableListOf<TextLayoutResult>()
-            val node = compose.onNode(hasText(text), useUnmergedTree = true).fetchSemanticsNode()
-            node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
-            assertFalse("$text is cut short on $device", layouts.single().let { it.hasVisualOverflow || it.isLineEllipsized(0) })
-        }
+        for (text in listOf("Mitnehmen", "Hier essen", "Kassieren")) assertFalse("$text is cut short on $device", cutShort(text))
+    }
+
+    /** The check above sees a word that is. */
+    @Test
+    fun aWordCutShortIsSeen() {
+        compose.setContent { Text("Mitnehmen", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(40.dp)) }
+        assertTrue(cutShort("Mitnehmen"))
+    }
+
+    private fun cutShort(text: String): Boolean {
+        val layouts = mutableListOf<TextLayoutResult>()
+        val node = compose.onNode(hasText(text), useUnmergedTree = true).fetchSemanticsNode()
+        node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+        val layout = layouts.single()
+        return layout.isLineEllipsized(layout.lineCount - 1)
     }
 
     @Test
