@@ -12,10 +12,12 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
 import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.TillState
 import de.hamzabistro.printstation.core.TillStep
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -85,6 +87,21 @@ class TillLayoutTest(private val device: TillDevice) {
         assertWhole(hasText("Mitnehmen"), "Mitnehmen")
         // And that there is more of it than shows is said.
         assertWhole(hasText("weitere", substring = true), "what is further down")
+    }
+
+    @Test
+    fun theWordsOnTheButtonsAreNotCutShort() {
+        show(f.basket(12))
+        if (device.phone) {
+            compose.onNodeWithText("Zur Kasse", substring = true).performClick()
+            compose.waitForIdle()
+        }
+        for (text in listOf("Mitnehmen", "Hier essen", "Kassieren")) {
+            val layouts = mutableListOf<TextLayoutResult>()
+            val node = compose.onNode(hasText(text), useUnmergedTree = true).fetchSemanticsNode()
+            node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            assertFalse("$text is cut short on $device", layouts.single().let { it.hasVisualOverflow || it.isLineEllipsized(0) })
+        }
     }
 
     @Test

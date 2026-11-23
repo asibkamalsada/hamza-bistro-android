@@ -29,6 +29,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -293,13 +295,15 @@ private fun TillMenu(
 
 @Composable
 private fun TillCategory(name: String?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val sight = remember { BringIntoViewRequester() }
+    LaunchedEffect(selected) { if (selected) sight.bringIntoView() }
     Surface(
         selected = selected,
         onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-        modifier = modifier,
+        modifier = modifier.bringIntoViewRequester(sight),
     ) {
         Box(Modifier.heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 6.dp), contentAlignment = Alignment.CenterStart) {
             Text(
@@ -327,7 +331,7 @@ private fun TillGrid(
     modifier: Modifier,
 ) {
     // One height for all, photo or not, with room for the name whatever the font size: the tiles line up. A long name
-    // takes its third line from the photo.
+    // takes its lines from the photo.
     val height = with(LocalDensity.current) { 80.dp + (TILL_NAME.lineHeight * 2).toDp() + PRICE_LINE.toDp() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 150.dp),
@@ -365,10 +369,10 @@ private fun TillTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, co
                 Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().weight(1f).alpha(if (orderable) 1f else 0.4f))
             }
             Column(
-                if (photo != null) Modifier.padding(horizontal = 10.dp, vertical = 6.dp) else Modifier.weight(1f).padding(10.dp),
+                if (photo != null) Modifier.padding(horizontal = 8.dp, vertical = 6.dp) else Modifier.weight(1f).padding(8.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(dish.name, style = TILL_NAME, maxLines = if (photo != null) 3 else 4, overflow = TextOverflow.Ellipsis)
+                Text(dish.name, style = TILL_NAME, maxLines = 4, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (orderable) Format.euro(dish.price) else stringResource(R.string.new_order_sold_out),
@@ -519,8 +523,8 @@ private fun TillBasketBelow(state: TillState, model: TillActions, onClear: () ->
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TillWhere(state, model, onClear, Modifier.weight(0.9f))
-            Column(Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            TillWhere(state, model, onClear, Modifier.weight(1f))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 TillUnderLines(state, list)
                 TillRingUp(state, model, Modifier.fillMaxWidth())
             }
@@ -657,12 +661,12 @@ private fun TillUnderLines(state: TillState, list: LazyListState) {
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(
             if (hidden > 0) stringResource(R.string.till_more_below, hidden) else "",
-            fontSize = 17.sp,
+            style = TILL_SMALL,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = 12.dp),
+            modifier = Modifier.padding(end = 8.dp),
         )
-        if (deal != null) Text(stringResource(R.string.new_order_deal) + "  " + Format.euro(-deal), fontSize = 17.sp)
+        if (deal != null) Text(stringResource(R.string.new_order_deal) + "  " + Format.euro(-deal), style = TILL_SMALL)
     }
 }
 
@@ -725,14 +729,14 @@ private fun TillToBasket(state: TillState, onClick: () -> Unit) {
 private fun TillOpenBar(state: TillState, model: TillActions, onShow: () -> Unit) {
     if (state.open.isEmpty()) return
     val one = state.open.singleOrNull()
-    val stale = state.open.any { it.stale }
-    val card = state.open.any { it.cardPending }
+    val stale = state.open.count { it.stale }
+    val card = state.open.count { it.cardPending }
     Surface(
         onClick = { if (one != null) model.resume(one) else onShow() },
         enabled = !state.busy,
         shape = MaterialTheme.shapes.medium,
-        color = if (stale || card) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = if (stale || card) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+        color = if (stale + card > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = if (stale + card > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
         modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp),
     ) {
         Row(Modifier.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -744,8 +748,8 @@ private fun TillOpenBar(state: TillState, model: TillActions, onShow: () -> Unit
                 }
             val why =
                 when {
-                    stale -> stringResource(R.string.till_open_stale_short)
-                    card -> stringResource(R.string.till_open_card_short)
+                    stale > 0 -> stringResource(R.string.till_open_stale_short).let { if (one != null) it else "$stale $it" }
+                    card > 0 -> stringResource(R.string.till_open_card_short).let { if (one != null) it else "$card× $it" }
                     else -> null
                 }
             Text(
