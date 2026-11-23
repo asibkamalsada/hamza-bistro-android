@@ -33,6 +33,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -402,13 +403,13 @@ private fun TillOptions(dish: MenuDish, groups: List<OptionGroup>, onDismiss: ()
             Column(Modifier.fillMaxSize()) {
                 Column(
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(dish.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(dish.name, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
                     val columns = if (wide && groups.size > 1) groups.chunked((groups.size + 1) / 2) else listOf(groups)
                     Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                         for (column in columns) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 for (group in column) {
                                     TillOptionGroup(group, chosen[group.id].orEmpty()) { chosen = OptionRules.toggle(group, chosen, it) }
                                 }
@@ -444,14 +445,14 @@ private fun TillOptions(dish: MenuDish, groups: List<OptionGroup>, onDismiss: ()
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TillOptionGroup(group: OptionGroup, chosen: List<Long>, onToggle: (MenuOption) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val hint = stringResource(if (group.selection == Selection.SINGLE) R.string.new_order_single_hint else R.string.new_order_multiple_hint)
         Text("${group.name} · $hint", fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             for (option in group.options) {
                 val on = option.id in chosen
+                // Chosen is a colour, not a tick: what is beside it must not move away under the next tap.
                 val label = buildString {
-                    if (on) append("✓ ")
                     append(option.name)
                     if (option.price > 0) append(" +").append(Format.euro(option.price))
                 }
@@ -464,9 +465,9 @@ private fun TillOptionGroup(group: OptionGroup, chosen: List<Long>, onToggle: (M
                     contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.alpha(if (option.available) 1f else 0.6f),
                 ) {
-                    Column(Modifier.heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
-                        Text(label, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Medium)
-                        if (!option.available) Text(stringResource(R.string.new_order_sold_out), color = MaterialTheme.colorScheme.error)
+                    Column(Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Center) {
+                        Text(label, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+                        if (!option.available) Text(stringResource(R.string.new_order_sold_out), style = TILL_SMALL, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -640,6 +641,12 @@ private fun TillRingUp(state: TillState, model: TillActions, modifier: Modifier)
     Button(
         onClick = model::ringUp,
         enabled = state.lines.isNotEmpty() && !state.busy,
+        // The total stays readable while the sale is on its way.
+        colors =
+            ButtonDefaults.buttonColors(
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
         modifier = modifier.heightIn(min = 72.dp).testTag(TILL_RING_UP_TAG),
     ) {
@@ -749,24 +756,40 @@ internal fun OpenSaleCard(sale: CounterSale, enabled: Boolean, onResume: () -> U
             else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(if (sale.training) R.string.till_open_training else R.string.till_open_sale, sale.number, Format.euro(sale.total)),
-                    fontSize = 20.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                val at = sale.openedAt?.let { if (sale.stale) Format.day(it) + " " + Format.clock(it) else Format.clock(it) }.orEmpty()
-                Text(
-                    listOfNotNull(at.ifEmpty { null }, sale.openedOn?.ifEmpty { null }, sale.openedBy.ifEmpty { null }).joinToString(" · "),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                if (sale.cardPending) Text(stringResource(R.string.till_card_pending), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                if (sale.stale) Text(stringResource(R.string.till_open_stale), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        BoxWithConstraints(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            val goOn: @Composable (Modifier) -> Unit = { modifier ->
+                Text(stringResource(R.string.till_resume), fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = modifier)
             }
-            Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.till_resume), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (maxWidth >= 480.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OpenSaleWords(sale, Modifier.weight(1f))
+                    goOn(Modifier.padding(start = 12.dp))
+                }
+            } else {
+                Column {
+                    OpenSaleWords(sale, Modifier.fillMaxWidth())
+                    goOn(Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun OpenSaleWords(sale: CounterSale, modifier: Modifier) {
+    Column(modifier) {
+        Text(
+            stringResource(if (sale.training) R.string.till_open_training else R.string.till_open_sale, sale.number, Format.euro(sale.total)),
+            fontSize = 19.sp,
+            lineHeight = 25.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        val at = sale.openedAt?.let { if (sale.stale) Format.day(it) + " " + Format.clock(it) else Format.clock(it) }.orEmpty()
+        Text(
+            listOfNotNull(at.ifEmpty { null }, sale.openedOn?.ifEmpty { null }, sale.openedBy.ifEmpty { null }).joinToString(" · "),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        if (sale.cardPending) Text(stringResource(R.string.till_card_pending), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        if (sale.stale) Text(stringResource(R.string.till_open_stale), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
     }
 }

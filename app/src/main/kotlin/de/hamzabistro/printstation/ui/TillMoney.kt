@@ -101,12 +101,13 @@ private fun TillButton(
     tone: TillTone = TillTone.MAIN,
     height: Dp = 64.dp,
     size: TextUnit = 20.sp,
+    maxLines: Int = 2,
 ) {
     val big = modifier.heightIn(min = height)
-    val padding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+    val padding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
     val shape = RoundedCornerShape(32.dp)
     val label: @Composable RowScope.() -> Unit = {
-        Text(text, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(text, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
     }
     when (tone) {
         TillTone.MAIN -> Button(onClick, big, enabled, shape, contentPadding = padding, content = label)
@@ -231,7 +232,7 @@ internal fun TillCashPane(state: TillState, sale: CounterSale, model: TillAction
         state,
         model,
         bottom = {
-            TillButton(stringResource(R.string.cancel_back), model::back, Modifier, !state.busy, TillTone.QUIET, height = 72.dp)
+            TillButton(stringResource(R.string.cancel_back), model::back, Modifier.widthIn(min = 112.dp), !state.busy, TillTone.QUIET, height = 72.dp)
             TillButton(stringResource(R.string.till_cash_paid), model::cashPaid, Modifier.weight(1f), state.cashReady && !state.busy, height = 72.dp, size = 24.sp)
         },
     ) { wide ->
@@ -304,7 +305,7 @@ private fun TillGiven(state: TillState, sale: CounterSale, model: TillActions, h
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (cents in CounterSales.notes(CounterSales.cents(sale.total))) {
                 val text = tillPlain(cents)
-                TillButton("$text €", { give(text) }, Modifier.weight(1f), tone = tone(text), height = height)
+                TillButton("$text €", { give(text) }, Modifier.weight(1f), tone = tone(text), height = height, size = 18.sp, maxLines = 1)
             }
         }
         val delete = stringResource(R.string.till_key_delete)
@@ -376,40 +377,47 @@ internal fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, m
         state,
         model,
         bottom = {
-            TillButton(
-                stringResource(if (view.printing) R.string.till_printing else R.string.till_print),
-                model::printReceipt,
-                Modifier.weight(1f),
-                // Unsigned, there is no receipt: on paper it would look like one.
-                enabled = model.canPrint && !view.printing && sale.orderId != null && receipt != null,
-                tone = TillTone.QUIET,
-                height = 72.dp,
-            )
+            // Unsigned, there is no receipt: on paper it would look like one. Nor without a printer.
+            if (receipt != null && model.canPrint) {
+                TillButton(
+                    stringResource(if (view.printing) R.string.till_printing else R.string.till_print),
+                    model::printReceipt,
+                    Modifier.weight(1f),
+                    enabled = !view.printing && sale.orderId != null,
+                    tone = TillTone.QUIET,
+                    height = 72.dp,
+                )
+            }
             TillButton(stringResource(R.string.till_next), model::next, Modifier.weight(1f), !state.busy, height = 72.dp)
         },
     ) { wide ->
         if (wide && receipt != null) {
             Row(Modifier.fillMaxSize()) {
-                TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillPaid(state, sale, view, model) }
+                TillColumn(Modifier.weight(1f).fillMaxHeight()) {
+                    TillPaid(state, sale, view, 64.sp)
+                    TillReceiptNotes(state, sale, model)
+                }
                 VerticalDivider()
                 TillColumn(Modifier.weight(1f).fillMaxHeight()) { TillCode(receipt, 300.dp) }
             }
         } else {
-            val code = if (maxWidth >= 600.dp) 320.dp else 220.dp
+            val roomy = maxWidth >= 600.dp
             TillColumn(Modifier.fillMaxSize()) {
-                TillPaid(state, sale, view, model)
-                if (receipt != null) TillCode(receipt, code)
+                TillPaid(state, sale, view, if (roomy || receipt == null) 64.sp else 44.sp)
+                // Held out to the customer: before everything that is only for the till.
+                if (receipt != null) TillCode(receipt, if (roomy) 320.dp else 220.dp)
+                TillReceiptNotes(state, sale, model)
             }
         }
     }
 }
 
 @Composable
-private fun TillPaid(state: TillState, sale: CounterSale, view: TillView, model: TillActions) {
+private fun TillPaid(state: TillState, sale: CounterSale, view: TillView, size: TextUnit) {
     val method = stringResource(if (sale.payment == CounterPayment.CARD) R.string.pay_card else R.string.pay_cash)
     val change = state.changeCents?.takeIf { it > 0 && sale.payment == CounterPayment.CASH }
     if (change == null) {
-        TillAmount(stringResource(R.string.till_paid, method), sale.total)
+        TillAmount(stringResource(R.string.till_paid, method), sale.total, size)
     } else {
         // The money is in the till; what is still to do is the change.
         Text(stringResource(R.string.till_paid, method) + " · " + Format.euro(sale.total), fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
@@ -417,18 +425,23 @@ private fun TillPaid(state: TillState, sale: CounterSale, view: TillView, model:
             Text(stringResource(R.string.till_change), fontSize = 20.sp, lineHeight = 26.sp, color = MaterialTheme.colorScheme.primary)
             Text(
                 Format.euro(CounterSales.euros(change)),
-                fontSize = 64.sp,
-                lineHeight = 72.sp,
+                fontSize = size,
+                lineHeight = size * 1.15f,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
             )
         }
     }
-    val receipt = sale.receipt
-    if (receipt == null) TillNote(stringResource(R.string.till_no_receipt)) else TillReceiptState(receipt, state.stoppedWaiting)
     view.printError?.let { TillNote(it, bad = true) }
     if (view.printed) TillNote(stringResource(R.string.till_printed), good = true)
+}
+
+/** The signature, and why nothing can be printed. */
+@Composable
+private fun TillReceiptNotes(state: TillState, sale: CounterSale, model: TillActions) {
+    val receipt = sale.receipt
+    if (receipt == null) TillNote(stringResource(R.string.till_no_receipt)) else TillReceiptState(receipt, state.stoppedWaiting)
     if (!model.canPrint) Text(stringResource(R.string.till_no_printer), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
