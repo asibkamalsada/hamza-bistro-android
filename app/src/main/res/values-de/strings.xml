@@ -966,7 +966,7 @@
     <string name="section_calls">Laden-Telefon</string>
     <string name="report_calls">Anrufe ans Tablet melden</string>
     <string name="report_calls_hint">Für das Telefon, auf dem die Kundschaft anruft. Während es klingelt, gibt es die Nummer ans Bestell-Tablet weiter, wo „Neue Bestellung“ gleich mit ihr beginnt. Der Anruf selbst bleibt, wie er ist. Nach Nummern, die in den Kontakten dieses Telefons stehen, fragt Android nicht: Sie erscheinen nicht auf dem Tablet, unterdrückte Nummern auch nicht.</string>
-    <!-- The call, big; and "Telefon-Bestellung": a phone order step by step, for anybody. -->
+    <!-- The call, big; the address by SMS; an order saved or waiting. -->
     <string name="call_take_order">Bestellung aufnehmen</string>
     <string name="call_ringing">📞 Das Telefon klingelt</string>
     <string name="call_order_sms">📱 SMS an den Anrufer senden</string>

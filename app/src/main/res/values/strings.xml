@@ -967,7 +967,7 @@
     <string name="section_calls">Shop phone</string>
     <string name="report_calls">Report calls to the tablet</string>
     <string name="report_calls_hint">For the phone that customers call. While it rings, it passes the number of the caller to the order tablet, where “New order” starts with it. The call itself is left as it is. Android does not ask about numbers saved in the contacts of this phone, so those do not appear on the tablet, and neither do withheld numbers.</string>
-    <!-- The call, big; and "Telefon-Bestellung": a phone order step by step, for anybody. -->
+    <!-- The call, big; the address by SMS; an order saved or waiting. -->
     <string name="call_take_order">Take the order</string>
     <string name="call_ringing">📞 The phone is ringing</string>
     <string name="call_order_sms">📱 Send the caller an SMS</string>
