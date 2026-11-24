@@ -212,18 +212,6 @@ object CounterSales {
                 }
         )
 
-    /** The same dish with the same choices is one line with more of it. */
-    fun add(lines: List<BasketLine>, line: BasketLine): List<BasketLine> {
-        val same = lines.indexOfFirst { it.dish.id == line.dish.id && it.options.map { o -> o.id } == line.options.map { o -> o.id } }
-        if (same < 0) return lines + line
-        return lines.mapIndexed { i, it -> if (i == same) it.copy(qty = (it.qty + line.qty).coerceAtMost(PhoneOrders.MAX_QTY)) else it }
-    }
-
-    /** [qty] of the line at [index]; none of it takes the line out. */
-    fun setQty(lines: List<BasketLine>, index: Int, qty: Int): List<BasketLine> =
-        if (qty <= 0) lines.filterIndexed { i, _ -> i != index }
-        else lines.mapIndexed { i, it -> if (i == index) it.copy(qty = qty.coerceAtMost(PhoneOrders.MAX_QTY)) else it }
-
     /** What the lines come to by the menu, in cents: shown until the database has answered. */
     fun subtotal(lines: List<BasketLine>): Long = lines.sumOf { cents(it.unitPrice) * it.qty }
 

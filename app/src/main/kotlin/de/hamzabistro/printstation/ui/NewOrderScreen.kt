@@ -4,53 +4,41 @@ import android.app.Application
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
-import android.content.res.Resources
 import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,9 +52,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -75,9 +61,9 @@ import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AddressCheck
 import de.hamzabistro.printstation.core.AddressRequest
-import de.hamzabistro.printstation.core.AddressStatus
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.BasketLine
+import de.hamzabistro.printstation.core.Baskets
 import de.hamzabistro.printstation.core.DraftProblem
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.Fulfilment
@@ -94,8 +80,6 @@ import de.hamzabistro.printstation.core.PhoneOrderQuote
 import de.hamzabistro.printstation.core.PhoneOrders
 import de.hamzabistro.printstation.core.RecentAddress
 import de.hamzabistro.printstation.core.RequestedLink
-import de.hamzabistro.printstation.core.Selection
-import de.hamzabistro.printstation.core.StreetDelivery
 import de.hamzabistro.printstation.core.StreetDirectory
 import de.hamzabistro.printstation.core.StreetMatcher
 import de.hamzabistro.printstation.core.StreetSuggestion
@@ -106,6 +90,7 @@ import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -114,11 +99,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** What "Neue Bestellung" shows. */
 data class NewOrderState(
     val menu: OrderMenu? = null,
     val menuError: String? = null,
+    /** The dishes to show first, the best seller of the day first: ids, as the Kasse has them. */
+    val bestsellers: List<Long> = emptyList(),
     val draft: PhoneOrderDraft = PhoneOrderDraft(),
     /** Leipzig's streets like the one typed; [streetChoices] is what of them is offered. */
     val streets: List<StreetSuggestion> = emptyList(),
@@ -221,7 +209,7 @@ private const val TILE_PX = 320
  * check-address first, as the checkout's does — while the caller is still
  * on the line, and with Leipzig's streets offered as the street is typed.
  */
-class NewOrderViewModel(application: Application) : AndroidViewModel(application) {
+class NewOrderViewModel(application: Application) : AndroidViewModel(application), OrderActions {
     private val app = application
     private val graph = (application as PrintStationApp).graph
 
@@ -242,16 +230,21 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** On every visit, so what sold out since the last order shows; the menu last read stays up meanwhile. */
-    fun loadMenu() {
+    override fun loadMenu() {
         _state.update { it.copy(menuError = null) }
+        // Outlives the screen: what is read late is there for the next visit.
+        val ranking = graph.scope.async { graph.bestsellers.today() }
         viewModelScope.launch {
             val menu = attempt(app, { error -> _state.update { it.copy(menuError = error) } }) { graph.phoneOrders.menu() } ?: return@launch
-            _state.update { it.copy(menu = menu) }
+            // Waited for, so no tile moves once there are some; not for long: the dishes come first.
+            val best = withTimeoutOrNull(BESTSELLERS_WAIT_MS) { ranking.await() } ?: graph.bestsellers.known
+            // Never under a finger that is tapping dishes.
+            _state.update { it.copy(menu = menu, bestsellers = if (it.menu == null || it.draft.lines.isEmpty()) best else it.bestsellers) }
         }
     }
 
     /** Any change to the order: the price shown is no longer it, and is worked out again after a pause in the typing. */
-    fun edit(change: (PhoneOrderDraft) -> PhoneOrderDraft) {
+    override fun edit(change: (PhoneOrderDraft) -> PhoneOrderDraft) {
         val before = _state.value.draft
         _state.update { it.copy(draft = change(it.draft), error = null) }
         val draft = _state.value.draft
@@ -310,32 +303,20 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** An earlier address picked: street, postcode, town and the door note of the last delivery there. */
-    fun pickAddress(address: RecentAddress) =
+    override fun pickAddress(address: RecentAddress) =
         edit { it.copy(street = address.street, postalCode = address.postalCode, city = address.city, addressNote = address.addressNote) }
 
     /** A street picked from the list: its name as the city spells it with the number typed, its postcode, and Leipzig. */
-    fun pickStreet(street: StreetSuggestion) =
+    override fun pickStreet(street: StreetSuggestion) =
         edit { it.copy(street = street.fullStreet, postalCode = street.primaryPostcode ?: it.postalCode, city = PhoneOrders.DEFAULT_CITY) }
 
-    fun add(line: BasketLine) =
-        edit { draft ->
-            // The same dish with the same choices and note is one line with more of it, as in the site's basket.
-            val same = draft.lines.indexOfFirst { it.dish.id == line.dish.id && it.options == line.options && it.note.trim() == line.note.trim() }
-            if (same < 0) draft.copy(lines = draft.lines + line)
-            else
-                draft.copy(
-                    lines = draft.lines.mapIndexed { i, it -> if (i == same) it.copy(qty = (it.qty + line.qty).coerceAtMost(PhoneOrders.MAX_QTY)) else it }
-                )
-        }
+    override fun add(line: BasketLine) = edit { it.copy(lines = Baskets.add(it.lines, line)) }
 
-    fun setQty(index: Int, qty: Int) =
-        edit { draft ->
-            draft.copy(
-                lines =
-                    if (qty <= 0) draft.lines.filterIndexed { i, _ -> i != index }
-                    else draft.lines.mapIndexed { i, it -> if (i == index) it.copy(qty = qty.coerceAtMost(PhoneOrders.MAX_QTY)) else it }
-            )
-        }
+    override fun setQty(index: Int, qty: Int) = edit { it.copy(lines = Baskets.setQty(it.lines, index, qty)) }
+
+    override fun setNote(index: Int, note: String) = edit { it.copy(lines = Baskets.setNote(it.lines, index, note)) }
+
+    override fun clear() = edit { it.copy(lines = emptyList()) }
 
     /** Priced again too: whether the kitchen is full depends on the slot the minutes land in. */
     fun pickMinutes(minutes: Int) {
@@ -344,7 +325,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** The minutes pre-selected for an order for now: the incoming order's rule, the ring from the price or the address check. */
-    fun suggestedMinutes(state: NewOrderState): Int {
+    override fun suggestedMinutes(state: NewOrderState): Int {
         val zone = state.quote?.deliveryZone ?: state.address?.zone
         val busy = graph.shopView.value.hours?.busyMinutes(Instant.now()) ?: 0
         return PhoneOrders.suggestedEta(state.draft, zone, graph.queue.state.value.prep, busy)
@@ -353,7 +334,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     fun ladder(): List<Int> = graph.settings.device.value.etaLadder
 
     /** "Erneut prüfen": asked again at once, basket or none, and priced again with the answer. */
-    fun checkAgain() {
+    override fun checkAgain() {
         _state.update { it.copy(checkedAddress = null, address = null) }
         addressCheck?.cancel()
         addressCheck = viewModelScope.launch { if (checkAddress(_state.value.draft)) reprice(atOnce = true) }
@@ -424,7 +405,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** Saved for real with the price shown, so a price that changed meanwhile is refused (HB409), not charged. */
-    fun save() {
+    override fun save() {
         val now = _state.value
         val quote = now.quote ?: return
         if (!now.priced || now.saving) return
@@ -463,7 +444,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         val now = _state.value
         val unused = now.link?.takeIf { !now.waiting && now.saved == null }
         if (unused != null) graph.scope.launch { runCatching { graph.addressRequests.cancel(unused.id) } }
-        _state.update { NewOrderState(menu = it.menu) }
+        _state.update { NewOrderState(menu = it.menu, bestsellers = it.bestsellers) }
     }
 
     // -------------------------------------------------------------------
@@ -481,13 +462,13 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun goTo(step: CallStep) = _state.update { it.copy(step = step) }
+    override fun goTo(step: CallStep) = _state.update { it.copy(step = step) }
 
     /**
      * "SMS an den Anrufer senden": a link for the number in the form, sent
      * from the phone in the shop; once more when there is one already.
      */
-    fun sendLink() {
+    override fun sendLink() {
         val now = _state.value
         if (now.linking || now.draft.phone.isBlank()) return
         _state.update { it.copy(linking = true, linkError = null) }
@@ -534,7 +515,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** "Speichern und auf die Adresse warten": the basket goes onto the link, for the tablet to place once the address is there. */
-    fun saveWaiting() {
+    override fun saveWaiting() {
         val now = _state.value
         val link = now.link ?: return
         if (now.savingWaiting || now.waiting || now.draft.lines.isEmpty()) return
@@ -560,17 +541,17 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     val photos: StateFlow<Map<String, ImageBitmap?>> = dishPhotos.photos
 
     /** Fetches [url]'s photo once, small enough for a tile; null when there is none to show. */
-    fun loadPhoto(url: String) = dishPhotos.load(url)
+    override fun loadPhoto(url: String) = dishPhotos.load(url)
 
     private companion object {
         const val PRICE_PAUSE_MS = 600L
+        const val BESTSELLERS_WAIT_MS = 1_500L
 
         /** From this many letters on, a street the list has nothing like is said not to be on it. */
         const val UNLISTED_FROM = 4
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewOrderScreen(
     onBack: () -> Unit,
@@ -579,6 +560,7 @@ fun NewOrderScreen(
     model: NewOrderViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    val photos by model.photos.collectAsStateWithLifecycle()
     // Where to, once the order is discarded.
     var discarding by remember { mutableStateOf<(() -> Unit)?>(null) }
     val leave: (() -> Unit) -> Unit = { go ->
@@ -592,74 +574,14 @@ fun NewOrderScreen(
     BackHandler { leave(onBack) }
     leaving.Ask(leave)
     LaunchedEffect(Unit) { model.loadMenu() }
-
-    var picking by remember { mutableStateOf<MenuDish?>(null) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.new_order_title)) },
-                navigationIcon = navigation,
-            )
-        },
-    ) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-            if (maxWidth >= 840.dp) {
-                // The tablet: the menu on the left, the order on the right, as on a till.
-                Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f).fillMaxSize()) { DishList(state, model::loadMenu) { picking = it } }
-                    LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        orderForm(state, model, showMenuButton = false) {}
-                    }
-                }
-            } else {
-                var menuOpen by rememberSaveable { mutableStateOf(false) }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    orderForm(state, model, showMenuButton = true) { menuOpen = true }
-                }
-                if (menuOpen) {
-                    Dialog(onDismissRequest = { menuOpen = false }) {
-                        Card(Modifier.fillMaxWidth().heightIn(max = 640.dp)) {
-                            DishList(state, model::loadMenu) {
-                                menuOpen = false
-                                picking = it
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    picking?.let { dish ->
-        val groups = remember(dish, state.menu) { OptionRules.groups(dish, state.menu?.groups.orEmpty()) }
-        DishDialog(dish, groups, onDismiss = { picking = null }) {
-            model.add(it)
-            picking = null
-        }
-    }
+    NewOrderContent(state, photos, model, model::pickMinutes, model.ladder(), navigation)
 
     discarding?.let { go ->
-        AlertDialog(
-            onDismissRequest = { discarding = null },
-            text = { Text(stringResource(R.string.new_order_discard)) },
-            confirmButton = {
-                Button(onClick = {
-                    discarding = null
-                    model.reset()
-                    go()
-                }) { Text(stringResource(R.string.new_order_discard_yes)) }
-            },
-            dismissButton = { TextButton(onClick = { discarding = null }) { Text(stringResource(R.string.cancel_back)) } },
-        )
+        AskFirst(stringResource(R.string.new_order_discard), null, stringResource(R.string.new_order_discard_yes), onDismiss = { discarding = null }) {
+            discarding = null
+            model.reset()
+            go()
+        }
     }
 
     state.saved?.let { saved ->
@@ -683,226 +605,127 @@ fun NewOrderScreen(
     }
 }
 
-/** The menu by category, with a search: a tap opens the dish's choices. */
+/**
+ * "Neue Bestellung" as it is drawn: the dishes as in the Kasse ([DishMenu]),
+ * on a tablet beside the form, on a phone over it.
+ */
 @Composable
-private fun DishList(state: NewOrderState, onRetry: () -> Unit, onPick: (MenuDish) -> Unit) {
-    val menu = state.menu
-    var query by rememberSaveable { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
-        when {
-            menu != null -> {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.new_order_search)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                )
-                val shown = menu.dishes.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
-                LazyColumn(contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for ((category, dishes) in shown.groupBy { it.category }) {
-                        item(key = "c-$category") {
-                            Text(category, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                        }
-                        items(dishes, key = { "d-${it.id}" }) { dish ->
-                            val orderable = OptionRules.orderable(dish, OptionRules.groups(dish, menu.groups))
-                            DishRow(dish, orderable) { onPick(dish) }
+internal fun NewOrderContent(
+    state: NewOrderState,
+    photos: Map<String, ImageBitmap?>,
+    model: OrderActions,
+    onMinutes: (Int) -> Unit,
+    ladder: List<Int>,
+    navigation: @Composable () -> Unit,
+) {
+    val shop = orderShop(state, photos, model)
+    var picking by remember { mutableStateOf<MenuDish?>(null) }
+    val tap: (MenuDish, List<OptionGroup>) -> Unit = { dish, groups ->
+        // Nothing to choose: in the basket with one tap.
+        if (groups.isEmpty()) model.add(BasketLine(dish, 1)) else picking = dish
+    }
+    Scaffold(topBar = { SlimHeader(stringResource(R.string.new_order_title), navigation, busy = state.saving) }) { padding ->
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            val form: LazyListScope.(Boolean, () -> Unit) -> Unit = { showMenuButton, onMenu ->
+                orderForm(state, model, onMinutes, ladder, showMenuButton, onMenu)
+            }
+            if (maxWidth >= WIDE_FROM) {
+                // The tablet: the menu on the left, the order on the right, as on a till.
+                Row(Modifier.fillMaxSize()) {
+                    DishesOrWhyNot(shop, state.draft.lines, rail = true, tap, Modifier.weight(1f).fillMaxHeight())
+                    VerticalDivider()
+                    LazyColumn(
+                        modifier = Modifier.width(if (maxWidth >= 1000.dp) 432.dp else maxWidth * 0.42f).fillMaxHeight(),
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        form(false) {}
+                    }
+                }
+            } else {
+                var menuOpen by rememberSaveable { mutableStateOf(false) }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    form(true) { menuOpen = true }
+                }
+                if (menuOpen) {
+                    BackHandler { menuOpen = false }
+                    Surface(Modifier.fillMaxSize()) {
+                        Column(Modifier.fillMaxSize()) {
+                            DishesOrWhyNot(shop, state.draft.lines, rail = maxWidth >= 600.dp, tap, Modifier.weight(1f).fillMaxWidth())
+                            HorizontalDivider()
+                            BottomBar { BigButton(stringResource(R.string.call_order_to_basket), onClick = { menuOpen = false }, modifier = Modifier.weight(1f)) }
                         }
                     }
                 }
             }
-            state.menuError != null ->
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.new_order_menu_failed, state.menuError), color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            picking?.let { dish ->
+                val groups = remember(dish, state.menu) { OptionRules.groups(dish, state.menu?.groups.orEmpty()) }
+                DishOptions(dish, groups, notes = true, onDismiss = { picking = null }) {
+                    model.add(it)
+                    picking = null
                 }
-            else ->
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularProgressIndicator()
-                    Text(stringResource(R.string.new_order_menu_loading))
-                }
-        }
-    }
-}
-
-@Composable
-private fun DishRow(dish: MenuDish, orderable: Boolean, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(enabled = orderable, onClick = onClick)) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                dish.name,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-                color = if (orderable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                if (orderable) Format.euro(dish.price) else stringResource(R.string.new_order_sold_out),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (orderable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-/** The site's options dialog: the dish's groups in order, the quantity and the dish's note. */
-@Composable
-private fun DishDialog(dish: MenuDish, groups: List<OptionGroup>, onDismiss: () -> Unit, onAdd: (BasketLine) -> Unit) {
-    var chosen by remember(dish.id) { mutableStateOf(OptionRules.preset(groups)) }
-    var qty by remember(dish.id) { mutableIntStateOf(1) }
-    var note by remember(dish.id) { mutableStateOf("") }
-    val options = OptionRules.chosen(groups, chosen)
-    val valid = OptionRules.invalid(groups, chosen).isEmpty()
-    val line = BasketLine(dish, qty, options, note)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(dish.name) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (group in groups) {
-                    Column {
-                        Text(
-                            "${group.name} · " +
-                                stringResource(if (group.selection == Selection.SINGLE) R.string.new_order_single_hint else R.string.new_order_multiple_hint),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        for (option in group.options) {
-                            val on = option.id in chosen[group.id].orEmpty()
-                            val label = buildString {
-                                append(option.name)
-                                if (option.price > 0) append(" (+").append(Format.euro(option.price)).append(")")
-                                if (!option.available) append(" — ")
-                            }
-                            val toggle = Modifier.fillMaxWidth().let {
-                                if (group.selection == Selection.SINGLE)
-                                    it.selectable(selected = on, enabled = option.available, role = Role.RadioButton) { chosen = OptionRules.toggle(group, chosen, option) }
-                                else it.toggleable(value = on, enabled = option.available, role = Role.Checkbox) { chosen = OptionRules.toggle(group, chosen, option) }
-                            }
-                            Row(toggle, verticalAlignment = Alignment.CenterVertically) {
-                                if (group.selection == Selection.SINGLE) RadioButton(selected = on, onClick = null, enabled = option.available)
-                                else Checkbox(checked = on, onCheckedChange = null, enabled = option.available)
-                                Text(label, modifier = Modifier.padding(start = 4.dp))
-                                if (!option.available) Text(stringResource(R.string.new_order_sold_out), color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.new_order_qty), modifier = Modifier.weight(1f))
-                    Stepper(qty, onChange = { qty = it.coerceIn(1, PhoneOrders.MAX_QTY) })
-                }
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it.take(PhoneOrders.NOTE_MAX) },
-                    label = { Text(stringResource(R.string.new_order_line_note)) },
-                    supportingText = { Text(stringResource(R.string.new_order_line_note_count, note.length, PhoneOrders.NOTE_MAX)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
-        },
-        confirmButton = {
-            Button(onClick = { onAdd(line) }, enabled = valid) { Text(stringResource(R.string.new_order_add, Format.euro(line.unitPrice * qty))) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_back)) } },
-    )
-}
-
-@Composable
-private fun Stepper(value: Int, onChange: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = { onChange(value - 1) }) { Text("−") }
-        Text(value.toString(), style = MaterialTheme.typography.titleMedium, modifier = Modifier.width(40.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        OutlinedButton(onClick = { onChange(value + 1) }) { Text("+") }
+        }
     }
 }
 
 /** The order: how it came in, the basket, who and where, when, the price, and saving it. */
-@OptIn(ExperimentalLayoutApi::class)
-private fun LazyListScope.orderForm(state: NewOrderState, model: NewOrderViewModel, showMenuButton: Boolean, onMenu: () -> Unit) {
+private fun LazyListScope.orderForm(
+    state: NewOrderState,
+    model: OrderActions,
+    onMinutes: (Int) -> Unit,
+    ladder: List<Int>,
+    showMenuButton: Boolean,
+    onMenu: () -> Unit,
+) {
     val draft = state.draft
     item(key = "how") {
-        Section {
-            Text(stringResource(R.string.new_order_source), style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (source in OrderSource.entries) {
-                    FilterChip(
-                        selected = draft.source == source,
-                        onClick = { model.edit { it.copy(source = source) } },
-                        label = { Text(stringResource(if (source == OrderSource.PHONE) R.string.source_phone else R.string.source_counter)) },
-                    )
-                }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val sources = OrderSource.entries
+            Choice(
+                sources.map { stringResource(if (it == OrderSource.PHONE) R.string.source_phone else R.string.source_counter) },
+                sources.indexOf(draft.source),
+                Modifier.fillMaxWidth(),
+            ) { index ->
+                model.edit { it.copy(source = sources[index]) }
             }
-            Text(stringResource(R.string.new_order_fulfilment), style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (fulfilment in Fulfilment.entries) {
-                    FilterChip(
-                        selected = draft.fulfilment == fulfilment,
-                        onClick = { model.edit { it.copy(fulfilment = fulfilment) } },
-                        label = { Text(stringResource(fulfilmentLabel(fulfilment))) },
-                    )
-                }
-            }
+            FulfilmentChoice(state, model, Fulfilment.entries)
         }
     }
 
     item(key = "basket") {
         Section(stringResource(R.string.new_order_basket)) {
-            if (draft.lines.isEmpty()) Text(stringResource(R.string.new_order_basket_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (draft.lines.isEmpty()) Text(stringResource(R.string.till_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             draft.lines.forEachIndexed { index, line ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(line.dish.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                        if (line.options.isNotEmpty()) Text(line.options.joinToString(", ") { it.name }, style = MaterialTheme.typography.bodyMedium)
-                        line.note.trim().takeIf { it.isNotEmpty() }?.let { Text("„$it“", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
-                        Text(Format.euro(line.unitPrice * line.qty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Stepper(line.qty) { model.setQty(index, it) }
-                }
-                HorizontalDivider()
+                if (index > 0) HorizontalDivider()
+                BasketRow(line, { model.setQty(index, it) }, { model.setNote(index, it) }, Modifier)
             }
-            if (showMenuButton) OutlinedButton(onClick = onMenu, modifier = Modifier.fillMaxWidth()) { Text("+ " + stringResource(R.string.new_order_add_dish)) }
+            if (showMenuButton) BigButton("+ " + stringResource(R.string.new_order_add_dish), onClick = onMenu, modifier = Modifier.fillMaxWidth(), tonal = true)
         }
     }
 
     item(key = "customer") {
         Section(stringResource(R.string.new_order_customer)) {
-            OutlinedTextField(
-                value = draft.name,
-                onValueChange = { v -> model.edit { it.copy(name = v) } },
-                label = { Text(stringResource(R.string.new_order_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = draft.phone,
-                onValueChange = { v -> model.edit { it.copy(phone = v) } },
-                label = { Text(stringResource(R.string.new_order_phone)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            ContactFields(state, model)
             if (!draft.fulfilment.needsContact) {
-                Text(stringResource(R.string.new_order_contact_optional), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.new_order_contact_optional), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 
     if (draft.delivery) {
-        item(key = "address") { AddressSection(state, model) }
+        item(key = "address") { Section(stringResource(R.string.new_order_address)) { AddressFields(state, model, help = true) } }
     }
 
-    item(key = "time") { TimeSection(state, model) }
+    item(key = "time") { TimeSection(state, model, onMinutes, ladder) }
 
     item(key = "notes") {
         Section {
-            OutlinedTextField(
-                value = draft.notes,
-                onValueChange = { v -> model.edit { it.copy(notes = v) } },
-                label = { Text(stringResource(R.string.new_order_kitchen_note)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            FormField(draft.notes, { v -> model.edit { it.copy(notes = v) } }, stringResource(R.string.new_order_kitchen_note), singleLine = false)
             if (draft.delivery) {
                 Row(
                     Modifier.fillMaxWidth().toggleable(value = draft.waiveFees, role = Role.Checkbox) { on -> model.edit { it.copy(waiveFees = on) } },
@@ -923,181 +746,29 @@ private fun LazyListScope.orderForm(state: NewOrderState, model: NewOrderViewMod
 
 @Composable
 private fun Section(title: String? = null, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            title?.let { Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            content()
-        }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider()
+        title?.let { Text(it, style = LINE_NAME) }
+        content()
     }
 }
-
-private fun fulfilmentLabel(fulfilment: Fulfilment): Int =
-    when (fulfilment) {
-        Fulfilment.PICKUP -> R.string.fulfilment_pickup
-        Fulfilment.DINE_IN -> R.string.fulfilment_dine_in
-        Fulfilment.DELIVERY -> R.string.fulfilment_delivery
-    }
-
-@Composable
-private fun AddressSection(state: NewOrderState, model: NewOrderViewModel) {
-    val draft = state.draft
-    Section(stringResource(R.string.new_order_address)) {
-        // First: for a caller who has ordered before, one tap is the whole address.
-        if (state.recentChoices.isNotEmpty()) {
-            Text(stringResource(R.string.new_order_recent_addresses), style = MaterialTheme.typography.labelLarge)
-            for (recent in state.recentChoices) {
-                OutlinedCard(Modifier.fillMaxWidth().clickable { model.pickAddress(recent) }) {
-                    Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                        Text(recent.line, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                        if (recent.addressNote.isNotBlank()) {
-                            Text(recent.addressNote, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-        OutlinedTextField(
-            value = draft.street,
-            onValueChange = { v -> model.edit { it.copy(street = v) } },
-            label = { Text(stringResource(R.string.new_order_street)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        // Under the field they are for, above the postcode and the town they fill in.
-        StreetChoices(state.streetChoices, model::pickStreet)
-        if (state.streetUnlisted) {
-            Text(stringResource(R.string.new_order_street_unlisted), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = draft.postalCode,
-                onValueChange = { v -> model.edit { it.copy(postalCode = v.filter(Char::isDigit).take(5)) } },
-                label = { Text(stringResource(R.string.new_order_postal_code)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = draft.city,
-                onValueChange = { v -> model.edit { it.copy(city = v) } },
-                label = { Text(stringResource(R.string.new_order_city)) },
-                singleLine = true,
-                modifier = Modifier.weight(2f),
-            )
-        }
-        OutlinedTextField(
-            value = draft.addressNote,
-            onValueChange = { v -> model.edit { it.copy(addressNote = v) } },
-            label = { Text(stringResource(R.string.new_order_door_note)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        val address = state.address
-        when {
-            state.checking -> Text(stringResource(R.string.new_order_checking_address), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            state.addressError != null -> {
-                Text(stringResource(R.string.new_order_address_failed, state.addressError), color = MaterialTheme.colorScheme.error)
-                OutlinedButton(onClick = model::checkAgain) { Text(stringResource(R.string.new_order_check_again)) }
-            }
-            // Not the answer for the address typed before: this one is asked about in a moment.
-            address != null && state.addressChecked -> AddressLine(address, model)
-        }
-    }
-}
-
-/**
- * Leipzig's streets like the one typed. A tap takes the name as the city
- * spells it, its postcode and the town, so nobody spells "Zschochersche"
- * and no caller is asked for a postcode.
- */
-@Composable
-private fun StreetChoices(streets: List<StreetSuggestion>, onPick: (StreetSuggestion) -> Unit) {
-    val resources = LocalResources.current
-    for (street in streets) {
-        // Outlined: the section is a card itself, and a card on a card does not show.
-        OutlinedCard(Modifier.fillMaxWidth().clickable { onPick(street) }) {
-            Row(
-                Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(street.fullStreet, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                    // With a house the list has: its own postcode, and the ring it is in.
-                    Text(
-                        listOfNotNull(street.postcodes.joinToString(", "), street.entry.district, street.ringZone?.let { ringName(resources, it) })
-                            .joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Said, and no more than that: the number may be misheard, or the house new.
-                    if (street.houseUnlisted) {
-                        Text(
-                            stringResource(R.string.new_order_house_unlisted, street.houseNumber.orEmpty()),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = toneColor(Tone.SOON),
-                        )
-                    }
-                }
-                // From the list, so only roughly: check-address has the last word on the door.
-                when (street.delivery) {
-                    StreetDelivery.OUTSIDE ->
-                        Text(stringResource(R.string.new_order_street_outside), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                    StreetDelivery.PARTLY -> Text(stringResource(R.string.new_order_street_partly), color = toneColor(Tone.SOON))
-                    StreetDelivery.INSIDE -> Unit
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddressLine(address: AddressCheck, model: NewOrderViewModel) {
-    val resources = LocalResources.current
-    when {
-        address.outside -> Text(stringResource(R.string.new_order_address_outside), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-        address.status == AddressStatus.VERIFIED ->
-            Text(stringResource(R.string.new_order_address_ok, ringName(resources, address.zone)), color = MaterialTheme.colorScheme.primary)
-        address.status == AddressStatus.UNVERIFIED -> Text(stringResource(R.string.new_order_address_unverified), color = toneColor(Tone.SOON))
-        else -> {
-            Text(stringResource(R.string.new_order_address_unchecked), color = toneColor(Tone.SOON))
-            OutlinedButton(onClick = model::checkAgain) { Text(stringResource(R.string.new_order_check_again)) }
-        }
-    }
-    address.suggestedPostalCode?.let { code ->
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.new_order_address_suggest, code), modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { model.edit { it.copy(postalCode = code) } }) { Text(stringResource(R.string.new_order_address_use, code)) }
-        }
-    }
-}
-
-/** The ring's name as the report says it, or the ring's own word. */
-private fun ringName(resources: Resources, zone: String?): String =
-    when (zone) {
-        "inner" -> resources.getString(R.string.report_ring_inner)
-        "near" -> resources.getString(R.string.report_ring_near)
-        "far" -> resources.getString(R.string.report_ring_far)
-        "edge" -> resources.getString(R.string.report_ring_edge)
-        else -> zone.orEmpty()
-    }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TimeSection(state: NewOrderState, model: NewOrderViewModel) {
+private fun TimeSection(state: NewOrderState, model: OrderActions, onMinutes: (Int) -> Unit, ladder: List<Int>) {
     val context = LocalContext.current
     val draft = state.draft
     Section(stringResource(R.string.new_order_time)) {
         Column {
             Row(
-                Modifier.fillMaxWidth().selectable(selected = draft.scheduledFor == null, role = Role.RadioButton) { model.edit { it.copy(scheduledFor = null) } },
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = draft.scheduledFor == null, role = Role.RadioButton) { model.edit { it.copy(scheduledFor = null) } },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = draft.scheduledFor == null, onClick = null)
                 Text(stringResource(R.string.new_order_asap), modifier = Modifier.padding(start = 8.dp))
             }
             Row(
-                Modifier.fillMaxWidth().selectable(selected = draft.scheduledFor != null, role = Role.RadioButton) {
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = draft.scheduledFor != null, role = Role.RadioButton) {
                     pickDateTime(context, draft.scheduledFor) { at -> model.edit { it.copy(scheduledFor = at) } }
                 },
                 verticalAlignment = Alignment.CenterVertically,
@@ -1120,10 +791,10 @@ private fun TimeSection(state: NewOrderState, model: NewOrderViewModel) {
             val picked = state.minutes ?: suggested
             Text(stringResource(R.string.new_order_minutes), style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (minutes in Eta.options(suggested, model.ladder())) {
+                for (minutes in Eta.options(suggested, ladder)) {
                     FilterChip(
                         selected = minutes == picked,
-                        onClick = { model.pickMinutes(minutes) },
+                        onClick = { onMinutes(minutes) },
                         label = { Text(stringResource(R.string.eta_button, minutes)) },
                     )
                 }
@@ -1160,70 +831,27 @@ private fun pickDateTime(context: Context, current: Instant?, onPicked: (Instant
 }
 
 @Composable
-private fun PriceSection(state: NewOrderState, model: NewOrderViewModel) {
+private fun PriceSection(state: NewOrderState, model: OrderActions) {
     val resources = LocalResources.current
-    val draft = state.draft
+    val problems = PhoneOrders.problems(state.draft, Instant.now())
+    val quote = state.quote
     Section(stringResource(R.string.new_order_price)) {
-        val problems = PhoneOrders.problems(draft, Instant.now())
-        val quote = state.quote
-        when {
-            problems.isNotEmpty() ->
-                Text(
-                    stringResource(R.string.new_order_missing, problems.joinToString(", ") { resources.getString(problemLabel(it)) }),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            state.quoting || state.checking ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator(Modifier.width(20.dp))
-                    Text(stringResource(R.string.new_order_pricing))
-                }
-            quote != null && state.priced -> Breakdown(quote)
-            state.error == null -> Text(stringResource(R.string.new_order_price_pending), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold) }
-        Spacer(Modifier.padding(top = 4.dp))
-        Button(
-            onClick = model::save,
-            enabled = state.priced && !state.saving && !state.quoting && problems.isEmpty(),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        if (problems.isNotEmpty()) {
             Text(
-                when {
-                    state.saving -> stringResource(R.string.new_order_saving)
-                    quote != null && state.priced -> stringResource(R.string.new_order_save, Format.euro(quote.total))
-                    else -> stringResource(R.string.new_order_save, "—")
-                }
+                stringResource(R.string.new_order_missing, problems.joinToString(", ") { resources.getString(problemLabel(it)) }),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        } else {
+            PriceLines(state)
         }
-    }
-}
-
-@Composable
-private fun Breakdown(quote: PhoneOrderQuote) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        PriceLine(stringResource(R.string.new_order_subtotal), quote.subtotal)
-        if (quote.dealDiscount > 0) PriceLine(stringResource(R.string.new_order_deal), -quote.dealDiscount, note = true)
-        if (quote.pickupDiscount > 0) PriceLine(stringResource(R.string.new_order_pickup_discount), -quote.pickupDiscount)
-        if (quote.deliveryFee > 0) PriceLine(stringResource(R.string.new_order_delivery_fee), quote.deliveryFee)
-        if (quote.smallOrderFee > 0) PriceLine(stringResource(R.string.new_order_small_fee), quote.smallOrderFee)
-        if (quote.waived > 0) PriceLine(stringResource(R.string.new_order_waived), -quote.waived, note = true)
-        HorizontalDivider()
-        PriceLine(stringResource(R.string.new_order_total), quote.total, bold = true)
-        if (quote.deposits > 0) {
-            Text(stringResource(R.string.new_order_deposits, Format.euro(quote.deposits)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (quote.overCapacity) {
-            Text(stringResource(R.string.new_order_over_capacity), color = toneColor(Tone.SOON), fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-/** [note]: already inside the line above (the deal is in the dishes' prices; the waiver is not charged), shown for information. */
-@Composable
-private fun PriceLine(label: String, amount: Double, bold: Boolean = false, note: Boolean = false) {
-    Row {
-        Text(label, modifier = Modifier.weight(1f), fontWeight = if (bold) FontWeight.Bold else null, color = if (note) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-        Text(Format.euro(amount), fontWeight = if (bold) FontWeight.Bold else null, color = if (note) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+        state.error?.let { StatusLine(it, bad = true) }
+        GoButton(
+            stringResource(if (state.saving) R.string.new_order_saving else R.string.call_order_save),
+            if (quote != null && state.priced) Format.euro(quote.total) else "—",
+            enabled = state.priced && !state.saving && !state.quoting && problems.isEmpty(),
+            onClick = model::save,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

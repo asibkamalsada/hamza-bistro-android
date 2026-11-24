@@ -61,13 +61,13 @@ class CounterSaleTest {
 
     @Test
     fun `the same dish with the same choices is one line`() {
-        var lines = CounterSales.add(emptyList(), BasketLine(doener, 1, listOf(halloumi)))
-        lines = CounterSales.add(lines, BasketLine(doener, 2, listOf(halloumi)))
-        lines = CounterSales.add(lines, BasketLine(doener, 1, listOf(lamb)))
+        var lines = Baskets.add(emptyList(), BasketLine(doener, 1, listOf(halloumi)))
+        lines = Baskets.add(lines, BasketLine(doener, 2, listOf(halloumi)))
+        lines = Baskets.add(lines, BasketLine(doener, 1, listOf(lamb)))
         assertEquals(listOf(3, 1), lines.map { it.qty })
-        assertEquals(99, CounterSales.add(lines, BasketLine(doener, 99, listOf(halloumi)))[0].qty)
-        assertEquals(listOf(1), CounterSales.setQty(lines, 0, 0).map { it.qty })
-        assertEquals(listOf(3, 5), CounterSales.setQty(lines, 1, 5).map { it.qty })
+        assertEquals(99, Baskets.add(lines, BasketLine(doener, 99, listOf(halloumi)))[0].qty)
+        assertEquals(listOf(1), Baskets.setQty(lines, 0, 0).map { it.qty })
+        assertEquals(listOf(3, 5), Baskets.setQty(lines, 1, 5).map { it.qty })
         assertEquals(3 * 900L + 950L, CounterSales.subtotal(lines))
     }
 

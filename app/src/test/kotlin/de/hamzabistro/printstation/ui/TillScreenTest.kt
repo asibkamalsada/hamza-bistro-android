@@ -64,7 +64,7 @@ class TillScreenTest {
         till.add(BasketLine(cola, 1))
         open()
         compose.onNodeWithText("Döner").assertIsDisplayed()
-        compose.onNodeWithTag(TILL_RING_UP_TAG).assertIsDisplayed().assertIsEnabled().assertTextContains(Format.euro(17.5))
+        compose.onNodeWithTag(BASKET_GO_TAG).assertIsDisplayed().assertIsEnabled().assertTextContains(Format.euro(17.5))
         compose.onNodeWithText("Eat here").performClick()
         compose.waitForIdle()
         assertTrue(till.state.value.dineIn)
@@ -79,7 +79,7 @@ class TillScreenTest {
         compose.onNodeWithText("Empty the basket").performClick()
         compose.waitForIdle()
         assertTrue(till.state.value.lines.isEmpty())
-        compose.onNodeWithTag(TILL_RING_UP_TAG).assertIsNotEnabled()
+        compose.onNodeWithTag(BASKET_GO_TAG).assertIsNotEnabled()
     }
 
     @Test
@@ -88,7 +88,7 @@ class TillScreenTest {
         open()
         till.dismissProblem()
         compose.waitForIdle()
-        compose.onNodeWithTag(TILL_RING_UP_TAG).performClick()
+        compose.onNodeWithTag(BASKET_GO_TAG).performClick()
         compose.waitUntil(timeoutMillis = 10_000) {
             // The answer comes back to the main thread, which this test is on.
             shadowOf(Looper.getMainLooper()).idle()
@@ -108,7 +108,7 @@ class TillScreenTest {
         compose.onNodeWithText("2 dishes").assertIsDisplayed().assertTextContains(Format.euro(15.0))
         compose.onNodeWithText("Basket ➜").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag(TILL_RING_UP_TAG).assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag(BASKET_GO_TAG).assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithText("Takeaway").assertIsDisplayed()
     }
 

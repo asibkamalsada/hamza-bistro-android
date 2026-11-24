@@ -75,11 +75,11 @@ class TillLayoutTest(private val device: TillDevice) {
     fun fiveLinesWithTheirQuantitiesAndEightDishesShowAtOnce() {
         if (device.phone) return
         show(f.basket(5))
-        assertWhole(hasTestTag(TILL_RING_UP_TAG), "Kassieren")
-        val lines = nodes(hasTestTag(TILL_LINE_TAG)).filter { it.whole() }
+        assertWhole(hasTestTag(BASKET_GO_TAG), "Kassieren")
+        val lines = nodes(hasTestTag(BASKET_LINE_TAG)).filter { it.whole() }
         val more = nodes(hasContentDescription("eins mehr", substring = true)).filter { it.whole() }
         val less = nodes(hasContentDescription("eins weniger", substring = true)).filter { it.whole() }
-        val tiles = nodes(hasTestTag(TILL_TILE_TAG)).filter { it.whole() }
+        val tiles = nodes(hasTestTag(DISH_TILE_TAG)).filter { it.whole() }
         assertEquals("lines on $device", 5, lines.size)
         assertEquals("plus on $device", 5, more.size)
         assertEquals("minus on $device", 5, less.size)
@@ -88,7 +88,7 @@ class TillLayoutTest(private val device: TillDevice) {
 
     /** The names of the dishes in sight, in reading order. */
     private fun tiles(): List<String> =
-        nodes(hasTestTag(TILL_TILE_TAG)).filter { it.whole() }.sortedWith(compareBy({ it.boundsInRoot.top }, { it.boundsInRoot.left })).map {
+        nodes(hasTestTag(DISH_TILE_TAG)).filter { it.whole() }.sortedWith(compareBy({ it.boundsInRoot.top }, { it.boundsInRoot.left })).map {
             it.config[SemanticsProperties.Text].first().text
         }
 
@@ -100,7 +100,7 @@ class TillLayoutTest(private val device: TillDevice) {
         assertEquals("on $device", f.bestsellers.take(first.size), first.take(f.bestsellers.size))
 
         // In its category a dish is where it always was.
-        compose.onAllNodes(hasText("Döner") and hasClickAction() and !hasTestTag(TILL_TILE_TAG)).onFirst().performClick()
+        compose.onAllNodes(hasText("Döner") and hasClickAction() and !hasTestTag(DISH_TILE_TAG)).onFirst().performClick()
         compose.waitForIdle()
         val doener = f.menu.dishes.filter { it.category == "Döner" }.map { it.name }
         val inCategory = tiles()
@@ -115,8 +115,8 @@ class TillLayoutTest(private val device: TillDevice) {
     @Test
     fun aLineSaysWhereTheBestsellersEnd() {
         show(f.empty, f.ranked)
-        compose.onNode(hasScrollToNodeAction() and hasAnyDescendant(hasTestTag(TILL_TILE_TAG))).performScrollToNode(hasTestTag(TILL_BESTSELLERS_END_TAG))
-        assertEquals("on $device", 1, nodes(hasTestTag(TILL_BESTSELLERS_END_TAG)).size)
+        compose.onNode(hasScrollToNodeAction() and hasAnyDescendant(hasTestTag(DISH_TILE_TAG))).performScrollToNode(hasTestTag(BESTSELLERS_END_TAG))
+        assertEquals("on $device", 1, nodes(hasTestTag(BESTSELLERS_END_TAG)).size)
     }
 
     @Test
@@ -133,7 +133,7 @@ class TillLayoutTest(private val device: TillDevice) {
             compose.onNodeWithText("Zur Kasse", substring = true).performClick()
             compose.waitForIdle()
         }
-        assertWhole(hasTestTag(TILL_RING_UP_TAG), "Kassieren")
+        assertWhole(hasTestTag(BASKET_GO_TAG), "Kassieren")
         assertWhole(hasText("Mitnehmen"), "Mitnehmen")
         // And that there is more of it than shows is said.
         assertWhole(hasText("weitere", substring = true), "what is further down")

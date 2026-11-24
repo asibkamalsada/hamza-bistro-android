@@ -4,28 +4,17 @@ import android.app.Application
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -303,9 +292,6 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
     }
 }
 
-/** From this width on there is room beside the thing somebody works on: the basket, the sale's lines, the keys. */
-internal val TILL_WIDE_FROM = 840.dp
-
 /**
  * "Kasse": a sale at the counter. Tap dishes, "Kassieren", Bar or Karte, the
  * receipt. See [Till] for what is recorded when, and where.
@@ -329,9 +315,8 @@ fun TillScreen(
 /**
  * The Kasse as it is drawn: what it shows, and what its taps do.
  *
- * Not [Zoomed] like the call screens: at a till, how much is on the screen at
- * once counts as much as how big it is. Its own text is set bigger instead,
- * and grows with the device's font size.
+ * How much is on the screen at once counts as much as how big it is: the text
+ * is set bigger than the rest of the app's, and grows with the device's font size.
  */
 @Composable
 internal fun TillContent(
@@ -368,7 +353,7 @@ internal fun TillContent(
     }
 
     if (aborting && sale != null && state.step == TillStep.PAY) {
-        TillAsk(
+        AskFirst(
             title = stringResource(R.string.till_abort_title, sale.number),
             text = stringResource(R.string.till_abort_text),
             yes = stringResource(R.string.till_abort),
@@ -380,65 +365,38 @@ internal fun TillContent(
     }
 }
 
-/**
- * One slim bar: ☰, where this is, and — in the bar's own colour, so it
- * cannot be missed and takes no room — that it is only training, and why.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** The bar, in its own colour while it is only training, and why. */
 @Composable
 private fun TillHeader(state: TillState, model: TillActions, navigation: @Composable () -> Unit) {
     val sale = state.sale
     val training = state.training || sale?.training == true
-    val strip =
-        when {
-            !training -> null
-            state.off -> stringResource(R.string.till_off_strip)
-            else -> stringResource(R.string.till_training_strip)
-        }
-    Surface(
-        color = if (training) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface,
-        contentColor = if (training) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface,
-    ) {
-        BoxWithConstraints(Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
-            val wide = maxWidth >= TILL_WIDE_FROM
-            Column {
-                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Where the other screens' bars have it.
-                    Box(Modifier.padding(start = 4.dp)) { navigation() }
-                    Text(
-                        if (sale == null) stringResource(R.string.till_title) else stringResource(R.string.till_sale, sale.number),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        modifier = if (wide) Modifier else Modifier.weight(1f),
-                    )
-                    if (wide) TillStrip(strip.orEmpty(), Modifier.weight(1f).padding(horizontal = 16.dp))
-                    // Off, there is nothing to choose: the bar says why.
-                    if (state.step == TillStep.DISHES && !state.off && state.available != false) {
-                        FilterChip(
-                            selected = state.training,
-                            onClick = { model.setTraining(!state.training) },
-                            label = {
-                                Text(
-                                    stringResource(if (state.training) R.string.till_training_end else R.string.till_training),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            },
+    SlimHeader(
+        if (sale == null) stringResource(R.string.till_title) else stringResource(R.string.till_sale, sale.number),
+        navigation,
+        note =
+            when {
+                !training -> null
+                state.off -> stringResource(R.string.till_off_strip)
+                else -> stringResource(R.string.till_training_strip)
+            },
+        tint = training,
+        busy = state.busy,
+        action = {
+            // Off, there is nothing to choose: the bar says why.
+            if (state.step == TillStep.DISHES && !state.off && state.available != false) {
+                FilterChip(
+                    selected = state.training,
+                    onClick = { model.setTraining(!state.training) },
+                    label = {
+                        Text(
+                            stringResource(if (state.training) R.string.till_training_end else R.string.till_training),
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                    }
-                }
-                if (!wide && strip != null) TillStrip(strip, Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
-                // The same height at rest, so nothing moves under a finger.
-                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                else HorizontalDivider(thickness = 4.dp, color = MaterialTheme.colorScheme.surface)
+                    },
+                )
             }
-        }
-    }
-}
-
-@Composable
-private fun TillStrip(text: String, modifier: Modifier) {
-    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = modifier)
+        },
+    )
 }
 
 @Composable
@@ -471,30 +429,6 @@ internal fun TillProblemCard(problem: TillProblem, onDismiss: () -> Unit, modifi
             )
         }
     }
-}
-
-/** Asked before something that cannot be taken back. */
-@Composable
-internal fun TillAsk(title: String, text: String?, yes: String, onDismiss: () -> Unit, onYes: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = text?.let { { Text(it, style = MaterialTheme.typography.titleMedium) } },
-        confirmButton = {
-            Button(
-                onClick = onYes,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-                modifier = Modifier.heightIn(min = 52.dp),
-            ) {
-                Text(yes, style = MaterialTheme.typography.titleMedium)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 52.dp)) {
-                Text(stringResource(R.string.cancel_back), style = MaterialTheme.typography.titleMedium)
-            }
-        },
-    )
 }
 
 /** What went wrong, for the person at the counter. */

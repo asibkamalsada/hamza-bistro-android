@@ -5,35 +5,22 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,49 +28,33 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.AppGraph
@@ -92,21 +63,11 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AddressRequest
 import de.hamzabistro.printstation.core.AddressRequests
 import de.hamzabistro.printstation.core.AddressRequestsState
-import de.hamzabistro.printstation.core.AddressStatus
-import de.hamzabistro.printstation.core.BasketLine
 import de.hamzabistro.printstation.core.Fulfilment
-import de.hamzabistro.printstation.core.MenuDish
-import de.hamzabistro.printstation.core.OptionGroup
-import de.hamzabistro.printstation.core.OptionRules
-import de.hamzabistro.printstation.core.OrderMenu
 import de.hamzabistro.printstation.core.PhoneNumbers
 import de.hamzabistro.printstation.core.PhoneOrderError
-import de.hamzabistro.printstation.core.PhoneOrderQuote
 import de.hamzabistro.printstation.core.PhoneOrders
-import de.hamzabistro.printstation.core.Selection
 import de.hamzabistro.printstation.core.SmsState
-import de.hamzabistro.printstation.core.StreetDelivery
-import de.hamzabistro.printstation.core.StreetSuggestion
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
@@ -114,36 +75,22 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * How much bigger the call screens are than the rest of the app, on a
- * tablet: the person taking the call may not read well, nor see well, and
- * taps with a finger that has just been holding the phone.
- */
-private const val ZOOM = 1.3f
-
-/** Up to this on its shorter side, a screen is a phone's, with no room to spare: drawn as it is. */
-private val ZOOM_NONE_UP_TO = 440.dp
-
-/** From this on its shorter side, a screen is a tablet's: drawn [ZOOM] times as big. */
-private val ZOOM_FULL_FROM = 640.dp
-
 /** The steps with a number on them: name, address, dishes, check. */
 private const val STEPS = 4
 
 /**
- * "Telefon-Bestellung": a phone order taken one screen at a time, for
- * anybody — the name; the address, typed with Leipzig's streets offered, or
- * texted for by SMS for the caller to type themselves; the dishes, as big
- * tiles with their photos; the total; saved. The same order as "Neue
- * Bestellung" ([NewOrderViewModel]), with the rest of its choices left to
- * their defaults: a phone delivery, as soon as possible, at the minutes an
- * incoming order would be offered.
+ * "Telefon-Bestellung": a phone order taken one screen at a time — the name;
+ * the address, typed with Leipzig's streets offered, or texted for by SMS for
+ * the caller to type themselves; the dishes, tapped as in the Kasse
+ * ([DishesPane]); the total; saved. The same order as "Neue Bestellung"
+ * ([NewOrderViewModel]), with the rest of its choices left to their defaults:
+ * a phone delivery, as soon as possible, at the minutes an incoming order
+ * would be offered.
  *
  * With the address coming by SMS, the order is saved to wait for it, and
  * the tablet puts it into the kitchen by itself the moment the caller has
  * typed it — during the call or after it ([de.hamzabistro.printstation.core.AddressRequestPlacer]).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CallOrderScreen(
     onBack: () -> Unit,
@@ -154,6 +101,7 @@ fun CallOrderScreen(
 ) {
     val graph = (LocalContext.current.applicationContext as PrintStationApp).graph
     val state by model.state.collectAsStateWithLifecycle()
+    val photos by model.photos.collectAsStateWithLifecycle()
     val links by graph.liveAddressRequests.collectAsStateWithLifecycle(AddressRequestsState())
     val link = links.byId(state.link?.id)
     LaunchedEffect(link) { model.linkRead(link) }
@@ -184,149 +132,84 @@ fun CallOrderScreen(
             CallStep.CONFIRM -> model.goTo(CallStep.DISHES)
         }
     }
+    val actions = remember(graph) { LinkActions(graph) }
+    CallOrderContent(state, photos, link, model, actions::retry, actions::resend, onFullForm, onDone = { finish(onBack) }, navigation)
 
-    Zoomed {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.call_order_title), fontWeight = FontWeight.Bold) },
-                    navigationIcon = navigation,
-                    actions = {
-                        // For whoever wants the time, the source or the fee waiver: the same order in the full form.
-                        if (state.step != CallStep.DONE) TextButton(onClick = onFullForm) { Text(stringResource(R.string.call_order_full_form)) }
-                    },
-                )
-            },
-        ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                when (state.step) {
-                    CallStep.NAME -> NameStep(state, model)
-                    CallStep.ADDRESS -> AddressStep(state, model, link)
-                    CallStep.DISHES -> DishesStep(state, model)
-                    CallStep.CONFIRM -> ConfirmStep(state, model, link)
-                    CallStep.DONE -> DoneStep(state, link, remember(graph) { LinkActions(graph) }, onDone = { finish(onBack) })
-                }
+    discarding?.let { go ->
+        AskFirst(stringResource(R.string.new_order_discard), null, stringResource(R.string.new_order_discard_yes), onDismiss = { discarding = null }) {
+            discarding = null
+            finish(go)
+        }
+    }
+}
+
+/** Telefon-Bestellung as it is drawn: what it shows, and what its taps do. */
+@Composable
+internal fun CallOrderContent(
+    state: NewOrderState,
+    photos: Map<String, ImageBitmap?>,
+    link: AddressRequest?,
+    model: OrderActions,
+    onRetry: (String) -> Unit,
+    onResend: (String) -> Unit,
+    onFullForm: () -> Unit,
+    onDone: () -> Unit,
+    navigation: @Composable () -> Unit,
+) {
+    val step =
+        when (state.step) {
+            CallStep.NAME -> stringResource(R.string.call_order_name_title)
+            CallStep.ADDRESS -> stringResource(R.string.call_order_address_title)
+            CallStep.DISHES -> stringResource(R.string.call_order_dishes_title)
+            CallStep.CONFIRM -> stringResource(R.string.call_order_confirm_title)
+            CallStep.DONE -> null
+        }
+    Scaffold(
+        topBar = {
+            SlimHeader(
+                stringResource(R.string.call_order),
+                navigation,
+                note = step?.let { stringResource(R.string.call_order_step, state.step.ordinal + 1, STEPS) + " · " + it },
+                busy = state.saving || state.savingWaiting,
+                // For whoever wants the time, the source or the fee waiver: the same order in the full form.
+                action = {
+                    if (state.step != CallStep.DONE) {
+                        TextButton(onClick = onFullForm, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.call_order_full_form), style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when (state.step) {
+                CallStep.NAME -> NameStep(state, model)
+                CallStep.ADDRESS -> AddressStep(state, model, link)
+                CallStep.DISHES -> DishesStep(state, photos, model)
+                CallStep.CONFIRM -> ConfirmStep(state, model, link)
+                CallStep.DONE -> DoneStep(state, link, onRetry, onResend, onDone)
             }
         }
     }
-
-    discarding?.let { go ->
-        AlertDialog(
-            onDismissRequest = { discarding = null },
-            text = { Text(stringResource(R.string.new_order_discard), style = MaterialTheme.typography.titleLarge) },
-            confirmButton = {
-                Button(onClick = {
-                    discarding = null
-                    finish(go)
-                }) { Text(stringResource(R.string.new_order_discard_yes)) }
-            },
-            dismissButton = { TextButton(onClick = { discarding = null }) { Text(stringResource(R.string.cancel_back)) } },
-        )
-    }
 }
 
-/**
- * Everything inside drawn bigger, text and touch targets alike, as far as
- * the screen has room for it ([zoomFor]): a phone's is drawn as it is, or
- * its button bar and the dishes no longer fit.
- */
+/** One step: what belongs to it, in one column or, where there is room, two; its buttons along the bottom, always in reach. */
 @Composable
-internal fun Zoomed(content: @Composable () -> Unit) {
-    BoxWithConstraints {
-        val density = LocalDensity.current
-        val zoom = zoomFor(minOf(maxWidth, maxHeight))
-        CompositionLocalProvider(LocalDensity provides Density(density.density * zoom, density.fontScale), content = content)
-    }
-}
-
-/** [ZOOM] from [ZOOM_FULL_FROM] on the screen's shorter side, none up to [ZOOM_NONE_UP_TO], and in between, in between. */
-internal fun zoomFor(shorterSide: Dp): Float {
-    val share = ((shorterSide - ZOOM_NONE_UP_TO) / (ZOOM_FULL_FROM - ZOOM_NONE_UP_TO)).coerceIn(0f, 1f)
-    return 1f + (ZOOM - 1f) * share
-}
-
-/** One step: which of how many, what it asks, its fields; the buttons along the bottom, always in reach. */
-@Composable
-private fun StepPage(number: Int, title: String, bottom: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
+private fun StepPage(bottom: @Composable RowScope.() -> Unit, content: @Composable (wide: Boolean) -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            StepHeading(number, title)
-            content()
-        }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) { content(maxWidth >= WIDE_FROM) }
         HorizontalDivider()
         BottomBar(bottom)
     }
 }
 
-/** The buttons along the bottom: "Zurück" as wide as it needs, the step's own button the rest. */
 @Composable
-internal fun BottomBar(content: @Composable RowScope.() -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+private fun StepColumn(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
-    )
-}
-
-@Composable
-private fun StepHeading(number: Int, title: String) {
-    Column {
-        Text(stringResource(R.string.call_order_step, number, STEPS), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-    }
-}
-
-/** A button big enough to hit without looking twice. */
-@Composable
-internal fun BigButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, outlined: Boolean = false, tonal: Boolean = false) {
-    val label: @Composable RowScope.() -> Unit = {
-        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-    val big = modifier.heightIn(min = 64.dp)
-    val padding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-    when {
-        outlined -> OutlinedButton(onClick = onClick, modifier = big, enabled = enabled, contentPadding = padding, content = label)
-        tonal -> FilledTonalButton(onClick = onClick, modifier = big, enabled = enabled, contentPadding = padding, content = label)
-        else -> Button(onClick = onClick, modifier = big, enabled = enabled, contentPadding = padding, content = label)
-    }
-}
-
-@Composable
-private fun BigField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    keyboard: KeyboardOptions = KeyboardOptions.Default,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        textStyle = MaterialTheme.typography.headlineSmall,
-        singleLine = true,
-        keyboardOptions = keyboard,
-        modifier = modifier.fillMaxWidth(),
-    )
-}
-
-/** A line that says how something went: green for done, red for wrong. */
-@Composable
-internal fun StatusLine(text: String, good: Boolean = false, bad: Boolean = false) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
-        color =
-            when {
-                bad -> MaterialTheme.colorScheme.error
-                good -> toneColor(Tone.OK)
-                else -> MaterialTheme.colorScheme.onSurface
-            },
     )
 }
 
@@ -335,14 +218,12 @@ internal fun StatusLine(text: String, good: Boolean = false, bad: Boolean = fals
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun NameStep(state: NewOrderState, model: NewOrderViewModel) {
+private fun NameStep(state: NewOrderState, model: OrderActions) {
     val draft = state.draft
     val focus = remember { FocusRequester() }
     // The keyboard up at once: the first thing to do is type.
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     StepPage(
-        1,
-        stringResource(R.string.call_order_name_title),
         bottom = {
             BigButton(
                 stringResource(R.string.call_order_next),
@@ -352,20 +233,7 @@ private fun NameStep(state: NewOrderState, model: NewOrderViewModel) {
             )
         },
     ) {
-        BigField(
-            draft.name,
-            { v -> model.edit { it.copy(name = v) } },
-            stringResource(R.string.call_order_name),
-            Modifier.focusRequester(focus),
-            KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
-        )
-        // Filled in from the call; typed only when the shop's phone did not say.
-        BigField(
-            draft.phone,
-            { v -> model.edit { it.copy(phone = v) } },
-            stringResource(R.string.call_order_phone),
-            keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
-        )
+        StepColumn(Modifier.fillMaxSize()) { ContactFields(state, model, Modifier.focusRequester(focus)) }
     }
 }
 
@@ -374,93 +242,44 @@ private fun NameStep(state: NewOrderState, model: NewOrderViewModel) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AddressStep(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?) {
+private fun AddressStep(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
     val draft = state.draft
     val outside = state.addressChecked && state.address?.outside == true
     val goOn = !draft.delivery || state.link != null || (PhoneOrders.addressComplete(draft) && !outside)
     StepPage(
-        2,
-        stringResource(R.string.call_order_address_title),
         bottom = {
             BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.NAME) }, outlined = true)
             BigButton(stringResource(R.string.call_order_next), onClick = { model.goTo(CallStep.DISHES) }, enabled = goOn, modifier = Modifier.weight(1f))
         },
-    ) {
-        if (!draft.delivery) {
-            StatusLine(stringResource(R.string.call_order_pickup_chosen))
-            BigButton(stringResource(R.string.call_order_deliver), onClick = { model.edit { it.copy(fulfilment = Fulfilment.DELIVERY) } }, outlined = true)
-        } else {
-            TypedAddress(state, model, outside)
-            HorizontalDivider()
-            TextedAddress(state, model, link)
-            HorizontalDivider()
-            OutlinedButton(onClick = { model.edit { it.copy(fulfilment = Fulfilment.PICKUP) } }, modifier = Modifier.heightIn(min = 56.dp)) {
-                Text(stringResource(R.string.call_order_pickup), style = MaterialTheme.typography.titleMedium)
-            }
+    ) { wide ->
+        val where = @Composable { FulfilmentChoice(state, model, listOf(Fulfilment.DELIVERY, Fulfilment.PICKUP)) }
+        when {
+            !draft.delivery -> StepColumn(Modifier.fillMaxSize()) { where() }
+            wide ->
+                Row(Modifier.fillMaxSize()) {
+                    StepColumn(Modifier.weight(1f).fillMaxHeight()) {
+                        where()
+                        AddressFields(state, model, help = false)
+                    }
+                    VerticalDivider()
+                    StepColumn(Modifier.weight(1f).fillMaxHeight()) {
+                        AddressHelp(state, model)
+                        TextedAddress(state, model, link)
+                    }
+                }
+            else ->
+                StepColumn(Modifier.fillMaxSize()) {
+                    where()
+                    AddressFields(state, model, help = true)
+                    HorizontalDivider()
+                    TextedAddress(state, model, link)
+                }
         }
     }
 }
 
 @Composable
-private fun TypedAddress(state: NewOrderState, model: NewOrderViewModel, outside: Boolean) {
-    val draft = state.draft
-    // A caller who has ordered before: one tap is the whole address.
-    for (recent in state.recentChoices) {
-        OutlinedCard(Modifier.fillMaxWidth().clickable { model.pickAddress(recent) }) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text("🏠 " + recent.line, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                if (recent.addressNote.isNotBlank()) Text(recent.addressNote, style = MaterialTheme.typography.titleMedium)
-            }
-        }
-    }
-    BigField(
-        draft.street,
-        { v -> model.edit { it.copy(street = v) } },
-        stringResource(R.string.call_order_street),
-        keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-    )
-    BigStreetChoices(state.streetChoices, model::pickStreet)
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = draft.postalCode,
-            onValueChange = { v -> model.edit { it.copy(postalCode = v.filter(Char::isDigit).take(5)) } },
-            label = { Text(stringResource(R.string.new_order_postal_code)) },
-            textStyle = MaterialTheme.typography.headlineSmall,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.weight(1f),
-        )
-        OutlinedTextField(
-            value = draft.city,
-            onValueChange = { v -> model.edit { it.copy(city = v) } },
-            label = { Text(stringResource(R.string.new_order_city)) },
-            textStyle = MaterialTheme.typography.headlineSmall,
-            singleLine = true,
-            modifier = Modifier.weight(2f),
-        )
-    }
-    BigField(draft.addressNote, { v -> model.edit { it.copy(addressNote = v) } }, stringResource(R.string.new_order_door_note))
-    val address = state.address
-    when {
-        state.checking -> StatusLine(stringResource(R.string.new_order_checking_address))
-        state.addressError != null -> {
-            StatusLine(stringResource(R.string.new_order_address_failed, state.addressError), bad = true)
-            BigButton(stringResource(R.string.new_order_check_again), onClick = model::checkAgain, outlined = true)
-        }
-        outside -> StatusLine(stringResource(R.string.call_order_outside), bad = true)
-        address != null && state.addressChecked && address.status == AddressStatus.VERIFIED ->
-            StatusLine("✓ " + stringResource(R.string.new_order_address_ok, ringWord(address.zone)), good = true)
-        address != null && state.addressChecked && address.status == AddressStatus.UNVERIFIED ->
-            StatusLine(stringResource(R.string.new_order_address_unverified))
-    }
-    address?.suggestedPostalCode?.takeIf { state.addressChecked }?.let { code ->
-        StatusLine(stringResource(R.string.new_order_address_suggest, code))
-        BigButton(stringResource(R.string.new_order_address_use, code), onClick = { model.edit { it.copy(postalCode = code) } }, outlined = true)
-    }
-}
-
-@Composable
-private fun TextedAddress(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?) {
+private fun TextedAddress(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
     val phone = state.draft.phone
     // A landline would have the link read out to it: no text there.
     val textable = PhoneNumbers.textable(phone)
@@ -480,7 +299,7 @@ private fun TextedAddress(state: NewOrderState, model: NewOrderViewModel, link: 
                     else -> R.string.call_order_sms_hint
                 }
             ),
-            style = MaterialTheme.typography.titleMedium,
+            style = LINE_SMALL,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     } else {
@@ -513,310 +332,34 @@ private fun SmsStatus(link: AddressRequest?, onAgain: () -> Unit) {
     if (failed || unsent) BigButton(stringResource(R.string.call_order_sms_again), onClick = onAgain, outlined = true)
 }
 
-/** Leipzig's streets like the one typed, big: a tap takes the name as the city spells it, its postcode and the town. */
-@Composable
-private fun BigStreetChoices(streets: List<StreetSuggestion>, onPick: (StreetSuggestion) -> Unit) {
-    for (street in streets) {
-        OutlinedCard(Modifier.fillMaxWidth().clickable { onPick(street) }) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(street.fullStreet, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    // With a house the list has: its own postcode, and the ring it is in.
-                    val ring = street.ringZone?.let { ringWord(it) }
-                    Text(
-                        listOfNotNull(street.postcodes.joinToString(", "), street.entry.district, ring).joinToString(" · "),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Said, and no more than that: the number may be misheard, or the house new.
-                    if (street.houseUnlisted) {
-                        Text(
-                            stringResource(R.string.new_order_house_unlisted, street.houseNumber.orEmpty()),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = toneColor(Tone.SOON),
-                        )
-                    }
-                }
-                when (street.delivery) {
-                    StreetDelivery.OUTSIDE ->
-                        Text("✗ " + stringResource(R.string.new_order_street_outside), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                    StreetDelivery.PARTLY -> Text(stringResource(R.string.new_order_street_partly), color = toneColor(Tone.SOON))
-                    StreetDelivery.INSIDE -> Unit
-                }
-            }
-        }
-    }
-}
-
-/** The ring's name as the report says it. */
-@Composable
-private fun ringWord(zone: String?): String {
-    val resources = LocalResources.current
-    return when (zone) {
-        "inner" -> resources.getString(R.string.report_ring_inner)
-        "near" -> resources.getString(R.string.report_ring_near)
-        "far" -> resources.getString(R.string.report_ring_far)
-        "edge" -> resources.getString(R.string.report_ring_edge)
-        else -> zone.orEmpty()
-    }
-}
-
 // ---------------------------------------------------------------------------
-// 3. The dishes
+// 3. The dishes, as in the Kasse
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun DishesStep(state: NewOrderState, model: NewOrderViewModel) {
-    val menu = state.menu
-    var picking by remember { mutableStateOf<MenuDish?>(null) }
-    val photos by model.photos.collectAsStateWithLifecycle()
-    Box(Modifier.fillMaxSize()) {
-        DishesPage(
-            menu = menu,
-            menuError = state.menuError,
-            lines = state.draft.lines,
-            photos = photos,
-            onPhoto = model::loadPhoto,
-            onRetry = model::loadMenu,
-            onBack = { model.goTo(CallStep.ADDRESS) },
-            onNext = { model.goTo(CallStep.CONFIRM) },
-        ) { dish, groups ->
-            // Nothing to choose: in the basket with one tap.
-            if (groups.isEmpty()) model.add(BasketLine(dish, 1)) else picking = dish
-        }
-        val dish = picking
-        if (dish != null && menu != null) {
-            val groups = remember(dish, menu) { OptionRules.groups(dish, menu.groups) }
-            OptionsPanel(dish, groups, onDismiss = { picking = null }) {
-                model.add(it)
-                picking = null
-            }
-        }
-    }
-}
-
-/**
- * Step 3 as it is drawn: the tiles, and under them what is in the basket
- * — on a line of its own, so a narrow screen squeezes neither it nor the
- * buttons beside it.
- */
-@Composable
-internal fun DishesPage(
-    menu: OrderMenu?,
-    menuError: String?,
-    lines: List<BasketLine>,
-    photos: Map<String, ImageBitmap?>,
-    onPhoto: (String) -> Unit,
-    onRetry: () -> Unit,
-    onBack: () -> Unit,
-    onNext: () -> Unit,
-    onTap: (MenuDish, List<OptionGroup>) -> Unit,
-) {
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            StepHeading(3, stringResource(R.string.call_order_dishes_title))
-            when {
-                menu != null -> DishGrid(menu, lines, photos, onPhoto, onTap)
-                menuError != null -> {
-                    StatusLine(stringResource(R.string.new_order_menu_failed, menuError), bad = true)
-                    BigButton(stringResource(R.string.retry), onClick = onRetry, outlined = true)
+private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderActions) {
+    val lines = state.draft.lines
+    val total = lines.sumOf { it.unitPrice * it.qty }
+    DishesPane(
+        orderShop(state, photos, model),
+        Basket(
+            lines,
+            total,
+            stringResource(R.string.call_order_to_basket),
+            onAdd = model::add,
+            onQty = model::setQty,
+            onNote = model::setNote,
+        ),
+        over = { modifier ->
+            Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(onClick = { model.goTo(CallStep.ADDRESS) }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
+                    Text(stringResource(R.string.call_order_back), fontSize = 17.sp, maxLines = 1)
                 }
-                else ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CircularProgressIndicator()
-                        Text(stringResource(R.string.new_order_menu_loading), style = MaterialTheme.typography.titleLarge)
-                    }
+                EmptyBasketButton(lines.isNotEmpty(), model::clear)
             }
-        }
-        HorizontalDivider()
-        val count = lines.sumOf { it.qty }
-        Text(
-            pluralStringResource(R.plurals.call_order_cart, count, count, Format.euro(lines.sumOf { it.unitPrice * it.qty })),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),
-        )
-        BottomBar {
-            BigButton(stringResource(R.string.call_order_back), onClick = onBack, outlined = true)
-            BigButton(stringResource(R.string.call_order_next), onClick = onNext, enabled = lines.isNotEmpty(), modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-/**
- * The menu as big tiles, a category at a time: the photo, the name, the
- * price, and how many are in the basket already. [onTap] is given the
- * dish's choices, empty when there is nothing to choose.
- */
-@Composable
-internal fun DishGrid(
-    menu: OrderMenu,
-    lines: List<BasketLine>,
-    photos: Map<String, ImageBitmap?>,
-    onPhoto: (String) -> Unit,
-    onTap: (MenuDish, List<OptionGroup>) -> Unit,
-) {
-    var category by rememberSaveable { mutableStateOf<String?>(null) }
-    val dishes = menu.dishes.filterNot { it.archived }
-    val categories = dishes.map { it.category }.distinct()
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            CategoryChip(stringResource(R.string.call_order_all_dishes), category == null) { category = null }
-            for (name in categories) CategoryChip(name, category == name) { category = name }
-        }
-        LazyVerticalGrid(
-            // Two to a row on a phone (360 dp less the padding is 328: two of 150 and a gap), five on a tablet.
-            columns = GridCells.Adaptive(minSize = 150.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 12.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(dishes.filter { category == null || it.category == category }, key = { it.id }) { dish ->
-                val groups = remember(dish, menu.groups) { OptionRules.groups(dish, menu.groups) }
-                val count = lines.filter { it.dish.id == dish.id }.sumOf { it.qty }
-                LaunchedEffect(dish.imageUrl) { onPhoto(dish.imageUrl) }
-                DishTile(dish, photos[dish.imageUrl], OptionRules.orderable(dish, groups), count) { onTap(dish, groups) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.large,
-        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
-    }
-}
-
-@Composable
-private fun DishTile(dish: MenuDish, photo: ImageBitmap?, orderable: Boolean, count: Int, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        enabled = orderable,
-        colors =
-            if (count > 0) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            else CardDefaults.cardColors(),
-        modifier = Modifier.fillMaxWidth().alpha(if (orderable) 1f else 0.5f),
-    ) {
-        Box {
-            Column {
-                if (photo != null) {
-                    Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f))
-                } else {
-                    // No photo: the first letter, big, so the tiles still line up.
-                    Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                        Text(dish.name.take(1), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Column(Modifier.padding(12.dp)) {
-                    Text(dish.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        if (orderable) Format.euro(dish.price) else stringResource(R.string.new_order_sold_out),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (orderable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            if (count > 0) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                ) {
-                    Text("$count×", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
-                }
-            }
-        }
-    }
-}
-
-/** The dish's choices over the whole screen, as big tiles, with how many: the site's options dialog, for a finger. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun OptionsPanel(dish: MenuDish, groups: List<OptionGroup>, onDismiss: () -> Unit, onAdd: (BasketLine) -> Unit) {
-    var chosen by remember(dish.id) { mutableStateOf(OptionRules.preset(groups)) }
-    var qty by remember(dish.id) { mutableIntStateOf(1) }
-    val valid = OptionRules.invalid(groups, chosen).isEmpty()
-    val line = BasketLine(dish, qty, OptionRules.chosen(groups, chosen))
-    BackHandler(onBack = onDismiss)
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(dish.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                for (group in groups) {
-                    Text(
-                        "${group.name} · " +
-                            stringResource(if (group.selection == Selection.SINGLE) R.string.new_order_single_hint else R.string.new_order_multiple_hint),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        for (option in group.options) {
-                            val on = option.id in chosen[group.id].orEmpty()
-                            val label = buildString {
-                                if (on) append("✓ ")
-                                append(option.name)
-                                if (option.price > 0) append(" +").append(Format.euro(option.price))
-                            }
-                            Surface(
-                                onClick = { chosen = OptionRules.toggle(group, chosen, option) },
-                                enabled = option.available,
-                                shape = MaterialTheme.shapes.medium,
-                                color = if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(if (on) 3.dp else 1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
-                                modifier = Modifier.alpha(if (option.available) 1f else 0.5f),
-                            ) {
-                                Column(Modifier.widthIn(min = 120.dp).padding(horizontal = 18.dp, vertical = 14.dp)) {
-                                    Text(label, style = MaterialTheme.typography.titleLarge, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
-                                    if (!option.available) Text(stringResource(R.string.new_order_sold_out), color = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.new_order_qty), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    BigStepper(qty) { qty = it.coerceIn(1, PhoneOrders.MAX_QTY) }
-                }
-            }
-            HorizontalDivider()
-            BottomBar {
-                BigButton(stringResource(R.string.cancel_back), onClick = onDismiss, outlined = true)
-                BigButton(
-                    stringResource(R.string.call_order_add) + " · " + Format.euro(line.unitPrice * qty),
-                    onClick = { onAdd(line) },
-                    enabled = valid,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun BigStepper(value: Int, onChange: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = { onChange(value - 1) }, modifier = Modifier.size(64.dp), contentPadding = PaddingValues(0.dp)) {
-            Text("−", style = MaterialTheme.typography.headlineMedium)
-        }
-        Text(value.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.width(64.dp))
-        OutlinedButton(onClick = { onChange(value + 1) }, modifier = Modifier.size(64.dp), contentPadding = PaddingValues(0.dp)) {
-            Text("+", style = MaterialTheme.typography.headlineMedium)
-        }
-    }
+        },
+        go = { GoButton(stringResource(R.string.call_order_next), Format.euro(total), lines.isNotEmpty(), { model.goTo(CallStep.CONFIRM) }, it) },
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -824,14 +367,13 @@ internal fun BigStepper(value: Int, onChange: (Int) -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ConfirmStep(state: NewOrderState, model: NewOrderViewModel, link: AddressRequest?) {
+private fun ConfirmStep(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
     val draft = state.draft
     val waitsForLink = state.awaitingLink
     val quote = state.quote
     val problems = PhoneOrders.problems(draft, Instant.now())
+    val subtotal = draft.lines.sumOf { it.unitPrice * it.qty }
     StepPage(
-        4,
-        stringResource(R.string.call_order_confirm_title),
         bottom = {
             BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.DISHES) }, outlined = true)
             if (waitsForLink) {
@@ -842,89 +384,70 @@ private fun ConfirmStep(state: NewOrderState, model: NewOrderViewModel, link: Ad
                     modifier = Modifier.weight(1f),
                 )
             } else {
-                BigButton(
-                    when {
-                        state.saving -> stringResource(R.string.new_order_saving)
-                        quote != null && state.priced -> stringResource(R.string.call_order_save, Format.euro(quote.total))
-                        else -> stringResource(R.string.call_order_save, "—")
-                    },
-                    onClick = model::save,
+                GoButton(
+                    stringResource(if (state.saving) R.string.new_order_saving else R.string.call_order_save),
+                    if (quote != null && state.priced) Format.euro(quote.total) else "—",
                     enabled = state.priced && !state.saving && !state.quoting && problems.isEmpty(),
+                    onClick = model::save,
                     modifier = Modifier.weight(1f),
                 )
             }
         },
-    ) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("👤 " + draft.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("📞 " + draft.phone, style = MaterialTheme.typography.titleLarge)
-                when {
-                    !draft.delivery -> Text(stringResource(R.string.call_order_pickup_chosen), style = MaterialTheme.typography.titleLarge)
-                    waitsForLink -> SmsStatus(link, onAgain = model::sendLink)
-                    else -> {
-                        Text("🏠 ${draft.street}, ${draft.postalCode} ${draft.city}", style = MaterialTheme.typography.titleLarge)
-                        if (draft.addressNote.isNotBlank()) Text(draft.addressNote, style = MaterialTheme.typography.titleMedium)
-                    }
-                }
+    ) { wide ->
+        val dishes: @Composable ColumnScope.() -> Unit = {
+            if (draft.lines.isEmpty()) StatusLine(stringResource(R.string.till_empty))
+            draft.lines.forEachIndexed { index, line ->
+                if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+                BasketRow(line, { model.setQty(index, it) }, { model.setNote(index, it) })
             }
         }
-
-        if (draft.lines.isEmpty()) StatusLine(stringResource(R.string.call_order_empty))
-        draft.lines.forEachIndexed { index, line ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(line.dish.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    if (line.options.isNotEmpty()) Text(line.options.joinToString(", ") { it.name }, style = MaterialTheme.typography.titleMedium)
-                    Text(Format.euro(line.unitPrice * line.qty), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                BigStepper(line.qty) { model.setQty(index, it) }
+        val rest: @Composable ColumnScope.() -> Unit = {
+            Who(state, model, link)
+            if (waitsForLink) {
+                PriceLine(stringResource(R.string.new_order_subtotal), subtotal, bold = true)
+                Text(stringResource(R.string.call_order_fee_later), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (problems.isEmpty()) {
+                PriceLines(state)
             }
-            HorizontalDivider()
+            state.error?.let { StatusLine(it, bad = true) }
+            // What to tell the caller.
+            if (!waitsForLink && draft.lines.isNotEmpty()) {
+                Text(stringResource(R.string.call_order_ready_in, model.suggestedMinutes(state)), fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+            }
         }
-
-        if (waitsForLink) {
-            BigPriceLine(stringResource(R.string.new_order_subtotal), draft.lines.sumOf { it.unitPrice * it.qty }, big = true)
-            Text(stringResource(R.string.call_order_fee_later), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = 8.dp), content = dishes)
+                VerticalDivider()
+                StepColumn(Modifier.weight(1f).fillMaxHeight(), rest)
+            }
         } else {
-            when {
-                problems.isNotEmpty() -> Unit
-                state.quoting || state.checking ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CircularProgressIndicator()
-                        Text(stringResource(R.string.new_order_pricing), style = MaterialTheme.typography.titleLarge)
-                    }
-                quote != null && state.priced -> BigBreakdown(quote)
-            }
-            if (draft.lines.isNotEmpty()) {
-                // What to tell the caller.
-                StatusLine(stringResource(R.string.call_order_ready_in, model.suggestedMinutes(state)))
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = rest)
+                HorizontalDivider()
+                Column(Modifier.padding(vertical = 8.dp), content = dishes)
             }
         }
-        state.error?.let { StatusLine(it, bad = true) }
     }
 }
 
+/** Whose order it is, and where it goes. */
 @Composable
-private fun BigBreakdown(quote: PhoneOrderQuote) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        BigPriceLine(stringResource(R.string.new_order_subtotal), quote.subtotal)
-        if (quote.dealDiscount > 0) BigPriceLine(stringResource(R.string.new_order_deal), -quote.dealDiscount)
-        if (quote.pickupDiscount > 0) BigPriceLine(stringResource(R.string.new_order_pickup_discount), -quote.pickupDiscount)
-        if (quote.deliveryFee > 0) BigPriceLine(stringResource(R.string.new_order_delivery_fee), quote.deliveryFee)
-        if (quote.smallOrderFee > 0) BigPriceLine(stringResource(R.string.new_order_small_fee), quote.smallOrderFee)
-        HorizontalDivider()
-        BigPriceLine(stringResource(R.string.new_order_total), quote.total, big = true)
-        if (quote.overCapacity) StatusLine(stringResource(R.string.new_order_over_capacity))
-    }
-}
-
-@Composable
-internal fun BigPriceLine(label: String, amount: Double, big: Boolean = false) {
-    val style = if (big) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = style, fontWeight = if (big) FontWeight.Bold else null, modifier = Modifier.weight(1f))
-        Text(Format.euro(amount), style = style, fontWeight = if (big) FontWeight.Bold else null)
+private fun Who(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
+    val draft = state.draft
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("👤 " + draft.name, style = LINE_NAME)
+            Text("📞 " + draft.phone, style = LINE_NAME)
+            when {
+                !draft.delivery -> Text(stringResource(R.string.call_order_pickup_chosen), style = LINE_NAME)
+                state.awaitingLink -> SmsStatus(link, onAgain = model::sendLink)
+                else -> {
+                    Text("🏠 ${draft.street}, ${draft.postalCode} ${draft.city}", style = LINE_NAME)
+                    if (draft.addressNote.isNotBlank()) Text(draft.addressNote, style = LINE_SMALL)
+                }
+            }
+        }
     }
 }
 
@@ -933,39 +456,43 @@ internal fun BigPriceLine(label: String, amount: Double, big: Boolean = false) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun DoneStep(state: NewOrderState, link: AddressRequest?, actions: LinkActions, onDone: () -> Unit) {
+private fun DoneStep(state: NewOrderState, link: AddressRequest?, onRetry: (String) -> Unit, onResend: (String) -> Unit, onDone: () -> Unit) {
     val context = LocalContext.current
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
-    ) {
-        val saved = state.saved
-        val problem = link?.problem
-        when {
-            saved != null -> DoneLine(stringResource(R.string.call_order_saved, saved.orderNumber ?: 0L))
-            link != null && link.placed -> DoneLine(stringResource(R.string.call_order_saved, link.orderNumber ?: 0L))
-            link != null && problem != null -> {
-                Text(
-                    stringResource(R.string.call_order_problem, problemText(problem)),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                )
-                BigButton(stringResource(R.string.call_order_call, PhoneNumbers.national(link.phone)), onClick = { dial(context, link.phone) })
-                BigButton(stringResource(R.string.call_order_retry), onClick = { actions.retry(link.id) }, outlined = true)
-            }
-            else -> {
-                CircularProgressIndicator(Modifier.size(64.dp))
-                Text(stringResource(R.string.call_order_waiting_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.call_order_waiting_text), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-                val arrived = link?.address
-                if (arrived != null) StatusLine(stringResource(R.string.call_order_address_arrived, arrived.line), good = true)
-                else SmsStatus(link) { link?.let { actions.resend(it.id) } }
+    StepPage(bottom = { BigButton(stringResource(R.string.call_order_done), onClick = onDone, modifier = Modifier.weight(1f)) }) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
+        ) {
+            val saved = state.saved
+            val problem = link?.problem
+            when {
+                saved != null -> {
+                    DoneLine(stringResource(R.string.call_order_saved, saved.orderNumber ?: 0L))
+                    if (saved.overCapacity) StatusLine(stringResource(R.string.new_order_saved_full), soon = true)
+                }
+                link != null && link.placed -> DoneLine(stringResource(R.string.call_order_saved, link.orderNumber ?: 0L))
+                link != null && problem != null -> {
+                    Text(
+                        stringResource(R.string.call_order_problem, problemText(problem)),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                    BigButton(stringResource(R.string.call_order_call, PhoneNumbers.national(link.phone)), onClick = { dial(context, link.phone) })
+                    BigButton(stringResource(R.string.call_order_retry), onClick = { onRetry(link.id) }, outlined = true)
+                }
+                else -> {
+                    CircularProgressIndicator(Modifier.size(64.dp))
+                    Text(stringResource(R.string.call_order_waiting_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.call_order_waiting_text), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                    val arrived = link?.address
+                    if (arrived != null) StatusLine(stringResource(R.string.call_order_address_arrived, arrived.line), good = true)
+                    else SmsStatus(link) { link?.let { onResend(it.id) } }
+                }
             }
         }
-        BigButton(stringResource(R.string.call_order_done), onClick = onDone, modifier = Modifier.widthIn(min = 240.dp))
     }
 }
 

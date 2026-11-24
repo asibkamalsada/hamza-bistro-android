@@ -1,6 +1,7 @@
 package de.hamzabistro.printstation.ui
 
 import android.app.Application
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -52,7 +53,7 @@ class CallOrderScreenTest {
     private fun named(model: NewOrderViewModel) {
         compose.onNodeWithText("Next ➜").assertIsNotEnabled()
         compose.onNodeWithText("Name").performTextInput("Ali")
-        compose.onNodeWithText("Phone number").performTextInput("0176 5550001")
+        compose.onNodeWithText("Phone").performTextInput("0176 5550001")
         compose.onNodeWithText("Next ➜").assertIsEnabled().performClick()
         compose.waitForIdle()
         assertEquals("Ali", model.state.value.draft.name)
@@ -63,15 +64,15 @@ class CallOrderScreenTest {
         val model = open()
         assertEquals(OrderSource.PHONE, model.state.value.draft.source)
         assertEquals(Fulfilment.DELIVERY, model.state.value.draft.fulfilment)
-        compose.onNodeWithText("What is the caller's name?").assertIsDisplayed()
+        compose.onNodeWithText("Step 1 of 4 · What is the caller's name?").assertIsDisplayed()
         named(model)
 
-        compose.onNodeWithText("Where should it go?").assertIsDisplayed()
+        compose.onNodeWithText("Step 2 of 4 · Where should it go?").assertIsDisplayed()
         // The way out for an address that does not survive the phone.
         compose.onNodeWithText("📱 Send the caller an SMS").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithText("Next ➜").assertIsNotEnabled()
 
-        compose.onNodeWithText("Street and house number").performTextInput("karl heine 9")
+        compose.onNodeWithText("Street and number").performTextInput("karl heine 9")
         compose.waitUntil(timeoutMillis = 10_000) { model.state.value.streets.isNotEmpty() }
         compose.onNodeWithText("Karl-Heine-Straße 9").performClick()
         compose.waitForIdle()
@@ -79,7 +80,7 @@ class CallOrderScreenTest {
 
         compose.onNodeWithText("Next ➜").assertIsEnabled().performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Which dishes?").assertIsDisplayed()
+        compose.onNodeWithText("Step 3 of 4 · Which dishes?").assertIsDisplayed()
         assertEquals(CallStep.DISHES, model.state.value.step)
     }
 
@@ -87,7 +88,7 @@ class CallOrderScreenTest {
     fun aLandlineIsNotOfferedAnSms() {
         val model = open()
         compose.onNodeWithText("Name").performTextInput("Ali")
-        compose.onNodeWithText("Phone number").performTextInput("0341 5550001")
+        compose.onNodeWithText("Phone").performTextInput("0341 5550001")
         compose.onNodeWithText("Next ➜").performClick()
         compose.waitForIdle()
         assertEquals(CallStep.ADDRESS, model.state.value.step)
@@ -99,10 +100,10 @@ class CallOrderScreenTest {
     fun aCallerWhoPicksUpNeedsNoAddress() {
         val model = open()
         named(model)
-        compose.onNodeWithText("🛍 Picks it up (no address)").performClick()
+        compose.onNodeWithText("Pickup").performClick()
         compose.waitForIdle()
         assertEquals(Fulfilment.PICKUP, model.state.value.draft.fulfilment)
-        compose.onNodeWithText("🛍 Picks it up at the shop").assertIsDisplayed()
+        compose.onNodeWithText("Street and number").assertDoesNotExist()
         compose.onNodeWithText("Next ➜").assertIsEnabled()
     }
 
@@ -134,9 +135,8 @@ class CallOrderScreenTest {
         val tapped = mutableListOf<Pair<String, Int>>()
         compose.setContent {
             AppTheme {
-                DishGrid(OrderMenu(listOf(doener, cola, soldOut), listOf(meat)), listOf(BasketLine(cola, 2)), emptyMap(), onPhoto = {}) { dish, groups ->
-                    tapped += dish.name to groups.size
-                }
+                val shop = Shop(OrderMenu(listOf(doener, cola, soldOut), listOf(meat)), null, emptyList(), emptyMap(), onPhoto = {}, onRetry = {})
+                DishesOrWhyNot(shop, listOf(BasketLine(cola, 2)), rail = false, onTap = { dish, groups -> tapped += dish.name to groups.size }, Modifier)
             }
         }
         compose.onNodeWithText("2×").assertIsDisplayed()

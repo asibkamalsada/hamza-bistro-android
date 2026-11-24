@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -54,6 +56,10 @@ enum class TillDevice(val qualifiers: String, val fontScale: Float) {
     PHONE("de-rDE-w360dp-h800dp-normal-long-port-notnight-xhdpi", 1f),
     PHONE_BIG("de-rDE-w360dp-h800dp-normal-long-port-notnight-xhdpi", 1.3f);
 
+    /** How much of the screen the keyboard takes. */
+    val keyboard: Dp
+        get() = if (landscape) 300.dp else if (phone) 290.dp else 320.dp
+
     val phone: Boolean
         get() = this == PHONE || this == PHONE_BIG
 
@@ -72,8 +78,8 @@ class OnDevice(private val device: TillDevice, private val night: Boolean = fals
 private val STATUS_BAR = 32.dp
 private val NAVIGATION_BAR = 48.dp
 
-/** The content as MainActivity frames it, with the bars the tablet has: nothing of it may lie under them. */
-internal fun ComposeContentTestRule.setScreen(content: @Composable () -> Unit) {
+/** The content as MainActivity frames it, with the bars the tablet has, and a [keyboard] when it is up: nothing of it may lie under them. */
+internal fun ComposeContentTestRule.setScreen(keyboard: Dp? = null, content: @Composable () -> Unit) {
     var dispatch: (() -> Unit)? = null
     setContent {
         val view = LocalView.current
@@ -83,6 +89,7 @@ internal fun ComposeContentTestRule.setScreen(content: @Composable () -> Unit) {
                 WindowInsetsCompat.Builder()
                     .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, (STATUS_BAR.value * density).toInt(), 0, 0))
                     .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, (NAVIGATION_BAR.value * density).toInt()))
+                    .apply { if (keyboard != null) setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, (keyboard.value * density).toInt())) }
                     .build()
             ViewCompat.dispatchApplyWindowInsets(view, insets)
         }
@@ -91,7 +98,10 @@ internal fun ComposeContentTestRule.setScreen(content: @Composable () -> Unit) {
                 content()
                 val bar = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
                 Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(STATUS_BAR).background(bar))
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(NAVIGATION_BAR).background(bar))
+                if (keyboard == null) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(NAVIGATION_BAR).background(bar))
+            }
+            if (keyboard != null) {
+                Box(Modifier.fillMaxSize()) { Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(keyboard).background(MaterialTheme.colorScheme.outlineVariant)) }
             }
         }
     }

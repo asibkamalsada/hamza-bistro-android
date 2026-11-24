@@ -162,9 +162,9 @@ class Till(
     // The basket
     // -----------------------------------------------------------------------
 
-    fun add(line: BasketLine) = edit { it.copy(lines = CounterSales.add(it.lines, line)) }
+    fun add(line: BasketLine) = edit { it.copy(lines = Baskets.add(it.lines, line)) }
 
-    fun setQty(index: Int, qty: Int) = edit { it.copy(lines = CounterSales.setQty(it.lines, index, qty)) }
+    fun setQty(index: Int, qty: Int) = edit { it.copy(lines = Baskets.setQty(it.lines, index, qty)) }
 
     fun setDineIn(dineIn: Boolean) = edit { it.copy(dineIn = dineIn) }
 
