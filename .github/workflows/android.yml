@@ -54,6 +54,24 @@ jobs:
       - name: Core, shrunk as the release is
         run: ./gradlew :core:shrunkTest
 
+      # The Android versions the app tests run on, 100s of MB Robolectric
+      # fetches by itself, past Gradle and its cache. Without this every run
+      # asked Maven Central for them, and its 429 failed the release of #84.
+      # Saved only by a run that passed, so the set is whole.
+      - name: Robolectric's version
+        id: robolectric
+        run: |
+          version=$(sed -nE 's/^robolectric = "([^"]+)".*/\1/p' gradle/libs.versions.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          # The target SDK, set there, is among the versions needed.
+          key: robolectric-${{ steps.robolectric.outputs.version }}-${{ hashFiles('app/build.gradle.kts') }}
+          restore-keys: robolectric-${{ steps.robolectric.outputs.version }}-
+
       # Robolectric: the view models made and the staff screens drawn, as
       # right after sign-in — what closed the app in android#24.
       - name: App tests
