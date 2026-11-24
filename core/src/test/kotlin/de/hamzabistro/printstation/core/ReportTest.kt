@@ -180,6 +180,35 @@ class ReportTest {
         assertFalse(before.enteredByStaff)
     }
 
+    @Test
+    fun `reads where the web orders came from, and nothing from a server before it`() {
+        val r =
+            json.decodeFromString(
+                Report.serializer(),
+                answer.trimEnd().removeSuffix("}") +
+                    ""","came_from": [""" +
+                    """{"came_from":"flyer","placed":12,"delivered":11,"new_customers":7,"revenue":243.1,"average_basket":22.1},""" +
+                    """{"came_from":null,"placed":30,"delivered":26,"new_customers":3,"revenue":569.3,"average_basket":21.9},""" +
+                    """{"came_from":"nebenan.de","placed":1,"delivered":0,"new_customers":0,"revenue":0,"average_basket":null}]}""",
+            )
+        assertEquals(listOf("flyer", null, "nebenan.de"), r.cameFrom.map { it.cameFrom })
+        assertEquals(ReportCameFrom("flyer", 12, 11, 7, 243.1, 22.1), r.cameFrom[0])
+        assertEquals(null, r.cameFrom[2].averageBasket)
+        assertTrue(r.knowsCameFrom)
+
+        val unknownOnly =
+            json.decodeFromString(
+                Report.serializer(),
+                answer.trimEnd().removeSuffix("}") +
+                    ""","came_from": [{"came_from":null,"placed":3,"delivered":3,"new_customers":1,"revenue":60,"average_basket":20}]}""",
+            )
+        assertFalse(unknownOnly.knowsCameFrom)
+
+        val before = json.decodeFromString(Report.serializer(), answer)
+        assertEquals(emptyList(), before.cameFrom)
+        assertFalse(before.knowsCameFrom)
+    }
+
     /** The issue's answer with the ratings section of 20261004020000_report_ratings.sql. */
     private fun withRatings(ratings: String): Report =
         json.decodeFromString(Report.serializer(), answer.trimEnd().removeSuffix("}") + ""","ratings": $ratings}""")
