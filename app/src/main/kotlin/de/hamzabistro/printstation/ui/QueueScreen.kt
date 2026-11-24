@@ -424,4 +424,4 @@ internal class Actions(private val context: Context, private val viewModel: Staf
 private const val FOCUS_MS = 4_000L
 
 /** Room under the last card, so "Neue Bestellung" never covers its buttons. */
-private val FAB_ROOM = 160.dp
+private val FAB_ROOM = 96.dp
