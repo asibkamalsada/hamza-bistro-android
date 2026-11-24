@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import de.hamzabistro.printstation.core.AddressRequest
 import java.time.Instant
 import org.junit.Assert.assertEquals
@@ -73,7 +74,7 @@ class OrderLayoutTest(private val device: TillDevice) {
     @Test
     fun theStreetsToPickShowWhileTheStreetIsTyped() {
         show(f.typing, keyboard = true)
-        compose.onNode(hasText("Straße und Hausnummer") and hasSetTextAction()).performClick()
+        compose.onNode(hasText("Straße und Hausnummer") and hasSetTextAction()).performScrollTo().performClick()
         compose.waitForIdle()
         assertWhole(hasText("Straße und Hausnummer") and hasSetTextAction(), "street", keyboard = true)
         if (!device.phone) assertWhole(hasText("Karl-Heine-Straße 9") and hasClickAction(), "the street to pick", keyboard = true)

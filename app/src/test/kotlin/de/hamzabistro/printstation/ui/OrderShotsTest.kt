@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import de.hamzabistro.printstation.core.AddressRequest
@@ -44,7 +45,7 @@ private val shots: List<OrderShot> by lazy {
     listOf(
         OrderShot("order-01-start", f.called, keyboard = true),
         OrderShot("order-02-start-no-keyboard", f.called),
-        OrderShot("order-03-typing", f.typing, keyboard = true, act = { onNode(hasText("Straße und Hausnummer") and hasSetTextAction()).performClick() }),
+        OrderShot("order-03-typing", f.typing, keyboard = true, act = { onNode(hasText("Straße und Hausnummer") and hasSetTextAction()).performScrollTo().performClick() }),
         OrderShot("order-04-typing-no-keyboard", f.typing),
         OrderShot("order-05-known", f.known),
         OrderShot("order-06-found", f.addressed),

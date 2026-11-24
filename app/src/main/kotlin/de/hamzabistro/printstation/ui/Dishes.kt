@@ -646,6 +646,8 @@ internal fun Choice(words: List<String>, selected: Int, modifier: Modifier, onCh
                 selected = index == selected,
                 onClick = { onChoose(index) },
                 shape = SegmentedButtonDefaults.itemShape(index, words.size),
+                // Three of them on a phone, in big letters, still have room for their words.
+                contentPadding = PaddingValues(horizontal = 4.dp),
                 icon = {},
                 label = { Text(label, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 modifier = Modifier.heightIn(min = 52.dp),

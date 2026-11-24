@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -684,13 +685,10 @@ private fun CustomerStep(state: NewOrderState, model: OrderTaking, link: Address
     LaunchedEffect(Unit) { if (draft.name.isBlank()) runCatching { focus.requestFocus() } }
     StepPage(
         bottom = {
-            GoButton(
-                stringResource(R.string.new_order_to_dishes),
-                if (draft.lines.isEmpty()) "" else Format.euro(draft.subtotal),
-                enabled = true,
-                onClick = { model.goTo(TakingStep.DISHES) },
-                modifier = Modifier.weight(1f),
-            )
+            val toDishes = { model.goTo(TakingStep.DISHES) }
+            val words = stringResource(R.string.new_order_to_dishes)
+            if (draft.lines.isEmpty()) BigButton(words, onClick = toDishes, modifier = Modifier.weight(1f).testTag(BASKET_GO_TAG))
+            else GoButton(words, Format.euro(state.total), enabled = true, onClick = toDishes, modifier = Modifier.weight(1f))
         },
     ) { wide ->
         if (wide) {
@@ -838,7 +836,6 @@ private fun MoreFields(state: NewOrderState, model: OrderTaking) {
 @Composable
 private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderTaking, link: AddressRequest?) {
     val draft = state.draft
-    val deal = state.quote?.dealDiscount?.takeIf { state.priced && it > 0 }
     DishesPane(
         Shop(state.menu, state.menuError, state.bestsellers, photos, model::loadPhoto, model::loadMenu),
         Basket(
@@ -847,7 +844,6 @@ private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, 
             stringResource(R.string.call_order_to_basket),
             onAdd = model::add,
             onQty = model::setQty,
-            deal = deal,
             onNote = model::setNote,
         ),
         over = { modifier ->
@@ -857,7 +853,7 @@ private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, 
             }
         },
         go = { modifier ->
-            Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 PriceAndTime(state, model)
                 Save(state, model)
             }
@@ -898,33 +894,35 @@ private fun smsWords(link: AddressRequest?): String =
     }
 
 /** What the price is made of, and when it is ready: what to tell the caller. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PriceAndTime(state: NewOrderState, model: OrderTaking) {
     val draft = state.draft
     if (draft.lines.isEmpty()) return
     val quote = state.quote?.takeIf { state.priced }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    val words =
         when {
-            state.awaitingLink -> Text(stringResource(R.string.call_order_fee_later), style = LINE_SMALL, color = muted)
-            state.quoting || state.checking -> Text(stringResource(R.string.new_order_pricing), style = LINE_SMALL, color = muted)
+            state.awaitingLink -> stringResource(R.string.call_order_fee_later)
+            state.quoting || state.checking -> stringResource(R.string.new_order_pricing)
             quote != null -> {
-                val parts =
+                val amounts =
                     listOf(
+                        R.string.new_order_deal to -quote.dealDiscount,
                         R.string.new_order_pickup_discount to -quote.pickupDiscount,
                         R.string.new_order_delivery_fee to quote.deliveryFee,
                         R.string.new_order_small_fee to quote.smallOrderFee,
                         R.string.new_order_waived to -quote.waived,
                     )
-                for ((label, amount) in parts) if (amount != 0.0) Text(stringResource(label) + " " + Format.euro(amount), style = LINE_SMALL, color = muted)
-                if (quote.deposits > 0) Text(stringResource(R.string.new_order_deposits, Format.euro(quote.deposits)), style = LINE_SMALL, color = muted)
+                val parts = amounts.filter { (_, amount) -> amount != 0.0 }.map { (label, amount) -> stringResource(label) + " " + Format.euro(amount) }
+                val deposits = if (quote.deposits > 0) listOf(stringResource(R.string.new_order_deposits, Format.euro(quote.deposits))) else emptyList()
+                (parts + deposits).joinToString(" · ")
             }
+            else -> ""
         }
-        val at = draft.scheduledFor
-        if (at != null) Text(Format.slot(LocalContext.current, at), style = LINE_NAME)
-        else if (!state.awaitingLink) Text(stringResource(R.string.call_order_ready_in, state.minutes ?: model.suggestedMinutes(state)), style = LINE_NAME)
-    }
+    if (words.isNotEmpty()) Text(words, style = LINE_SMALL, color = muted)
+    val at = draft.scheduledFor
+    if (at != null) Text(Format.slot(LocalContext.current, at), style = LINE_NAME)
+    else if (!state.awaitingLink) Text(stringResource(R.string.call_order_ready_in, state.minutes ?: model.suggestedMinutes(state)), style = LINE_NAME)
     if (quote?.overCapacity == true) Text(stringResource(R.string.new_order_over_capacity), style = LINE_SMALL, color = toneColor(Tone.SOON))
     if (draft.delivery && !state.awaitingLink && state.addressError != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
