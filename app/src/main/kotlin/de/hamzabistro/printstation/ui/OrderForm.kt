@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
@@ -223,9 +228,18 @@ private fun RecentAddresses(state: NewOrderState, model: OrderTaking) {
 @Composable
 private fun StreetChoices(state: NewOrderState, model: OrderTaking) {
     val resources = LocalResources.current
-    for (street in state.streetChoices) {
+    val choices = state.streetChoices
+    // Under the field, and on a phone under the keyboard's edge: the best of them comes into sight as the street is typed.
+    val sight = remember { BringIntoViewRequester() }
+    val shown = remember { mutableStateOf(choices) }
+    LaunchedEffect(choices) {
+        if (choices.isNotEmpty() && choices != shown.value) sight.bringIntoView()
+        shown.value = choices
+    }
+    choices.forEachIndexed { index, street ->
         ChoiceRow(
             onClick = { model.pickStreet(street) },
+            modifier = if (index == 0) Modifier.bringIntoViewRequester(sight) else Modifier,
             end = {
                 // From the list, so only roughly: check-address has the last word on the door.
                 when (street.delivery) {
@@ -256,12 +270,12 @@ private fun StreetChoices(state: NewOrderState, model: OrderTaking) {
 
 /** Something to pick with a tap. */
 @Composable
-private fun ChoiceRow(onClick: () -> Unit, end: @Composable () -> Unit = {}, words: @Composable ColumnScope.() -> Unit) {
+private fun ChoiceRow(onClick: () -> Unit, modifier: Modifier = Modifier, end: @Composable () -> Unit = {}, words: @Composable ColumnScope.() -> Unit) {
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             Modifier.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 6.dp),

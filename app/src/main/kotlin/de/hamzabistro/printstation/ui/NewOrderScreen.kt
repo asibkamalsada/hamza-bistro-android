@@ -474,7 +474,11 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     override fun goTo(step: TakingStep) = _state.update { it.copy(step = step) }
 
-    override fun dismissError() = _state.update { it.copy(error = null) }
+    /** Priced again where there is no price: what is refused still says so again, rather than leaving a button that does nothing. */
+    override fun dismissError() {
+        _state.update { it.copy(error = null) }
+        if (!_state.value.priced) reprice(atOnce = true)
+    }
 
     override fun another() = reset()
 
@@ -913,9 +917,7 @@ private fun PriceAndTime(state: NewOrderState, model: OrderTaking) {
                         R.string.new_order_small_fee to quote.smallOrderFee,
                         R.string.new_order_waived to -quote.waived,
                     )
-                val parts = amounts.filter { (_, amount) -> amount != 0.0 }.map { (label, amount) -> stringResource(label) + " " + Format.euro(amount) }
-                val deposits = if (quote.deposits > 0) listOf(stringResource(R.string.new_order_deposits, Format.euro(quote.deposits))) else emptyList()
-                (parts + deposits).joinToString(" · ")
+                amounts.filter { (_, amount) -> amount != 0.0 }.map { (label, amount) -> stringResource(label) + " " + Format.euro(amount) }.joinToString(" · ")
             }
             else -> ""
         }

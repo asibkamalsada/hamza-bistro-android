@@ -5,9 +5,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import de.hamzabistro.printstation.core.AddressRequest
@@ -51,7 +54,7 @@ class TakingAnOrderTest {
 
     private fun named(model: NewOrderViewModel) {
         compose.onNodeWithText("Name").performTextInput("Ali")
-        compose.onNodeWithText("Phone").performTextInput("0176 5550001")
+        compose.onNode(hasText("Phone") and hasSetTextAction()).performTextInput("0176 5550001")
         compose.waitForIdle()
         assertEquals("Ali", model.state.value.draft.name)
     }
@@ -83,6 +86,17 @@ class TakingAnOrderTest {
     }
 
     @Test
+    @Config(qualifiers = "w360dp-h420dp") // a phone with its keyboard up
+    fun theStreetToPickComesIntoSightAsItIsTyped() {
+        val model = open()
+        compose.onNodeWithText("Street and number").performScrollTo().performTextInput("karl heine 9")
+        compose.waitUntil(timeoutMillis = 10_000) { model.state.value.streets.isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithText("Karl-Heine-Straße 9").assertIsDisplayed()
+        compose.onNodeWithText("karl heine 9").assertIsDisplayed()
+    }
+
+    @Test
     fun theDishesComeFirstWhenTheCallerStartsWithThem() {
         val model = open()
         compose.onNodeWithText("Dishes ➜").performClick()
@@ -97,7 +111,7 @@ class TakingAnOrderTest {
     @Test
     fun aLandlineIsNotOfferedAnSms() {
         open()
-        compose.onNodeWithText("Phone").performTextInput("0341 5550001")
+        compose.onNode(hasText("Phone") and hasSetTextAction()).performTextInput("0341 5550001")
         compose.waitForIdle()
         compose.onNodeWithText("📱 Send the caller an SMS").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("That is a landline number: an SMS only goes to a mobile.").assertIsDisplayed()

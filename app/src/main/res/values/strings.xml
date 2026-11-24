@@ -918,7 +918,6 @@
     <string name="new_order_pickup_discount">Pickup discount</string>
     <string name="new_order_delivery_fee">Delivery fee</string>
     <string name="new_order_small_fee">Small-order fee</string>
-    <string name="new_order_deposits">incl. deposit %1$s</string>
     <string name="new_order_waived">Waived</string>
     <string name="new_order_over_capacity">Kitchen full in this slot. The order still goes in.</string>
     <string name="new_order_saving">Saving …</string>

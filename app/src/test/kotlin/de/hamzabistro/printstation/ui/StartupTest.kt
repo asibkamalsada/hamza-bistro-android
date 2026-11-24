@@ -113,7 +113,7 @@ class StartupTest {
         }
         compose.waitForIdle()
         // A screen with a back of its own.
-        compose.onNodeWithText("+ New order").performClick()
+        compose.onNodeWithText("📞 New order").performClick()
         compose.waitForIdle()
         openMenu()
         entry("Orders").assertIsDisplayed()

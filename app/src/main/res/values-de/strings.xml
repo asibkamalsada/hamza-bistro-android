@@ -917,7 +917,6 @@
     <string name="new_order_pickup_discount">Selbstabholerrabatt</string>
     <string name="new_order_delivery_fee">Liefergebühr</string>
     <string name="new_order_small_fee">Kleinmengenzuschlag</string>
-    <string name="new_order_deposits">inkl. Pfand %1$s</string>
     <string name="new_order_waived">Erlassen</string>
     <string name="new_order_over_capacity">Küche voll in diesem Slot. Die Bestellung geht trotzdem rein.</string>
     <string name="new_order_saving">Wird gespeichert …</string>

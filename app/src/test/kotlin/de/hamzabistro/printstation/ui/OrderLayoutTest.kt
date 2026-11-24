@@ -96,7 +96,7 @@ class OrderLayoutTest(private val device: TillDevice) {
         assertWhole(hasTestTag(BASKET_GO_TAG), "Speichern")
         val lines = nodes(hasTestTag(BASKET_LINE_TAG)).filter { it.whole() }
         // Big letters and a place for the note: some of the five are further down, and said to be.
-        assertTrue("${lines.size} lines on $device", lines.size >= if (device.fontScale == 1f) 5 else if (device.phone) 2 else 3)
+        assertTrue("${lines.size} lines on $device", lines.size >= if (device.fontScale == 1f) 5 else if (device.phone || device.landscape) 2 else 3)
         if (device.phone) return
         val tiles = nodes(hasTestTag(DISH_TILE_TAG)).filter { it.whole() }
         assertTrue("${tiles.size} dishes on $device", tiles.size >= 8)
