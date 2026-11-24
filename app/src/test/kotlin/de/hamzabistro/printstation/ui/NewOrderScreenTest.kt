@@ -85,6 +85,27 @@ class NewOrderScreenTest {
     }
 
     @Test
+    fun aDishesNoteIsTypedOnItsLine() {
+        val model = NewOrderViewModel(app)
+        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, navigation = {}, model = model) } }
+        val doener = MenuDish(1, "Speisen", "Döner", "", 7.5, 12, 0, "", true, emptyList())
+        model.add(BasketLine(doener, 1))
+        model.goTo(TakingStep.DISHES)
+        compose.waitForIdle()
+        compose.onNodeWithText("+\u00A0Note").performClick()
+        compose.onNodeWithText("Note for this dish (optional)").performTextInput("ohne Zwiebeln")
+        compose.onNodeWithText("Add ✓").performClick()
+        compose.waitForIdle()
+        assertEquals("ohne Zwiebeln", model.state.value.draft.lines.single().note)
+        compose.onNodeWithText("„ohne Zwiebeln“").assertIsDisplayed()
+        // Read again meanwhile, and dearer: still one line for the two without a note.
+        model.add(BasketLine(doener, 1))
+        model.add(BasketLine(doener.copy(price = 8.0), 1))
+        compose.waitForIdle()
+        assertEquals(listOf(1, 2), model.state.value.draft.lines.map { it.qty })
+    }
+
+    @Test
     fun aStreetTheListHasNothingLikeStaysAsTyped() {
         val model = typed("Qwertzuiopweg 3")
         assertTrue(model.state.value.streetChoices.isEmpty())

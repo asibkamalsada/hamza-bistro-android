@@ -75,7 +75,7 @@ private fun TillPage(
 ) {
     Column(Modifier.fillMaxSize()) {
         state.problem?.let { TillProblemCard(it, model::dismissProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) { content(maxWidth >= TILL_WIDE_FROM) }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) { content(maxWidth >= WIDE_FROM) }
         HorizontalDivider()
         BottomBar(bottom)
     }
@@ -241,9 +241,9 @@ private fun TillSaleLines(sale: CounterSale) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Text("${line.qty}×", fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 40.dp))
             Column(Modifier.weight(1f)) {
-                Text(line.name, style = TILL_NAME)
+                Text(line.name, style = LINE_NAME)
                 if (line.options.isNotEmpty()) {
-                    Text(line.options.joinToString(", "), style = TILL_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(line.options.joinToString(", "), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.width(8.dp))

@@ -121,19 +121,35 @@ rules, ported to Kotlin with the site's own test cases
 
 ### Neue Bestellung
 
-A call, or somebody at the counter (#9): **+ Neue Bestellung** on the queue
-types the order in, and it lands already accepted in "In der Küche" on
+A call, or somebody at the counter (#9): **📞 Neue Bestellung** on the queue,
+or the call's banner, opens one screen in two steps
+([`NewOrderScreen`](app/src/main/kotlin/de/hamzabistro/printstation/ui/NewOrderScreen.kt)).
+Saved, the order lands already accepted in "In der Küche" on
 every device, counts towards the kitchen's load and prints like any
 accepted order
 ([`PhoneOrder`](core/src/main/kotlin/de/hamzabistro/printstation/core/PhoneOrder.kt),
-[`20261004040000_phone_orders.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261004040000_phone_orders.sql)):
+[`20261004040000_phone_orders.sql`](https://github.com/asibkamalsada/hamza-bistro-web/blob/main/supabase/migrations/20261004040000_phone_orders.sql)).
 
-- **Telefon** or **Vor Ort / Theke**; **Abholung**, **Vor Ort** (eaten
-  here) or **Lieferung**;
-- dishes from the menu with the site's options dialog: the dish's groups in
+1. **Für wen und wohin?** **Telefon** or **Theke**; **Lieferung**,
+   **Abholung** or **Vor Ort** (eaten here); name, phone, address, and what
+   is mostly right as it is: when, the minutes, the note for the kitchen, the
+   fee waiver. It starts as a phone delivery, as soon as possible.
+2. **Welche Gerichte?** The Kasse's dishes, with the basket beside them.
+   Over the basket whose order it is (a tap leads back), under it the price,
+   "Fertig in ca. 35 Min." to tell the caller, and **✓ Speichern**. Until it
+   can be saved, that button says what is missing and leads there: "Es fehlt
+   noch: Name, Straße ➜". So the steps can be taken in any order.
+
+In detail:
+
+- dishes tapped as in the Kasse
+  ([`Dishes`](app/src/main/kotlin/de/hamzabistro/printstation/ui/Dishes.kt):
+  the same tiles, categories and bestsellers, choices and basket lines, at
+  the website's prices), with the site's options: the dish's groups in
   its order, a "single" group a required choice that starts on its first
   choice still on sale, a "multiple" one any number; sold out by an
-  ingredient counts. A quantity and a note per dish (80 characters);
+  ingredient counts. A quantity, and a note per dish (80 characters) with a
+  tap on its line;
 - name and phone, needed for a delivery or a pickup. With
   [the shop's phone reporting its calls](#the-callers-number-on-the-tablet),
   the number is there before it is asked for;
@@ -158,7 +174,7 @@ accepted order
 - the address goes through the site's own `check-address`, as the
   signed-in staff account, which shows the ring — as soon as there is a
   house number and a postcode, while the caller is still on the line;
-- as soon as possible, with the minutes chosen as on an incoming order, or
+- **Sofort**, with the minutes chosen as on an incoming order, or **Später**,
   a time in the next seven days;
 - the price is the database's own, from a dry run of `staff_place_order`:
   the deal of the day, the Selbstabholerrabatt, the ring's fee and minimum.
@@ -178,8 +194,8 @@ phone's screen. With the app also on the shop's phone, the tablet shows
 who is calling, over whatever screen is up, big enough to read from across
 the kitchen: **📞 Das Telefon klingelt**, **Anruf von 0176 1234567** in
 large type, where that number had its last delivery, and one wide button,
-**Bestellung aufnehmen**, which opens [Telefon-Bestellung](#telefon-bestellung)
-with the number in it. With an order form already open, the button is
+**Bestellung aufnehmen**, which opens [Neue Bestellung](#neue-bestellung)
+with the number in it. With an order already open, the button is
 **Nummer übernehmen**, and only while its phone field is empty. Nothing
 opens by itself; a banner goes when it is used, put away with ✕, or three
 minutes old. A driver's phone shows none.
@@ -201,38 +217,9 @@ address book does not appear on the tablet; and a withheld number has
 nothing to pass on. On a database without the migration, the phone's
 reports fail quietly and the tablet shows no banners.
 
-### Telefon-Bestellung
+### The address by SMS
 
-The same order as [Neue Bestellung](#neue-bestellung), taken one screen at
-a time by somebody who need not read or see well: everything 1.3 times as
-big, one question per screen, the buttons along the bottom, **Weiter ➜**
-only once the screen is answered
-([`CallOrderScreen`](app/src/main/kotlin/de/hamzabistro/printstation/ui/CallOrderScreen.kt)).
-It opens from the call's banner, and from **📞 Telefon-Bestellung** on the
-queue, beside **+ Neue Bestellung**:
-
-1. **Wie heißt der Anrufer?** The name; the number is there already from
-   the call.
-2. **Wohin soll es gehen?** The address as in Neue Bestellung — the
-   caller's earlier addresses to tap, Leipzig's streets offered as it is
-   typed, the postcode and town filled in, check-address's verdict ("✓" or
-   "Dorthin liefern wir nicht") — or, when the address does not survive the
-   phone, **📱 SMS an den Anrufer senden** (below). **🛍 Holt selbst ab**
-   makes it a pickup with no address.
-3. **Welche Gerichte?** Only the dishes: big tiles with their photos, a
-   category at a time; a tap puts one in the basket (or opens the dish's
-   choices over the whole screen), and the tile says "2×".
-4. **Prüfen, dann speichern**: who, where, the dishes with − and +, the
-   price (the database's own dry run, as in Neue Bestellung), and "Fertig
-   in ca. 35 Min." to tell the caller. **✓ Bestellung speichern** puts it
-   into the kitchen, accepted, as soon as possible, at the minutes an
-   incoming order would be offered.
-
-**Alle Felder** switches to the full form with everything typed so far, for
-a time ahead, a counter order or the fee waiver.
-
-#### The address by SMS
-
+When the address does not survive the phone,
 **📱 SMS an den Anrufer senden** texts the caller a link —
 `https://www.hamzabistro.de/a/…` — to a page where they type the address
 themselves, on their own phone, during the call or after it
@@ -244,7 +231,7 @@ The screen says how the text fares ("✓ SMS gesendet", or why not, with
 - The address arrives while the caller is still on the line: it goes into
   the fields, is checked and priced like one typed, and the order is saved
   the usual way.
-- It has not arrived by step 4: **✓ Speichern und auf die Adresse warten**
+- It has not arrived when the dishes are in: **✓ Speichern und auf die Adresse warten**
   saves the basket on the link. The tablet puts the order into the kitchen
   by itself the moment the caller sends the address — checked with
   check-address, priced, saved, and printed like any other
@@ -313,7 +300,7 @@ reached by typing the address. Everything they do is here, in the drawer
 that **☰** at the top left of every screen opens (or a swipe to the
 right). It is the one way from screen to screen: the drawer marks the one
 shown, **Bestellungen** on top leads back to the queue, and Android's back
-does too. An order half typed ("Neue Bestellung", "Telefon-Bestellung") asks
+does too. An order half typed ("Neue Bestellung") asks
 before it is discarded.
 
 - **Letzte Bestellungen** — the last 50 orders whatever became of them,

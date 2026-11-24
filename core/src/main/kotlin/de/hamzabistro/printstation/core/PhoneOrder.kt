@@ -92,6 +92,10 @@ data class PhoneOrderDraft(
     /** How many dishes, counting each one. */
     val count: Int
         get() = lines.sumOf { it.qty }
+
+    /** What the lines come to by the menu: shown until the database has priced them. */
+    val subtotal: Double
+        get() = lines.sumOf { it.unitPrice * it.qty }
 }
 
 /** What is still missing or wrong before the order can be priced or saved. */

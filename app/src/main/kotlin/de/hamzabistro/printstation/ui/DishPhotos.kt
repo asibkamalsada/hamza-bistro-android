@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The dishes' photos for the big tiles of "Telefon-Bestellung" and "Kasse", each fetched once. */
+/** The dishes' photos for the big tiles of "Neue Bestellung" and "Kasse", each fetched once. */
 class DishPhotos(private val graph: AppGraph, private val scope: CoroutineScope) {
     private val cache = mutableMapOf<String, ImageBitmap?>()
     private val _photos = MutableStateFlow<Map<String, ImageBitmap?>>(emptyMap())

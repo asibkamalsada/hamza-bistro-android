@@ -39,7 +39,7 @@ class CallBannerTest {
     }
 
     @Test
-    fun theCallersNumberOpensTheCallOrderWithItFilledIn() {
+    fun theCallersNumberOpensAnOrderWithItFilledIn() {
         banners(listOf(call("c-1", "+491761234567")), lastAddress = RecentAddress("Karl-Heine-Straße 9", "04229", "Leipzig", "Hinterhaus"))
         compose.onNodeWithText("Call from 0176 1234567").assertIsDisplayed()
         compose.onNodeWithText("last delivery: Karl-Heine-Straße 9, 04229 Leipzig").assertIsDisplayed()
@@ -78,7 +78,7 @@ class CallBannerTest {
     @Test
     fun aCallAfterAnOrderIsSavedStartsANewOne() {
         order.edit { it.copy(phone = "0341 999999", name = "Vorher") }
-        order.goTo(CallStep.DONE)
+        order.goTo(TakingStep.DONE)
         banners(listOf(call("c-1", "+491761234567")), newOrderOpen = true)
 
         compose.onNodeWithText("Take the order").performClick()
@@ -86,7 +86,7 @@ class CallBannerTest {
 
         assertEquals("0176 1234567", order.state.value.draft.phone)
         assertEquals("", order.state.value.draft.name)
-        assertEquals(CallStep.NAME, order.state.value.step)
+        assertEquals(TakingStep.CUSTOMER, order.state.value.step)
         assertEquals(1, opened)
     }
 
