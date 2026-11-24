@@ -155,7 +155,7 @@ private sealed interface Asking {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IssuesScreen(onBack: () -> Unit) {
+fun IssuesScreen(navigation: @Composable () -> Unit) {
     val model: IssuesViewModel = viewModel()
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -166,7 +166,7 @@ fun IssuesScreen(onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.issues_title)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
                 actions = { TextButton(onClick = model::load, enabled = !state.loading) { Text(stringResource(R.string.reload)) } },
             )
         },

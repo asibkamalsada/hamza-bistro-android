@@ -162,7 +162,7 @@ private fun pickDay(context: Context, day: LocalDate, today: LocalDate, onPicked
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CashUpScreen(onBack: () -> Unit) {
+fun CashUpScreen(navigation: @Composable () -> Unit) {
     val model: CashUpViewModel = viewModel()
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -172,7 +172,7 @@ fun CashUpScreen(onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.cash_up_title)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
                 actions = {
                     val shown = state.cashUp
                     TextButton(onClick = { shown?.let { share(context, it) } }, enabled = shown != null && !state.loading) {

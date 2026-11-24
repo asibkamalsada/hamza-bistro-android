@@ -30,7 +30,7 @@ class HouseNumberChoicesTest {
 
     private fun typed(street: String): NewOrderViewModel {
         val model = NewOrderViewModel(app)
-        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, model = model) } }
+        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, navigation = {}, model = model) } }
         compose.onNodeWithText("Delivery").performClick()
         compose.onNodeWithText("Street and number").performTextInput(street)
         // Searched off the main thread, and read from the build the first time.

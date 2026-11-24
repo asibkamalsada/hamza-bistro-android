@@ -80,7 +80,7 @@ fun QueueScreen(
     focus: StateFlow<String?>,
     onFocused: () -> Unit,
     onOpen: (StaffScreen) -> Unit,
-    onMenu: () -> Unit,
+    navigation: @Composable () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val asked by focus.collectAsStateWithLifecycle()
@@ -109,8 +109,6 @@ fun QueueScreen(
     LaunchedEffect(asked, tapped) { if (asked != null || tapped != null) driving = false }
     val chosen by viewModel.chosen.collectAsStateWithLifecycle()
     val stopOrder by viewModel.stopOrder.collectAsStateWithLifecycle()
-    val issues by viewModel.issues.collectAsStateWithLifecycle()
-    val update = viewModel.update.collectAsStateWithLifecycle().value.available
 
     Scaffold(
         topBar = {
@@ -118,7 +116,7 @@ fun QueueScreen(
                 title = {
                     Text(if (waiting > 0) stringResource(R.string.queue_title_waiting, waiting) else stringResource(R.string.queue_title))
                 },
-                navigationIcon = { MenuButton(issues.count, update = update != null, onClick = onMenu) },
+                navigationIcon = navigation,
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

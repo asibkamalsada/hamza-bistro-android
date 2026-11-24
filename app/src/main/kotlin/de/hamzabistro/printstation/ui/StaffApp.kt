@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -20,7 +22,7 @@ import de.hamzabistro.printstation.BuildConfig
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/** Where a staff account is in the app. Everything but the queue goes back to the queue. */
+/** Where a staff account is in the app. ☰ leads from each to the others; back, to the queue. */
 enum class StaffScreen {
     QUEUE,
 
@@ -58,7 +60,7 @@ enum class StaffScreen {
 /**
  * A staff account's app: the queue, and from it everything the website's
  * staff pages had — the history, the menu, the delivery hours, the settings —
- * in the drawer that ☰ on the queue opens.
+ * in the drawer that ☰ opens, the same on every one of them.
  */
 @Composable
 fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String?>, onFocused: () -> Unit) {
@@ -66,6 +68,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val back = { screen = StaffScreen.QUEUE }
+    val leaving = remember { Leaving() }
     if (screen != StaffScreen.QUEUE) BackHandler(onBack = back)
     // "Neue Reklamation" tapped: the list, not the queue; "Schlechte
     // Bewertung": the history, where the stars are.
@@ -93,31 +96,38 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
             DrawerHeader(account?.email, staff.deviceLabel(), BuildConfig.VERSION_NAME, update, install)
         }
     // Whether there is a till, and what is open on it: once signed in, and whenever the drawer is opened.
+    // Not over the till: it looks itself, and a look that failed would replace what it says about a sale.
     val till by staff.till.collectAsStateWithLifecycle()
-    LaunchedEffect(account?.userId, drawer.isOpen) { if (account != null) staff.lookAtTill() }
+    LaunchedEffect(account?.userId, drawer.isOpen) { if (account != null && screen != StaffScreen.TILL) staff.lookAtTill() }
+    val navigation = @Composable { MenuButton(issues.count, update = update != null) { scope.launch { drawer.open() } } }
     StaffDrawer(
         drawer,
-        enabled = screen == StaffScreen.QUEUE,
+        current = screen,
         issues,
         header,
-        onOpen = { screen = it },
+        onOpen = { to -> if (to != screen) leaving.leave { screen = to } },
         onInstall = { staff.install(it) },
         till = till,
     ) {
         Box(Modifier.fillMaxSize()) {
             when (screen) {
-                StaffScreen.QUEUE ->
-                    QueueScreen(staff, focus, onFocused, onOpen = { screen = it }, onMenu = { scope.launch { drawer.open() } })
-                StaffScreen.HISTORY -> HistoryScreen(staff, onBack = back)
-                StaffScreen.ISSUES -> IssuesScreen(onBack = back)
-                StaffScreen.CASH_UP -> CashUpScreen(onBack = back)
-                StaffScreen.REPORT -> ReportScreen(onBack = back)
-                StaffScreen.MENU -> MenuScreen(onBack = back)
-                StaffScreen.HOURS -> HoursScreen(staff, onBack = back)
-                StaffScreen.SETTINGS -> SettingsScreen(staff, main, onBack = back)
-                StaffScreen.TILL -> TillScreen(onBack = back)
-                StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back)
-                StaffScreen.CALL_ORDER -> CallOrderScreen(onBack = back, onFullForm = { screen = StaffScreen.NEW_ORDER })
+                StaffScreen.QUEUE -> QueueScreen(staff, focus, onFocused, onOpen = { screen = it }, navigation = navigation)
+                StaffScreen.HISTORY -> HistoryScreen(staff, navigation)
+                StaffScreen.ISSUES -> IssuesScreen(navigation)
+                StaffScreen.CASH_UP -> CashUpScreen(navigation)
+                StaffScreen.REPORT -> ReportScreen(navigation)
+                StaffScreen.MENU -> MenuScreen(navigation)
+                StaffScreen.HOURS -> HoursScreen(staff, navigation)
+                StaffScreen.SETTINGS -> SettingsScreen(staff, main, navigation)
+                StaffScreen.TILL -> TillScreen(onBack = back, navigation = navigation, leaving = leaving)
+                StaffScreen.NEW_ORDER -> NewOrderScreen(onBack = back, navigation = navigation, leaving = leaving)
+                StaffScreen.CALL_ORDER ->
+                    CallOrderScreen(
+                        onBack = back,
+                        onFullForm = { screen = StaffScreen.NEW_ORDER },
+                        navigation = navigation,
+                        leaving = leaving,
+                    )
             }
             // Who is calling the shop's phone, over any screen. Not on a driver's phone: nobody takes an order there.
             if (!prefs.driver) {
@@ -128,6 +138,33 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
             }
+        }
+    }
+}
+
+/**
+ * What the screen shown does, or asks, before the drawer leads away from it:
+ * an order half typed is not discarded unasked. A screen with nothing to say
+ * is simply left.
+ */
+class Leaving {
+    private var guard: ((() -> Unit) -> Unit)? = null
+
+    /** Leaves with [go]: at once, or when the screen says so. */
+    fun leave(go: () -> Unit) {
+        val asked = guard
+        if (asked == null) go() else asked(go)
+    }
+
+    /** From the screen, for as long as it is shown: [ask] is given what leaves it. */
+    @Composable
+    fun Ask(ask: (() -> Unit) -> Unit) {
+        val latest by rememberUpdatedState(ask)
+        DisposableEffect(this) {
+            val mine: (() -> Unit) -> Unit = { go -> latest(go) }
+            guard = mine
+            // The next screen's may be in place already.
+            onDispose { if (guard === mine) guard = null }
         }
     }
 }

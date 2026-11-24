@@ -74,7 +74,7 @@ private val QUIET_WINDOWS: List<Pair<LocalTime, LocalTime>?> =
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Unit) {
+fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, navigation: @Composable () -> Unit) {
     val state by staff.state.collectAsStateWithLifecycle()
     val mainState by main.state.collectAsStateWithLifecycle()
     val update by staff.update.collectAsStateWithLifecycle()
@@ -96,7 +96,7 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, onBack: () -> Uni
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
             )
         },
     ) { padding ->

@@ -9,8 +9,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
+import de.hamzabistro.printstation.core.BasketLine
+import de.hamzabistro.printstation.core.MenuDish
 import de.hamzabistro.printstation.core.StreetDelivery
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -33,7 +36,7 @@ class NewOrderScreenTest {
     /** The form with "Lieferung" picked and [street] typed, once the list has been searched for it. */
     private fun typed(street: String): NewOrderViewModel {
         val model = NewOrderViewModel(app)
-        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, model = model) } }
+        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, navigation = {}, model = model) } }
         compose.onNodeWithText("Delivery").performClick()
         compose.onNodeWithText("Street and number").performTextInput(street)
         // Searched off the main thread, and read from the build the first time.
@@ -62,6 +65,23 @@ class NewOrderScreenTest {
         assertEquals(StreetDelivery.OUTSIDE, model.state.value.streets.first().entry.delivery)
         compose.onNodeWithText("Karl-Härting-Straße 9").assertIsDisplayed()
         compose.onAllNodesWithText("no delivery").onFirst().assertIsDisplayed()
+    }
+
+    @Test
+    fun theDrawerLeadsAwayFromAnOrderHalfTypedOnlyOnceItIsDiscarded() {
+        val model = NewOrderViewModel(app)
+        val leaving = Leaving()
+        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, navigation = {}, leaving = leaving, model = model) } }
+        model.add(BasketLine(MenuDish(1, "Speisen", "Döner", "", 7.5, 12, 0, "", true, emptyList()), 1))
+        compose.waitForIdle()
+        var gone = false
+        compose.runOnIdle { leaving.leave { gone = true } }
+        compose.onNodeWithText("Discard this order?").assertIsDisplayed()
+        assertFalse(gone)
+        compose.onNodeWithText("Discard").performClick()
+        compose.waitForIdle()
+        assertTrue(gone)
+        assertTrue(model.state.value.draft.lines.isEmpty())
     }
 
     @Test

@@ -119,7 +119,6 @@
     <string name="queue_cook">In der Küche</string>
     <string name="queue_out">Unterwegs &amp; abholbereit</string>
     <string name="settings">Einstellungen</string>
-    <string name="back">Zurück</string>
     <string name="retry">Erneut</string>
     <string name="shift_off_banner">Keine Schicht: dieses Gerät klingelt nicht bei neuen Bestellungen.</string>
     <string name="shift_start">Schicht beginnen</string>
@@ -1108,7 +1107,6 @@
     <string name="till_receipt_test">TSE-Testumgebung: kein gültiger Beleg</string>
     <string name="till_print_old">Der Server kann noch keine Belege drucken: print-ticket braucht das Update.</string>
     <string name="till_print_failed">Der Beleg wurde nicht gedruckt: %1$s. Drucker an, Papier drin?</string>
-    <string name="till_close">Kasse schließen</string>
     <string name="till_dismiss">Meldung ausblenden</string>
     <string name="till_training_end">Training beenden</string>
     <string name="till_off_strip">TRAINING – Kasse ist aus: Signatur nicht eingeschaltet</string>

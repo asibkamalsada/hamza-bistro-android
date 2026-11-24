@@ -310,8 +310,11 @@ is switched on in the settings
 The website still has `/orders`, `/orders/settings`, `/orders/hours` and
 `/menu-admin`, but links to none of them any more: they are a fallback,
 reached by typing the address. Everything they do is here, in the drawer
-that **☰** at the top left of the queue opens (or a swipe from the left
-edge):
+that **☰** at the top left of every screen opens (or a swipe to the
+right). It is the one way from screen to screen: the drawer marks the one
+shown, **Bestellungen** on top leads back to the queue, and Android's back
+does too. An order half typed ("Neue Bestellung", "Telefon-Bestellung") asks
+before it is discarded.
 
 - **Letzte Bestellungen** — the last 50 orders whatever became of them,
   and what today's delivered orders came to, for the call about yesterday's

@@ -54,7 +54,7 @@ class TillScreenTest {
 
     private fun open() {
         val model = TillViewModel(app)
-        compose.setContent { AppTheme { TillScreen(onBack = {}, model = model) } }
+        compose.setContent { AppTheme { TillScreen(onBack = {}, navigation = {}, model = model) } }
         compose.waitForIdle()
     }
 
@@ -168,7 +168,7 @@ class TillScreenTest {
             AppTheme {
                 StaffDrawer(
                     rememberDrawerState(DrawerValue.Open),
-                    enabled = true,
+                    current = StaffScreen.QUEUE,
                     IssuesState(),
                     DrawerHeader("a@example.com", "Tablet", "9.9"),
                     onOpen = { opened = it },
@@ -192,7 +192,7 @@ class TillScreenTest {
             AppTheme {
                 StaffDrawer(
                     rememberDrawerState(DrawerValue.Open),
-                    enabled = true,
+                    current = StaffScreen.QUEUE,
                     IssuesState(),
                     DrawerHeader("a@example.com", "Tablet", "9.9"),
                     onOpen = {},

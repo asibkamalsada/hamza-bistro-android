@@ -107,7 +107,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(staff: StaffViewModel, onBack: () -> Unit) {
+fun HistoryScreen(staff: StaffViewModel, navigation: @Composable () -> Unit) {
     val history: HistoryViewModel = viewModel()
     val state by history.state.collectAsStateWithLifecycle()
     // For the cards' clocks, the dishes' prep times and the map app this device uses.
@@ -120,7 +120,7 @@ fun HistoryScreen(staff: StaffViewModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.history_title)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
                 actions = { TextButton(onClick = history::load, enabled = !state.loading) { Text(stringResource(R.string.reload)) } },
             )
         },

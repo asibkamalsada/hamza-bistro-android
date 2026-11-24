@@ -22,8 +22,10 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -48,9 +50,10 @@ data class DrawerHeader(
 )
 
 /**
- * Where the queue leads, in a drawer from the left: opened with ☰ or a swipe
- * from the left edge, closed with back, a tap beside it or a choice. The
- * same modal drawer on a tablet as on a phone: the queue's three columns
+ * The way from every screen to every other, in a drawer from the left: opened
+ * with ☰ or a swipe, closed with back, a tap beside it or a choice, the
+ * screen shown marked in it ([current]).
+ * The same modal drawer on a tablet as on a phone: the queue's three columns
  * keep the whole width, and the screens behind it are rarely needed while
  * orders come in. "Kasse" only on a database that has a till, with the
  * sales left open on it; "Reklamationen" only on a database that has them, with
@@ -59,7 +62,7 @@ data class DrawerHeader(
 @Composable
 fun StaffDrawer(
     drawer: DrawerState,
-    enabled: Boolean,
+    current: StaffScreen,
     issues: IssuesState,
     header: DrawerHeader,
     onOpen: (StaffScreen) -> Unit,
@@ -70,9 +73,6 @@ fun StaffDrawer(
     val scope = rememberCoroutineScope()
     ModalNavigationDrawer(
         drawerState = drawer,
-        // Only where ☰ is, so a sub-screen's own swipes are its own; while
-        // open, always, so it can be swiped shut.
-        gesturesEnabled = enabled || drawer.isOpen,
         drawerContent = {
             ModalDrawerSheet {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
@@ -89,7 +89,7 @@ fun StaffDrawer(
                             icon = { Icon(painterResource(entry.icon), contentDescription = null) },
                             label = { Text(stringResource(entry.label)) },
                             badge = { if (count > 0) CountBadge { Text(count.toString()) } },
-                            selected = false,
+                            selected = entry.screen == current,
                             onClick = {
                                 scope.launch { drawer.close() }
                                 onOpen(entry.screen)
@@ -102,8 +102,11 @@ fun StaffDrawer(
         },
         content = content,
     )
-    // Composed after the screens' own, so back closes the drawer first.
-    BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
+    // A keyboard up for the screen below would cover half of it.
+    val focused = LocalFocusManager.current
+    LaunchedEffect(drawer.isOpen) { if (drawer.isOpen) focused.clearFocus() }
+    // Only once it is open: after the screen's own, so back closes the drawer first.
+    if (drawer.isOpen) BackHandler { scope.launch { drawer.close() } }
 }
 
 /**
@@ -145,6 +148,7 @@ private class DrawerEntry(val screen: StaffScreen, @StringRes val label: Int, @D
 
 private fun drawerEntries(issues: IssuesState, till: TillState): List<DrawerEntry> =
     listOfNotNull(
+        DrawerEntry(StaffScreen.QUEUE, R.string.queue_title, R.drawable.ic_orders),
         // Only on a database that has a till.
         DrawerEntry(StaffScreen.TILL, R.string.till_title, R.drawable.ic_till).takeIf { till.available == true },
         DrawerEntry(StaffScreen.HISTORY, R.string.history_title, R.drawable.ic_history),

@@ -1,6 +1,8 @@
 package de.hamzabistro.printstation.ui
 
 import android.app.Application
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -8,6 +10,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -78,6 +84,57 @@ class StartupTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun everyScreenHasTheSameMenuAndItLeadsToEveryOther() {
+        val staff = StaffViewModel(app)
+        val main = MainViewModel(app)
+        compose.setContent { AppTheme { StaffApp(staff, main, MutableStateFlow(null), onFocused = {}) } }
+        compose.waitForIdle()
+        for (label in listOf("Recent orders", "Cash-up", "Reports", "Menu", "Delivery hours", "Settings", "Orders")) {
+            openMenu()
+            entry(label).performScrollTo().performClick()
+            compose.waitForIdle()
+            // There, says the drawer, opened with that screen's ☰.
+            openMenu()
+            entry(label).assertIsDisplayed().assertIsSelected().performClick()
+            compose.waitForIdle()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun backClosesTheMenuBeforeItLeavesTheScreen() {
+        val staff = StaffViewModel(app)
+        val main = MainViewModel(app)
+        var back: OnBackPressedDispatcher? = null
+        compose.setContent {
+            back = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+            AppTheme { StaffApp(staff, main, MutableStateFlow(null), onFocused = {}) }
+        }
+        compose.waitForIdle()
+        // A screen with a back of its own.
+        compose.onNodeWithText("+ New order").performClick()
+        compose.waitForIdle()
+        openMenu()
+        entry("Orders").assertIsDisplayed()
+        compose.runOnIdle { back!!.onBackPressed() }
+        compose.waitForIdle()
+        entry("Orders").assertIsNotDisplayed()
+        compose.onNodeWithText("New order").assertIsDisplayed()
+        compose.runOnIdle { back!!.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNodeWithTag(STRIP_TAG).assertIsDisplayed()
+    }
+
+    private fun openMenu() {
+        compose.onNodeWithContentDescription("Open menu", substring = true).performClick()
+        compose.waitForIdle()
+    }
+
+    /** The drawer's entry, not the title of the screen it leads to. */
+    private fun entry(label: String) = compose.onNode(hasText(label) and isSelectable())
+
+    @Test
     fun theQueueStripOpensItsSheet() {
         val staff = StaffViewModel(app)
         val main = MainViewModel(app)
@@ -98,12 +155,12 @@ class StartupTest {
         compose.setContent {
             AppTheme {
                 val drawer = rememberDrawerState(DrawerValue.Open)
-                StaffDrawer(drawer, enabled = true, issues, DrawerHeader("kitchen@example.com", "Tablet Küche", "9.9"), onOpen = { opened = it }) {
+                StaffDrawer(drawer, current = StaffScreen.QUEUE, issues, DrawerHeader("kitchen@example.com", "Tablet Küche", "9.9"), onOpen = { opened = it }) {
                     TopAppBar(title = { Text("Queue") }, navigationIcon = { MenuButton(issues.count, onClick = {}) })
                 }
             }
         }
-        for (entry in listOf("Recent orders", "Complaints", "Cash-up", "Reports", "Menu", "Delivery hours", "Settings")) {
+        for (entry in listOf("Orders", "Recent orders", "Complaints", "Cash-up", "Reports", "Menu", "Delivery hours", "Settings")) {
             compose.onNodeWithText(entry).assertIsDisplayed()
         }
         compose.onNodeWithText("Hamza Bistro").assertIsDisplayed()

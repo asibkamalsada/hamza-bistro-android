@@ -53,7 +53,7 @@ class TillLayoutTest(private val device: TillDevice) {
 
     private val f = TillFixtures
 
-    private fun show(state: TillState, view: TillView = f.view) = compose.setScreen { TillContent(state, view, f.photos, NoTill(), onBack = {}) }
+    private fun show(state: TillState, view: TillView = f.view) = compose.setScreen { TillContent(state, view, f.photos, NoTill(), onBack = {}, navigation = { MenuButton(0, onClick = {}) }) }
 
     private fun nodes(matcher: SemanticsMatcher): List<SemanticsNode> = compose.onAllNodes(matcher).fetchSemanticsNodes()
 
