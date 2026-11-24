@@ -120,7 +120,7 @@ class TillScreenTest {
                 "s-1", 321, "open", total = 16.0, pendingMethod = "card", openedAt = Instant.parse("2026-11-22T11:00:00Z"),
                 openedBy = "koch", openedOn = "Tablet", stale = true,
             )
-        compose.setContent { AppTheme { OpenSaleCard(sale, current = StaffScreen.QUEUE) { resumed = true } } }
+        compose.setContent { AppTheme { OpenSaleCard(sale, enabled = true) { resumed = true } } }
         compose.onNodeWithText("Open sale #321 · " + Format.euro(16.0)).assertIsDisplayed()
         compose.onNodeWithText("22.11. 12:00 · Tablet · koch").assertIsDisplayed()
         compose.onNodeWithText("A card payment was started: check the card app").assertIsDisplayed()
