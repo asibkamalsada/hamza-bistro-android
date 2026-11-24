@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -84,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.BasketLine
+import de.hamzabistro.printstation.core.Bestsellers
 import de.hamzabistro.printstation.core.CounterSale
 import de.hamzabistro.printstation.core.CounterSales
 import de.hamzabistro.printstation.core.MenuDish
@@ -101,6 +104,9 @@ const val TILL_RING_UP_TAG = "till-ring-up"
 
 /** One dish to tap. */
 const val TILL_TILE_TAG = "till-tile"
+
+/** The line below the bestsellers. */
+const val TILL_BESTSELLERS_END_TAG = "till-bestsellers-end"
 
 /** One line of the basket. */
 const val TILL_LINE_TAG = "till-line"
@@ -221,7 +227,7 @@ private fun TillShop(
             TillOpenBar(state, model, onOpenSales)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
-                    view.menu != null -> TillMenu(view.menu, state.lines, photos, model::loadPhoto, rail, onTap)
+                    view.menu != null -> TillMenu(view.menu, view.bestsellers, state.lines, photos, model::loadPhoto, rail, onTap)
                     view.menuError != null ->
                         Column(
                             Modifier.align(Alignment.Center).widthIn(max = 560.dp).padding(12.dp),
@@ -252,10 +258,15 @@ private fun TillShop(
     }
 }
 
-/** A category at a time: the categories down the side, all in sight, or along the top where there is no side. */
+/**
+ * A category at a time: the categories down the side, all in sight, or along
+ * the top where there is no side. All of them together start with what sells
+ * most today; within its category a dish stays where the card has it.
+ */
 @Composable
 private fun TillMenu(
     menu: OrderMenu,
+    bestsellers: List<Long>,
     lines: List<BasketLine>,
     photos: Map<String, ImageBitmap?>,
     onPhoto: (String) -> Unit,
@@ -265,9 +276,14 @@ private fun TillMenu(
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     val dishes = remember(menu) { menu.dishes.filterNot { it.archived } }
     val categories = remember(dishes) { listOf<String?>(null) + dishes.map { it.category }.distinct() }
-    val shown = dishes.filter { category == null || it.category == category }
+    val shown =
+        remember(dishes, bestsellers, category) {
+            if (category == null) Bestsellers.onTop(dishes, bestsellers) else Bestsellers.Arranged(dishes.filter { it.category == category }, 0)
+        }
+    // From the top whenever something else is shown: the grid would follow the dish it showed first to its new place.
+    val place = remember(category, bestsellers) { LazyGridState() }
     val grid: @Composable (Modifier) -> Unit = { modifier ->
-        TillGrid(shown, menu, lines, photos, onPhoto, rail, onTap, modifier)
+        TillGrid(shown, place, menu, lines, photos, onPhoto, rail, onTap, modifier)
     }
     if (rail) {
         Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -321,7 +337,8 @@ private fun TillCategory(name: String?, selected: Boolean, modifier: Modifier, o
 
 @Composable
 private fun TillGrid(
-    dishes: List<MenuDish>,
+    shown: Bestsellers.Arranged,
+    place: LazyGridState,
     menu: OrderMenu,
     lines: List<BasketLine>,
     photos: Map<String, ImageBitmap?>,
@@ -335,17 +352,26 @@ private fun TillGrid(
     val height = with(LocalDensity.current) { 80.dp + (TILL_NAME.lineHeight * 2).toDp() + PRICE_LINE.toDp() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 150.dp),
+        state = place,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = if (rail) PaddingValues(vertical = 8.dp) else PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp),
         modifier = modifier,
     ) {
-        items(dishes, key = { it.id }) { dish ->
+        val tile: @Composable (MenuDish) -> Unit = { dish ->
             val groups = remember(dish, menu.groups) { OptionRules.groups(dish, menu.groups) }
             val count = lines.filter { it.dish.id == dish.id }.sumOf { it.qty }
             LaunchedEffect(dish.imageUrl) { onPhoto(dish.imageUrl) }
             TillTile(dish, photos[dish.imageUrl], OptionRules.orderable(dish, groups), count, Modifier.height(height)) { onTap(dish, groups) }
         }
+        items(shown.dishes.take(shown.top), key = { it.id }) { tile(it) }
+        // Where the bestsellers end, and the card in its own order begins.
+        if (shown.top in 1 until shown.dishes.size) {
+            item(key = "rest", span = { GridItemSpan(maxLineSpan) }) {
+                HorizontalDivider(thickness = 2.dp, modifier = Modifier.padding(vertical = 4.dp).testTag(TILL_BESTSELLERS_END_TAG))
+            }
+        }
+        items(shown.dishes.drop(shown.top), key = { it.id }) { tile(it) }
     }
 }
 

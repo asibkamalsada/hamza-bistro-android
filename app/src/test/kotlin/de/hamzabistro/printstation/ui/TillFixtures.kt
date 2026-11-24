@@ -322,6 +322,15 @@ internal object TillFixtures {
 
     val view = TillView(menu = menu)
 
+    /** A Friday's bestsellers: from all over the card, one of them sold out. */
+    val bestsellers =
+        listOf(
+            "Dürüm Döner", "Döner", "Ayran", "Falafel im Brot", "Pommes frites", "Cola 0,33 l", "Schawarma-Teller",
+            "Lammkoteletts", "Cheeseburger", "Hähnchen-Schawarma im Saj-Brot", "Dönerteller mit Pommes frites", "Baklava (3 Stück)",
+        )
+
+    val ranked = view.copy(bestsellers = bestsellers.map { name -> menu.dishes.first { it.name == name }.id })
+
     /** The till on, nothing in the basket. */
     val empty = TillState(status = CounterStatus(enabled = true), available = true)
 

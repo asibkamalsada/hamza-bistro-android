@@ -330,6 +330,13 @@ edge):
   is found again on any device, after a restart too. Not in the drawer on a
   database without the till (`20261123100000_counter_sales` in
   hamza-bistro-web); training only while the server's signing is off.
+  Under *Alle* the twelve dishes that sell most stand on top, the rest
+  below a line in the card's order; in its category every dish stays where
+  it always is. What sells most is worked out on the device once a day from
+  the delivered orders of the last eight weeks (`Bestsellers`): how many
+  orders a dish was in, where the same day of the week counts four times,
+  the counter three times, and an order half as much after four weeks.
+  Today's orders wait until tomorrow, so no tile moves during the day.
 - **Kassensturz** — for today or a day picked: per driver (account and
   device name), how many orders, cash, card and unknown, with the order
   numbers behind each sum a tap away, and **Teilen** as plain text through
@@ -586,7 +593,7 @@ the app logs it.
   and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
-  phone and walk-in orders (`PhoneOrder`), the caller's number and the
+  phone and walk-in orders (`PhoneOrder`), what the Kasse shows first (`Bestsellers`), the caller's number and the
   address by SMS (`IncomingCalls`, `AddressRequests`), who hears about orders, the print
   stations and the address check (`Devices`), the alarm's rules
   (`AlarmPolicy`), Realtime (`OrdersRealtime`), printing

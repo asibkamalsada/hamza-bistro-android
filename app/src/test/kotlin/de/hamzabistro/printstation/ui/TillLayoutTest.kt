@@ -8,13 +8,17 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,7 +53,7 @@ class TillLayoutTest(private val device: TillDevice) {
 
     private val f = TillFixtures
 
-    private fun show(state: TillState) = compose.setScreen { TillContent(state, f.view, f.photos, NoTill(), onBack = {}) }
+    private fun show(state: TillState, view: TillView = f.view) = compose.setScreen { TillContent(state, view, f.photos, NoTill(), onBack = {}) }
 
     private fun nodes(matcher: SemanticsMatcher): List<SemanticsNode> = compose.onAllNodes(matcher).fetchSemanticsNodes()
 
@@ -80,6 +84,46 @@ class TillLayoutTest(private val device: TillDevice) {
         assertEquals("plus on $device", 5, more.size)
         assertEquals("minus on $device", 5, less.size)
         assertTrue("${tiles.size} dishes on $device", tiles.size >= 8)
+    }
+
+    /** The names of the dishes in sight, in reading order. */
+    private fun tiles(): List<String> =
+        nodes(hasTestTag(TILL_TILE_TAG)).filter { it.whole() }.sortedWith(compareBy({ it.boundsInRoot.top }, { it.boundsInRoot.left })).map {
+            it.config[SemanticsProperties.Text].first().text
+        }
+
+    @Test
+    fun theBestsellersAreTheFirstDishesAndTheCategoriesStayAsTheCardHasThem() {
+        show(f.empty, f.ranked)
+        val first = tiles()
+        assertTrue("${first.size} dishes on $device", first.size >= if (device.phone) 4 else 6)
+        assertEquals("on $device", f.bestsellers.take(first.size), first.take(f.bestsellers.size))
+
+        // In its category a dish is where it always was.
+        compose.onAllNodes(hasText("Döner") and hasClickAction() and !hasTestTag(TILL_TILE_TAG)).onFirst().performClick()
+        compose.waitForIdle()
+        val doener = f.menu.dishes.filter { it.category == "Döner" }.map { it.name }
+        val inCategory = tiles()
+        assertEquals("on $device", doener.take(inCategory.size), inCategory)
+
+        // And back on all of them, the bestsellers are in sight again.
+        compose.onNode(hasText("Alle") and hasClickAction()).performClick()
+        compose.waitForIdle()
+        assertEquals("on $device", first, tiles())
+    }
+
+    @Test
+    fun aLineSaysWhereTheBestsellersEnd() {
+        show(f.empty, f.ranked)
+        compose.onNode(hasScrollToNodeAction() and hasAnyDescendant(hasTestTag(TILL_TILE_TAG))).performScrollToNode(hasTestTag(TILL_BESTSELLERS_END_TAG))
+        assertEquals("on $device", 1, nodes(hasTestTag(TILL_BESTSELLERS_END_TAG)).size)
+    }
+
+    @Test
+    fun withoutBestsellersTheDishesAreInTheCardsOrder() {
+        show(f.empty)
+        val first = tiles()
+        assertEquals("on $device", f.menu.dishes.take(first.size).map { it.name }, first)
     }
 
     @Test
