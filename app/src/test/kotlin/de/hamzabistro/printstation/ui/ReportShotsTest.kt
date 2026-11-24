@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -13,8 +12,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureScreenRoboImage
-import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.ReportCameFrom
+import de.hamzabistro.printstation.core.ReportText
 import java.io.File
 import org.junit.Rule
 import org.junit.Test
@@ -49,11 +48,11 @@ class ReportShotsTest(private val device: TillDevice) {
     fun cameFrom() {
         compose.setScreen {
             Box(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 56.dp)) {
-                CameFrom(rows, stringResource(R.string.report_orders), stringResource(R.string.report_revenue))
+                CameFrom(rows)
             }
         }
         captureScreenRoboImage(File("build/kasse-shots", "report-came-from--${device.name.lowercase().replace('_', '-')}.png"))
-        for (name in listOf("Instagram-Anzeige", "Gedruckte Karte oder getippt", "Facebook-Anzeige", "instagram-ad-pizza", "nebenan.de", "Unbekannt")) {
+        for (name in listOf("Instagram-Anzeige", "Gedruckte Karte oder getippt", "Facebook-Anzeige", "instagram-ad-pizza", "nebenan.de", "Unbekannt", "31 geliefert, 22 neu", ReportText.euro(1060.0))) {
             compose.onNodeWithText(name).performScrollTo().assertIsDisplayed()
         }
     }

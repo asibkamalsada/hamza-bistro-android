@@ -386,7 +386,7 @@ private fun LazyListScope.reportItems(report: Report, words: ReportWords) {
     // Only once something came in by phone or at the counter (#9): otherwise it is all "Website".
     if (report.enteredByStaff) item(key = "sources") { Sources(report, words) }
     // Only once a web order in the range carries a label (hamza-bistro-web 20261124120000).
-    if (report.knowsCameFrom) item(key = "came_from") { CameFrom(report.cameFrom, words.orders, words.revenue) }
+    if (report.knowsCameFrom) item(key = "came_from") { CameFrom(report.cameFrom) }
     item(key = "best") { BestSellers(report) }
     item(key = "grid") { BusyHours(report.grid) }
     item(key = "times") { Times(report, words) }
@@ -530,15 +530,21 @@ private fun sourceName(resources: Resources, source: String): String =
 
 /** Instagram-Anzeige, Flyer, Google, direkt: what each way in brought, and how many of them were new. */
 @Composable
-internal fun CameFrom(rows: List<ReportCameFrom>, orders: String, revenue: String) {
+internal fun CameFrom(rows: List<ReportCameFrom>) {
     val resources = LocalResources.current
     val most = rows.maxOfOrNull { it.delivered } ?: 0
     ReportSection(stringResource(R.string.report_came_from)) {
-        Line("", orders, stringResource(R.string.report_came_from_new), revenue, muted = true)
         for (row in rows) {
-            // On a line of its own: next to three columns a phone leaves it no room.
-            Text(cameFromName(resources, row.cameFrom), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            Line("", row.delivered.toString(), row.newCustomers.toString(), ReportText.euro(row.revenue))
+            // Not Line's columns: beside three of them a phone leaves the names no room.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(cameFromName(resources, row.cameFrom), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(ReportText.euro(row.revenue), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            }
+            Text(
+                stringResource(R.string.report_came_from_counts, row.delivered, row.newCustomers),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (most > 0) Bar(row.delivered.toDouble() / most)
         }
         Text(stringResource(R.string.report_came_from_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
