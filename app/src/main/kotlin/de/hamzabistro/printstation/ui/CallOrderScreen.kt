@@ -49,6 +49,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -306,7 +308,7 @@ private fun TextedAddress(state: NewOrderState, model: OrderTaking, link: Addres
         SmsStatus(link, onAgain = model::sendLink)
         val arrived = link?.address
         if (arrived != null) StatusLine(stringResource(R.string.call_order_address_arrived, arrived.line), good = true)
-        else StatusLine(stringResource(R.string.call_order_address_pending))
+        else if (link?.sms != SmsState.FAILED) StatusLine(stringResource(R.string.call_order_address_pending))
     }
     state.linkError?.let { StatusLine(stringResource(R.string.call_order_link_failed, it), bad = true) }
 }
@@ -373,9 +375,11 @@ private fun ConfirmStep(state: NewOrderState, model: OrderTaking, link: AddressR
     val quote = state.quote
     val problems = PhoneOrders.problems(draft, Instant.now())
     val subtotal = draft.lines.sumOf { it.unitPrice * it.qty }
+    val roomy = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } >= 600.dp
     StepPage(
         bottom = {
-            BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.DISHES) }, outlined = true)
+            // A phone has no room for both in one row; its own back leads back as well.
+            if (roomy) BigButton(stringResource(R.string.call_order_back), onClick = { model.goTo(CallStep.DISHES) }, outlined = true)
             if (waitsForLink) {
                 BigButton(
                     if (state.savingWaiting) stringResource(R.string.new_order_saving) else stringResource(R.string.call_order_save_waiting),

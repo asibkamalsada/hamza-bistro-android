@@ -91,7 +91,7 @@ class NewOrderScreenTest {
         val doener = MenuDish(1, "Speisen", "Döner", "", 7.5, 12, 0, "", true, emptyList())
         model.add(BasketLine(doener, 1))
         compose.waitForIdle()
-        compose.onNodeWithText("+ Note").performClick()
+        compose.onNodeWithText("+\u00A0Note").performClick()
         compose.onNodeWithText("Note for this dish (optional)").performTextInput("ohne Zwiebeln")
         compose.onNodeWithText("Add ✓").performClick()
         compose.waitForIdle()

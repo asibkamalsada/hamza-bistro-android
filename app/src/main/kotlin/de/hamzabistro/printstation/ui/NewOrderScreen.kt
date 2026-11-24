@@ -699,7 +699,7 @@ private fun LazyListScope.orderForm(
     }
 
     item(key = "basket") {
-        Section(stringResource(R.string.new_order_basket)) {
+        FormSection(stringResource(R.string.new_order_basket)) {
             if (draft.lines.isEmpty()) Text(stringResource(R.string.till_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             draft.lines.forEachIndexed { index, line ->
                 if (index > 0) HorizontalDivider()
@@ -710,7 +710,7 @@ private fun LazyListScope.orderForm(
     }
 
     item(key = "customer") {
-        Section(stringResource(R.string.new_order_customer)) {
+        FormSection(stringResource(R.string.new_order_customer)) {
             ContactFields(state, model)
             if (!draft.fulfilment.needsContact) {
                 Text(stringResource(R.string.new_order_contact_optional), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -719,13 +719,13 @@ private fun LazyListScope.orderForm(
     }
 
     if (draft.delivery) {
-        item(key = "address") { Section(stringResource(R.string.new_order_address)) { AddressFields(state, model, help = true) } }
+        item(key = "address") { FormSection(stringResource(R.string.new_order_address)) { AddressFields(state, model, help = true) } }
     }
 
     item(key = "time") { TimeSection(state, model, onMinutes, ladder) }
 
     item(key = "notes") {
-        Section {
+        FormSection {
             FormField(draft.notes, { v -> model.edit { it.copy(notes = v) } }, stringResource(R.string.new_order_kitchen_note), singleLine = false)
             if (draft.delivery) {
                 Row(
@@ -746,7 +746,7 @@ private fun LazyListScope.orderForm(
 }
 
 @Composable
-private fun Section(title: String? = null, content: @Composable () -> Unit) {
+private fun FormSection(title: String? = null, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         HorizontalDivider()
         title?.let { Text(it, style = LINE_NAME) }
@@ -759,7 +759,7 @@ private fun Section(title: String? = null, content: @Composable () -> Unit) {
 private fun TimeSection(state: NewOrderState, model: OrderTaking, onMinutes: (Int) -> Unit, ladder: List<Int>) {
     val context = LocalContext.current
     val draft = state.draft
-    Section(stringResource(R.string.new_order_time)) {
+    FormSection(stringResource(R.string.new_order_time)) {
         Column {
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = draft.scheduledFor == null, role = Role.RadioButton) { model.edit { it.copy(scheduledFor = null) } },
@@ -836,7 +836,7 @@ private fun PriceSection(state: NewOrderState, model: OrderTaking) {
     val resources = LocalResources.current
     val problems = PhoneOrders.problems(state.draft, Instant.now())
     val quote = state.quote
-    Section(stringResource(R.string.new_order_price)) {
+    FormSection(stringResource(R.string.new_order_price)) {
         if (problems.isNotEmpty()) {
             Text(
                 stringResource(R.string.new_order_missing, problems.joinToString(", ") { resources.getString(problemLabel(it)) }),

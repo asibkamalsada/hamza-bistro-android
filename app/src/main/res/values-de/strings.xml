@@ -1003,7 +1003,7 @@
     <string name="call_order_fee_later">+ Liefergebühr, sobald die Adresse da ist</string>
     <string name="call_order_save">✓ Speichern</string>
     <string name="call_order_to_basket">Warenkorb ➜</string>
-    <string name="line_note_add">+ Hinweis</string>
+    <string name="line_note_add">+\u00A0Hinweis</string>
     <string name="call_order_save_waiting">✓ Speichern und auf die Adresse warten</string>
     <string name="call_order_ready_in">Fertig in ca. %1$d Min.</string>
     <string name="call_order_saved">✓ Bestellung #%1$d ist in der Küche</string>

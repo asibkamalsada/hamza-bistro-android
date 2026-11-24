@@ -1004,7 +1004,7 @@
     <string name="call_order_fee_later">+ delivery fee, once the address is there</string>
     <string name="call_order_save">✓ Save</string>
     <string name="call_order_to_basket">Basket ➜</string>
-    <string name="line_note_add">+ Note</string>
+    <string name="line_note_add">+\u00A0Note</string>
     <string name="call_order_save_waiting">✓ Save, and wait for the address</string>
     <string name="call_order_ready_in">Ready in about %1$d min.</string>
     <string name="call_order_saved">✓ Order #%1$d is in the kitchen</string>

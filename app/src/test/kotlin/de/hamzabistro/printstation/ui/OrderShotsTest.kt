@@ -50,7 +50,7 @@ private val shots: List<OrderShot> by lazy {
         OrderShot("call-11-dishes", f.at(CallStep.DISHES, f.noted(5))),
         OrderShot("call-12-dishes-twelve", f.at(CallStep.DISHES, f.priced(12))),
         OrderShot("call-13-basket-up", f.at(CallStep.DISHES, f.noted(6)), on = { it.phone }, act = { onNodeWithText("Warenkorb", substring = true).performClick() }),
-        OrderShot("call-14-options", f.at(CallStep.DISHES, f.priced(3)), act = { onAllNodesWithText("Big Döner").onFirst().performClick() }),
+        OrderShot("call-14-options", f.at(CallStep.DISHES, f.priced(3)), act = { onAllNodesWithText("Dürüm Döner").onFirst().performClick() }),
         OrderShot("call-15-check", f.at(CallStep.CONFIRM, f.noted(5))),
         OrderShot("call-16-check-pickup", f.at(CallStep.CONFIRM, pickup(f.with(3)))),
         OrderShot("call-17-check-texted", f.at(CallStep.CONFIRM, f.with(3, f.texted)), f.link()),
