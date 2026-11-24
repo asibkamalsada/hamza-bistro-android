@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
@@ -20,7 +19,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -313,14 +311,19 @@ internal val TILL_WIDE_FROM = 840.dp
  * receipt. See [Till] for what is recorded when, and where.
  */
 @Composable
-fun TillScreen(onBack: () -> Unit, model: TillViewModel = viewModel()) {
+fun TillScreen(
+    onBack: () -> Unit,
+    navigation: @Composable () -> Unit,
+    leaving: Leaving = remember { Leaving() },
+    model: TillViewModel = viewModel(),
+) {
     val state by model.state.collectAsStateWithLifecycle()
     val view by model.view.collectAsStateWithLifecycle()
     val photos by model.photos.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { model.look() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.rank() }
     LaunchedEffect(state.sale?.id, state.step) { if (state.step == TillStep.DONE) model.awaitReceipt() }
-    TillContent(state, view, photos, model, onBack)
+    TillContent(state, view, photos, model, onBack, navigation, leaving)
 }
 
 /**
@@ -331,17 +334,26 @@ fun TillScreen(onBack: () -> Unit, model: TillViewModel = viewModel()) {
  * and grows with the device's font size.
  */
 @Composable
-internal fun TillContent(state: TillState, view: TillView, photos: Map<String, ImageBitmap?>, model: TillActions, onBack: () -> Unit) {
+internal fun TillContent(
+    state: TillState,
+    view: TillView,
+    photos: Map<String, ImageBitmap?>,
+    model: TillActions,
+    onBack: () -> Unit,
+    navigation: @Composable () -> Unit,
+    leaving: Leaving = remember { Leaving() },
+) {
     val sale = state.sale
     var aborting by remember(sale?.id) { mutableStateOf(false) }
-    val leave = {
+    val leave: (() -> Unit) -> Unit = { go ->
         // A sale that is paid is over; an open one stays where it is.
         if (state.step == TillStep.DONE) model.next()
-        onBack()
+        go()
     }
-    BackHandler { if (state.step == TillStep.CASH) model.back() else leave() }
+    BackHandler { if (state.step == TillStep.CASH) model.back() else leave(onBack) }
+    leaving.Ask(leave)
 
-    Scaffold(topBar = { TillHeader(state, model, onLeave = leave) }) { padding ->
+    Scaffold(topBar = { TillHeader(state, model, navigation) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (state.step) {
                 TillStep.DISHES ->
@@ -369,12 +381,12 @@ internal fun TillContent(state: TillState, view: TillView, photos: Map<String, I
 }
 
 /**
- * One slim bar: out, where this is, and — in the bar's own colour, so it
+ * One slim bar: ☰, where this is, and — in the bar's own colour, so it
  * cannot be missed and takes no room — that it is only training, and why.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TillHeader(state: TillState, model: TillActions, onLeave: () -> Unit) {
+private fun TillHeader(state: TillState, model: TillActions, navigation: @Composable () -> Unit) {
     val sale = state.sale
     val training = state.training || sale?.training == true
     val strip =
@@ -391,10 +403,8 @@ private fun TillHeader(state: TillState, model: TillActions, onLeave: () -> Unit
             val wide = maxWidth >= TILL_WIDE_FROM
             Column {
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val close = stringResource(R.string.till_close)
-                    IconButton(onClick = onLeave, modifier = Modifier.size(52.dp).semantics { contentDescription = close }) {
-                        Text("✕", style = MaterialTheme.typography.titleLarge)
-                    }
+                    // Where the other screens' bars have it.
+                    Box(Modifier.padding(start = 4.dp)) { navigation() }
                     Text(
                         if (sale == null) stringResource(R.string.till_title) else stringResource(R.string.till_sale, sale.number),
                         style = MaterialTheme.typography.titleLarge,

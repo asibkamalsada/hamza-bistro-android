@@ -44,7 +44,7 @@ class CallOrderScreenTest {
 
     private fun open(): NewOrderViewModel {
         val model = NewOrderViewModel(app)
-        compose.setContent { AppTheme { CallOrderScreen(onBack = {}, onFullForm = {}, model = model) } }
+        compose.setContent { AppTheme { CallOrderScreen(onBack = {}, onFullForm = {}, navigation = {}, model = model) } }
         compose.waitForIdle()
         return model
     }

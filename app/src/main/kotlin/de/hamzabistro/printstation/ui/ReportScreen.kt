@@ -280,7 +280,7 @@ private fun pickRange(context: Context, shown: ReportRange?, today: LocalDate, o
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportScreen(onBack: () -> Unit) {
+fun ReportScreen(navigation: @Composable () -> Unit) {
     val model: ReportViewModel = viewModel()
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -291,7 +291,7 @@ fun ReportScreen(onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.report_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
                 actions = {
                     val shown = state.report?.takeIf { !state.loading }
                     TextButton(onClick = { shown?.let { scope.launch { exportCsv(context, it) } } }, enabled = shown != null) {

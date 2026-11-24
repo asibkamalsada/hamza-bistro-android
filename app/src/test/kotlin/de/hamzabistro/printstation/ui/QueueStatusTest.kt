@@ -189,7 +189,7 @@ class QueueStatusTest {
         compose.setContent {
             AppTheme {
                 val drawer = rememberDrawerState(DrawerValue.Open)
-                StaffDrawer(drawer, enabled = true, IssuesState(), DrawerHeader(null, "Tablet", "0.2.100", release), onOpen = {}) {
+                StaffDrawer(drawer, current = StaffScreen.QUEUE, IssuesState(), DrawerHeader(null, "Tablet", "0.2.100", release), onOpen = {}) {
                     Column {
                         MenuButton(0, update = true, onClick = {})
                         Text("Queue")
@@ -211,7 +211,7 @@ class QueueStatusTest {
             AppTheme {
                 val drawer = rememberDrawerState(DrawerValue.Open)
                 val header = DrawerHeader(null, "Tablet", "0.2.100", release, install)
-                StaffDrawer(drawer, enabled = true, IssuesState(), header, onOpen = {}, onInstall = { asked += it }) { Text("Queue") }
+                StaffDrawer(drawer, current = StaffScreen.QUEUE, IssuesState(), header, onOpen = {}, onInstall = { asked += it }) { Text("Queue") }
             }
         }
         compose.onNodeWithText("Download in the browser").assertDoesNotExist()

@@ -120,7 +120,7 @@ class TillShotsTest(private val device: TillDevice, private val name: String) {
     @OptIn(ExperimentalRoborazziApi::class)
     @Test
     fun draw() {
-        compose.setScreen { TillContent(shot.state, shot.view, TillFixtures.photos, NoTill(shot.canPrint), onBack = {}) }
+        compose.setScreen { TillContent(shot.state, shot.view, TillFixtures.photos, NoTill(shot.canPrint), onBack = {}, navigation = { MenuButton(0, onClick = {}) }) }
         shot.act(compose, device)
         compose.waitForIdle()
         captureScreenRoboImage(File("build/kasse-shots", "$name--${device.name.lowercase().replace('_', '-')}.png"))

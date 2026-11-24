@@ -811,7 +811,7 @@ class MenuViewModel(application: Application) : AndroidViewModel(application) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun MenuScreen(onBack: () -> Unit) {
+fun MenuScreen(navigation: @Composable () -> Unit) {
     val menu: MenuViewModel = viewModel()
     val state by menu.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { menu.open(state.tab) }
@@ -820,7 +820,7 @@ fun MenuScreen(onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.menu_title)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
                 actions = { TextButton(onClick = { menu.load() }, enabled = !state.loading) { Text(stringResource(R.string.reload)) } },
             )
         },

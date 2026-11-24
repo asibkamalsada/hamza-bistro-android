@@ -572,16 +572,25 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewOrderScreen(onBack: () -> Unit, model: NewOrderViewModel = viewModel()) {
+fun NewOrderScreen(
+    onBack: () -> Unit,
+    navigation: @Composable () -> Unit,
+    leaving: Leaving = remember { Leaving() },
+    model: NewOrderViewModel = viewModel(),
+) {
     val state by model.state.collectAsStateWithLifecycle()
-    var discarding by remember { mutableStateOf(false) }
-    val leave = {
+    // Where to, once the order is discarded.
+    var discarding by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val leave: (() -> Unit) -> Unit = { go ->
         if (state.draft.lines.isEmpty() || state.saved != null) {
             model.reset()
-            onBack()
-        } else discarding = true
+            go()
+        } else {
+            discarding = go
+        }
     }
-    BackHandler(onBack = leave)
+    BackHandler { leave(onBack) }
+    leaving.Ask(leave)
     LaunchedEffect(Unit) { model.loadMenu() }
 
     var picking by remember { mutableStateOf<MenuDish?>(null) }
@@ -590,7 +599,7 @@ fun NewOrderScreen(onBack: () -> Unit, model: NewOrderViewModel = viewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.new_order_title)) },
-                navigationIcon = { TextButton(onClick = leave) { Text("←") } },
+                navigationIcon = navigation,
             )
         },
     ) { padding ->
@@ -638,18 +647,18 @@ fun NewOrderScreen(onBack: () -> Unit, model: NewOrderViewModel = viewModel()) {
         }
     }
 
-    if (discarding) {
+    discarding?.let { go ->
         AlertDialog(
-            onDismissRequest = { discarding = false },
+            onDismissRequest = { discarding = null },
             text = { Text(stringResource(R.string.new_order_discard)) },
             confirmButton = {
                 Button(onClick = {
-                    discarding = false
+                    discarding = null
                     model.reset()
-                    onBack()
+                    go()
                 }) { Text(stringResource(R.string.new_order_discard_yes)) }
             },
-            dismissButton = { TextButton(onClick = { discarding = false }) { Text(stringResource(R.string.cancel_back)) } },
+            dismissButton = { TextButton(onClick = { discarding = null }) { Text(stringResource(R.string.cancel_back)) } },
         )
     }
 

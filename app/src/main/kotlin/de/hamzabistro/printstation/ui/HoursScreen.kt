@@ -427,7 +427,7 @@ class HoursViewModel(application: Application) : AndroidViewModel(application) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HoursScreen(staff: StaffViewModel, onBack: () -> Unit) {
+fun HoursScreen(staff: StaffViewModel, navigation: @Composable () -> Unit) {
     val hours: HoursViewModel = viewModel()
     val state by hours.state.collectAsStateWithLifecycle()
     val staffState by staff.state.collectAsStateWithLifecycle()
@@ -441,7 +441,7 @@ fun HoursScreen(staff: StaffViewModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.hours_title)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
+                navigationIcon = navigation,
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

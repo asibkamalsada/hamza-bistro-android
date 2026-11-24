@@ -145,7 +145,13 @@ private const val STEPS = 4
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderViewModel = viewModel()) {
+fun CallOrderScreen(
+    onBack: () -> Unit,
+    onFullForm: () -> Unit,
+    navigation: @Composable () -> Unit,
+    leaving: Leaving = remember { Leaving() },
+    model: NewOrderViewModel = viewModel(),
+) {
     val graph = (LocalContext.current.applicationContext as PrintStationApp).graph
     val state by model.state.collectAsStateWithLifecycle()
     val links by graph.liveAddressRequests.collectAsStateWithLifecycle(AddressRequestsState())
@@ -154,17 +160,25 @@ fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderV
     // Again after a reset underneath — a new call taken from the banner.
     LaunchedEffect(state.callStarted) { model.startCall() }
     LaunchedEffect(Unit) { model.loadMenu() }
-    var discarding by remember { mutableStateOf(false) }
-    val finish = {
+    // Where to, once the order is discarded.
+    var discarding by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val finish: (() -> Unit) -> Unit = { go ->
         model.reset()
-        onBack()
+        go()
     }
-    val leave = { if (state.step == CallStep.DONE || (state.draft.lines.isEmpty() && state.link == null)) finish() else discarding = true }
+    val leave: (() -> Unit) -> Unit = { go ->
+        if (state.step == CallStep.DONE || (state.draft.lines.isEmpty() && state.link == null)) {
+            finish(go)
+        } else {
+            discarding = go
+        }
+    }
+    leaving.Ask(leave)
     // Back is a step back; from the first, out.
     BackHandler {
         when (state.step) {
             CallStep.NAME,
-            CallStep.DONE -> leave()
+            CallStep.DONE -> leave(onBack)
             CallStep.ADDRESS -> model.goTo(CallStep.NAME)
             CallStep.DISHES -> model.goTo(CallStep.ADDRESS)
             CallStep.CONFIRM -> model.goTo(CallStep.DISHES)
@@ -176,7 +190,7 @@ fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderV
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.call_order_title), fontWeight = FontWeight.Bold) },
-                    navigationIcon = { TextButton(onClick = leave) { Text("✕", style = MaterialTheme.typography.titleLarge) } },
+                    navigationIcon = navigation,
                     actions = {
                         // For whoever wants the time, the source or the fee waiver: the same order in the full form.
                         if (state.step != CallStep.DONE) TextButton(onClick = onFullForm) { Text(stringResource(R.string.call_order_full_form)) }
@@ -190,23 +204,23 @@ fun CallOrderScreen(onBack: () -> Unit, onFullForm: () -> Unit, model: NewOrderV
                     CallStep.ADDRESS -> AddressStep(state, model, link)
                     CallStep.DISHES -> DishesStep(state, model)
                     CallStep.CONFIRM -> ConfirmStep(state, model, link)
-                    CallStep.DONE -> DoneStep(state, link, remember(graph) { LinkActions(graph) }, onDone = finish)
+                    CallStep.DONE -> DoneStep(state, link, remember(graph) { LinkActions(graph) }, onDone = { finish(onBack) })
                 }
             }
         }
     }
 
-    if (discarding) {
+    discarding?.let { go ->
         AlertDialog(
-            onDismissRequest = { discarding = false },
+            onDismissRequest = { discarding = null },
             text = { Text(stringResource(R.string.new_order_discard), style = MaterialTheme.typography.titleLarge) },
             confirmButton = {
                 Button(onClick = {
-                    discarding = false
-                    finish()
+                    discarding = null
+                    finish(go)
                 }) { Text(stringResource(R.string.new_order_discard_yes)) }
             },
-            dismissButton = { TextButton(onClick = { discarding = false }) { Text(stringResource(R.string.cancel_back)) } },
+            dismissButton = { TextButton(onClick = { discarding = null }) { Text(stringResource(R.string.cancel_back)) } },
         )
     }
 }
