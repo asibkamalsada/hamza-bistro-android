@@ -14,7 +14,7 @@ import de.hamzabistro.printstation.core.StreetSuggestion
 import java.time.Instant
 
 /** Takes every tap and does nothing with it. */
-internal open class NoOrder : OrderActions {
+internal open class NoOrder : OrderTaking {
     override fun loadPhoto(url: String) = Unit
 
     override fun loadMenu() = Unit
@@ -27,7 +27,7 @@ internal open class NoOrder : OrderActions {
 
     override fun setNote(index: Int, note: String) = Unit
 
-    override fun clear() = Unit
+    override fun emptyBasket() = Unit
 
     override fun goTo(step: CallStep) = Unit
 

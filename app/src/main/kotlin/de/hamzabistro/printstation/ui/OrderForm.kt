@@ -43,7 +43,7 @@ import de.hamzabistro.printstation.core.StreetSuggestion
 // pick from and the same words, step by step on the phone and in the full form.
 
 /** What the screens of a phone or walk-in order can be asked to do: [NewOrderViewModel] does it, a drawing in a test does not. */
-interface OrderActions {
+interface OrderTaking {
     fun loadPhoto(url: String)
 
     fun loadMenu()
@@ -56,7 +56,7 @@ interface OrderActions {
 
     fun setNote(index: Int, note: String)
 
-    fun clear()
+    fun emptyBasket()
 
     fun goTo(step: CallStep)
 
@@ -77,7 +77,7 @@ interface OrderActions {
 }
 
 /** The menu as [state] has it, for [DishesPane]. */
-internal fun orderShop(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderActions): Shop =
+internal fun orderShop(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderTaking): Shop =
     Shop(state.menu, state.menuError, state.bestsellers, photos, model::loadPhoto, model::loadMenu)
 
 /** One field, big enough to read what is typed. */
@@ -103,7 +103,7 @@ internal fun FormField(
 
 /** Name and number. */
 @Composable
-internal fun ContactFields(state: NewOrderState, model: OrderActions, nameField: Modifier = Modifier) {
+internal fun ContactFields(state: NewOrderState, model: OrderTaking, nameField: Modifier = Modifier) {
     val draft = state.draft
     FormField(
         draft.name,
@@ -123,7 +123,7 @@ internal fun ContactFields(state: NewOrderState, model: OrderActions, nameField:
 
 /** Lieferung, Abholung or Vor Ort: those of [offered]. */
 @Composable
-internal fun FulfilmentChoice(state: NewOrderState, model: OrderActions, offered: List<Fulfilment>) {
+internal fun FulfilmentChoice(state: NewOrderState, model: OrderTaking, offered: List<Fulfilment>) {
     Choice(offered.map { stringResource(fulfilmentLabel(it)) }, offered.indexOf(state.draft.fulfilment), Modifier.fillMaxWidth()) { index ->
         model.edit { it.copy(fulfilment = offered[index]) }
     }
@@ -142,7 +142,7 @@ private fun fulfilmentLabel(fulfilment: Fulfilment): Int =
  * stands beside them ([help] false, [AddressHelp]).
  */
 @Composable
-internal fun AddressFields(state: NewOrderState, model: OrderActions, help: Boolean) {
+internal fun AddressFields(state: NewOrderState, model: OrderTaking, help: Boolean) {
     val draft = state.draft
     if (help) RecentAddresses(state, model)
     FormField(
@@ -179,7 +179,7 @@ internal fun AddressFields(state: NewOrderState, model: OrderActions, help: Bool
 
 /** Beside the fields, where there is room: in sight while the street is typed, keyboard or not. */
 @Composable
-internal fun AddressHelp(state: NewOrderState, model: OrderActions) {
+internal fun AddressHelp(state: NewOrderState, model: OrderTaking) {
     AddressVerdict(state, model)
     StreetChoices(state, model)
     RecentAddresses(state, model)
@@ -187,7 +187,7 @@ internal fun AddressHelp(state: NewOrderState, model: OrderActions) {
 
 /** For a caller who has ordered before, one tap is the whole address. */
 @Composable
-private fun RecentAddresses(state: NewOrderState, model: OrderActions) {
+private fun RecentAddresses(state: NewOrderState, model: OrderTaking) {
     if (state.recentChoices.isEmpty()) return
     Text(stringResource(R.string.new_order_recent_addresses), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
     for (recent in state.recentChoices) {
@@ -204,7 +204,7 @@ private fun RecentAddresses(state: NewOrderState, model: OrderActions) {
  * and no caller is asked for a postcode.
  */
 @Composable
-private fun StreetChoices(state: NewOrderState, model: OrderActions) {
+private fun StreetChoices(state: NewOrderState, model: OrderTaking) {
     val resources = LocalResources.current
     for (street in state.streetChoices) {
         ChoiceRow(
@@ -259,7 +259,7 @@ private fun ChoiceRow(onClick: () -> Unit, end: @Composable () -> Unit = {}, wor
 
 /** What check-address says about the address in the fields. */
 @Composable
-internal fun AddressVerdict(state: NewOrderState, model: OrderActions) {
+internal fun AddressVerdict(state: NewOrderState, model: OrderTaking) {
     val resources = LocalResources.current
     val address = state.address
     when {

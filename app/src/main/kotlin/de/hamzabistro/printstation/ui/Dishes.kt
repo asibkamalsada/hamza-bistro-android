@@ -80,12 +80,15 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -711,19 +714,23 @@ internal fun BasketRow(line: BasketLine, onQty: (Int) -> Unit, onNote: ((String)
     ) {
         QtyStepper(line.qty, line.dish.name, onQty)
         Spacer(Modifier.width(12.dp))
-        val words = Modifier.weight(1f)
-        Column(if (onNote == null) words else words.heightIn(min = 48.dp).clickable { noting = true }, verticalArrangement = Arrangement.Center) {
+        val room = Modifier.weight(1f)
+        Column(if (onNote == null) room else room.heightIn(min = 48.dp).clickable { noting = true }, verticalArrangement = Arrangement.Center) {
             Row {
                 Text(line.dish.name, style = LINE_NAME, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 Text(Format.euro(line.unitPrice * line.qty), style = LINE_NAME, maxLines = 1)
             }
-            if (line.options.isNotEmpty()) {
-                Text(line.options.joinToString(", ") { it.name }, style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            // Choices and note in one run of text: every line of it is one line of the basket less.
             val note = line.note.trim()
-            if (note.isNotEmpty()) Text("„$note“", style = LINE_SMALL, color = MaterialTheme.colorScheme.error)
-            else if (onNote != null) Text(stringResource(R.string.line_note_add), style = LINE_SMALL, color = MaterialTheme.colorScheme.primary)
+            val addNote = stringResource(R.string.line_note_add).takeIf { onNote != null && note.isEmpty() }
+            val words = buildAnnotatedString {
+                append(line.options.joinToString(", ") { it.name })
+                if (length > 0 && (note.isNotEmpty() || addNote != null)) append("  ")
+                if (note.isNotEmpty()) withStyle(SpanStyle(color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)) { append("„$note“") }
+                if (addNote != null) withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(addNote) }
+            }
+            if (words.isNotEmpty()) Text(words, style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     if (noting && onNote != null) {

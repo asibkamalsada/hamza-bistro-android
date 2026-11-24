@@ -209,7 +209,7 @@ private const val TILE_PX = 320
  * check-address first, as the checkout's does — while the caller is still
  * on the line, and with Leipzig's streets offered as the street is typed.
  */
-class NewOrderViewModel(application: Application) : AndroidViewModel(application), OrderActions {
+class NewOrderViewModel(application: Application) : AndroidViewModel(application), OrderTaking {
     private val app = application
     private val graph = (application as PrintStationApp).graph
 
@@ -316,7 +316,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     override fun setNote(index: Int, note: String) = edit { it.copy(lines = Baskets.setNote(it.lines, index, note)) }
 
-    override fun clear() = edit { it.copy(lines = emptyList()) }
+    override fun emptyBasket() = edit { it.copy(lines = emptyList()) }
 
     /** Priced again too: whether the kitchen is full depends on the slot the minutes land in. */
     fun pickMinutes(minutes: Int) {
@@ -613,7 +613,7 @@ fun NewOrderScreen(
 internal fun NewOrderContent(
     state: NewOrderState,
     photos: Map<String, ImageBitmap?>,
-    model: OrderActions,
+    model: OrderTaking,
     onMinutes: (Int) -> Unit,
     ladder: List<Int>,
     navigation: @Composable () -> Unit,
@@ -629,13 +629,14 @@ internal fun NewOrderContent(
             val form: LazyListScope.(Boolean, () -> Unit) -> Unit = { showMenuButton, onMenu ->
                 orderForm(state, model, onMinutes, ladder, showMenuButton, onMenu)
             }
-            if (maxWidth >= WIDE_FROM) {
+            val room = maxWidth
+            if (room >= WIDE_FROM) {
                 // The tablet: the menu on the left, the order on the right, as on a till.
                 Row(Modifier.fillMaxSize()) {
                     DishesOrWhyNot(shop, state.draft.lines, rail = true, tap, Modifier.weight(1f).fillMaxHeight())
                     VerticalDivider()
                     LazyColumn(
-                        modifier = Modifier.width(if (maxWidth >= 1000.dp) 432.dp else maxWidth * 0.42f).fillMaxHeight(),
+                        modifier = Modifier.width(if (room >= 1000.dp) 432.dp else room * 0.42f).fillMaxHeight(),
                         contentPadding = PaddingValues(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -655,7 +656,7 @@ internal fun NewOrderContent(
                     BackHandler { menuOpen = false }
                     Surface(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
-                            DishesOrWhyNot(shop, state.draft.lines, rail = maxWidth >= 600.dp, tap, Modifier.weight(1f).fillMaxWidth())
+                            DishesOrWhyNot(shop, state.draft.lines, rail = room >= 600.dp, tap, Modifier.weight(1f).fillMaxWidth())
                             HorizontalDivider()
                             BottomBar { BigButton(stringResource(R.string.call_order_to_basket), onClick = { menuOpen = false }, modifier = Modifier.weight(1f)) }
                         }
@@ -676,7 +677,7 @@ internal fun NewOrderContent(
 /** The order: how it came in, the basket, who and where, when, the price, and saving it. */
 private fun LazyListScope.orderForm(
     state: NewOrderState,
-    model: OrderActions,
+    model: OrderTaking,
     onMinutes: (Int) -> Unit,
     ladder: List<Int>,
     showMenuButton: Boolean,
@@ -755,7 +756,7 @@ private fun Section(title: String? = null, content: @Composable () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TimeSection(state: NewOrderState, model: OrderActions, onMinutes: (Int) -> Unit, ladder: List<Int>) {
+private fun TimeSection(state: NewOrderState, model: OrderTaking, onMinutes: (Int) -> Unit, ladder: List<Int>) {
     val context = LocalContext.current
     val draft = state.draft
     Section(stringResource(R.string.new_order_time)) {
@@ -831,7 +832,7 @@ private fun pickDateTime(context: Context, current: Instant?, onPicked: (Instant
 }
 
 @Composable
-private fun PriceSection(state: NewOrderState, model: OrderActions) {
+private fun PriceSection(state: NewOrderState, model: OrderTaking) {
     val resources = LocalResources.current
     val problems = PhoneOrders.problems(state.draft, Instant.now())
     val quote = state.quote

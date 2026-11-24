@@ -149,7 +149,7 @@ internal fun CallOrderContent(
     state: NewOrderState,
     photos: Map<String, ImageBitmap?>,
     link: AddressRequest?,
-    model: OrderActions,
+    model: OrderTaking,
     onRetry: (String) -> Unit,
     onResend: (String) -> Unit,
     onFullForm: () -> Unit,
@@ -218,7 +218,7 @@ private fun StepColumn(modifier: Modifier, content: @Composable ColumnScope.() -
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun NameStep(state: NewOrderState, model: OrderActions) {
+private fun NameStep(state: NewOrderState, model: OrderTaking) {
     val draft = state.draft
     val focus = remember { FocusRequester() }
     // The keyboard up at once: the first thing to do is type.
@@ -242,7 +242,7 @@ private fun NameStep(state: NewOrderState, model: OrderActions) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AddressStep(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
+private fun AddressStep(state: NewOrderState, model: OrderTaking, link: AddressRequest?) {
     val draft = state.draft
     val outside = state.addressChecked && state.address?.outside == true
     val goOn = !draft.delivery || state.link != null || (PhoneOrders.addressComplete(draft) && !outside)
@@ -279,7 +279,7 @@ private fun AddressStep(state: NewOrderState, model: OrderActions, link: Address
 }
 
 @Composable
-private fun TextedAddress(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
+private fun TextedAddress(state: NewOrderState, model: OrderTaking, link: AddressRequest?) {
     val phone = state.draft.phone
     // A landline would have the link read out to it: no text there.
     val textable = PhoneNumbers.textable(phone)
@@ -337,7 +337,7 @@ private fun SmsStatus(link: AddressRequest?, onAgain: () -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderActions) {
+private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderTaking) {
     val lines = state.draft.lines
     val total = lines.sumOf { it.unitPrice * it.qty }
     DishesPane(
@@ -355,7 +355,7 @@ private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, 
                 OutlinedButton(onClick = { model.goTo(CallStep.ADDRESS) }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
                     Text(stringResource(R.string.call_order_back), fontSize = 17.sp, maxLines = 1)
                 }
-                EmptyBasketButton(lines.isNotEmpty(), model::clear)
+                EmptyBasketButton(lines.isNotEmpty(), model::emptyBasket)
             }
         },
         go = { GoButton(stringResource(R.string.call_order_next), Format.euro(total), lines.isNotEmpty(), { model.goTo(CallStep.CONFIRM) }, it) },
@@ -367,7 +367,7 @@ private fun DishesStep(state: NewOrderState, photos: Map<String, ImageBitmap?>, 
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ConfirmStep(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
+private fun ConfirmStep(state: NewOrderState, model: OrderTaking, link: AddressRequest?) {
     val draft = state.draft
     val waitsForLink = state.awaitingLink
     val quote = state.quote
@@ -433,7 +433,7 @@ private fun ConfirmStep(state: NewOrderState, model: OrderActions, link: Address
 
 /** Whose order it is, and where it goes. */
 @Composable
-private fun Who(state: NewOrderState, model: OrderActions, link: AddressRequest?) {
+private fun Who(state: NewOrderState, model: OrderTaking, link: AddressRequest?) {
     val draft = state.draft
     Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {

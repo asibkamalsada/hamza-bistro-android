@@ -130,10 +130,14 @@ accepted order
 
 - **Telefon** or **Vor Ort / Theke**; **Abholung**, **Vor Ort** (eaten
   here) or **Lieferung**;
-- dishes from the menu with the site's options dialog: the dish's groups in
+- dishes tapped as in the Kasse
+  ([`Dishes`](app/src/main/kotlin/de/hamzabistro/printstation/ui/Dishes.kt):
+  the same tiles, categories and bestsellers, choices and basket lines, at
+  the website's prices), with the site's options: the dish's groups in
   its order, a "single" group a required choice that starts on its first
   choice still on sale, a "multiple" one any number; sold out by an
-  ingredient counts. A quantity and a note per dish (80 characters);
+  ingredient counts. A quantity, and a note per dish (80 characters) with a
+  tap on its line;
 - name and phone, needed for a delivery or a pickup. With
   [the shop's phone reporting its calls](#the-callers-number-on-the-tablet),
   the number is there before it is asked for;
@@ -204,9 +208,9 @@ reports fail quietly and the tablet shows no banners.
 ### Telefon-Bestellung
 
 The same order as [Neue Bestellung](#neue-bestellung), taken one screen at
-a time by somebody who need not read or see well: everything 1.3 times as
-big, one question per screen, the buttons along the bottom, **Weiter ➜**
-only once the screen is answered
+a time: one question per screen, the buttons along the bottom, **Weiter ➜**
+only once the screen is answered, everything as big and where it is in the
+Kasse
 ([`CallOrderScreen`](app/src/main/kotlin/de/hamzabistro/printstation/ui/CallOrderScreen.kt)).
 It opens from the call's banner, and from **📞 Telefon-Bestellung** on the
 queue, beside **+ Neue Bestellung**:
@@ -217,11 +221,12 @@ queue, beside **+ Neue Bestellung**:
    caller's earlier addresses to tap, Leipzig's streets offered as it is
    typed, the postcode and town filled in, check-address's verdict ("✓" or
    "Dorthin liefern wir nicht") — or, when the address does not survive the
-   phone, **📱 SMS an den Anrufer senden** (below). **🛍 Holt selbst ab**
-   makes it a pickup with no address.
-3. **Welche Gerichte?** Only the dishes: big tiles with their photos, a
-   category at a time; a tap puts one in the basket (or opens the dish's
-   choices over the whole screen), and the tile says "2×".
+   phone, **📱 SMS an den Anrufer senden** (below). On a tablet lying on its
+   side the streets stand beside the fields, in sight with the keyboard up.
+   **Abholung** makes it a pickup with no address.
+3. **Welche Gerichte?** The Kasse's dishes with the basket beside them: a
+   tap puts one in (or opens the dish's choices over the whole screen), and
+   the tile says "2×".
 4. **Prüfen, dann speichern**: who, where, the dishes with − and +, the
    price (the database's own dry run, as in Neue Bestellung), and "Fertig
    in ca. 35 Min." to tell the caller. **✓ Bestellung speichern** puts it
