@@ -878,7 +878,7 @@
     <string name="new_order_to_customer">Change customer and address</string>
     <string name="new_order_no_name">No name yet</string>
     <string name="new_order_no_address">No address yet</string>
-    <string name="new_order_address_by_sms">Address comes by SMS link</string>
+    <string name="new_order_address_by_sms">Address by SMS</string>
     <string name="new_order_time_needs_address">For a time: save once the address is there ➜</string>
     <string name="fulfilment_pickup">Pickup</string>
     <string name="fulfilment_dine_in">Eat in</string>
@@ -922,7 +922,7 @@
     <string name="new_order_over_capacity">Kitchen full in this slot. The order still goes in.</string>
     <string name="new_order_saving">Saving …</string>
     <string name="new_order_saved_full">Kitchen full in that slot. The order is in all the same.</string>
-    <string name="new_order_another">Another order</string>
+    <string name="new_order_another">Another</string>
     <string name="new_order_discard">Discard this order?</string>
     <string name="new_order_discard_yes">Discard</string>
     <string name="new_order_missing">Still missing: %1$s</string>

@@ -877,7 +877,7 @@
     <string name="new_order_to_customer">Kunde und Adresse ändern</string>
     <string name="new_order_no_name">Name fehlt noch</string>
     <string name="new_order_no_address">Adresse fehlt noch</string>
-    <string name="new_order_address_by_sms">Adresse kommt per SMS-Link</string>
+    <string name="new_order_address_by_sms">Adresse per SMS</string>
     <string name="new_order_time_needs_address">Mit Uhrzeit erst speichern, wenn die Adresse da ist ➜</string>
     <string name="fulfilment_pickup">Abholung</string>
     <string name="fulfilment_dine_in">Vor Ort</string>
@@ -921,7 +921,7 @@
     <string name="new_order_over_capacity">Küche voll in diesem Slot. Die Bestellung geht trotzdem rein.</string>
     <string name="new_order_saving">Wird gespeichert …</string>
     <string name="new_order_saved_full">Küche voll in diesem Slot. Die Bestellung ist trotzdem drin.</string>
-    <string name="new_order_another">Noch eine Bestellung</string>
+    <string name="new_order_another">Noch eine</string>
     <string name="new_order_discard">Diese Bestellung verwerfen?</string>
     <string name="new_order_discard_yes">Verwerfen</string>
     <string name="new_order_missing">Es fehlt noch: %1$s</string>
