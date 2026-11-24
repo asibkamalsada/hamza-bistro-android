@@ -623,7 +623,7 @@ internal fun EmptyBasketButton(enabled: Boolean, onClear: () -> Unit) {
     }
 }
 
-/** What goes on with the basket. The amount and the button are one: there is nothing to look for. */
+/** What goes on with the basket. The amount and the button are one: there is nothing to look for. Without an [amount], a sentence. */
 @Composable
 internal fun GoButton(text: String, amount: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
     Button(
@@ -814,6 +814,11 @@ private fun totalColors() =
 /** A button's words at its left, its amount, bigger, at its right. */
 @Composable
 private fun RowScope.ButtonWords(text: String, amount: String, big: Boolean = true) {
+    if (amount.isEmpty()) {
+        // A sentence: what is missing, or what will happen.
+        Text(text, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        return
+    }
     Text(text, fontSize = if (big) 22.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     Spacer(Modifier.width(8.dp))
     Text(amount, fontSize = if (big) 28.sp else 22.sp, fontWeight = FontWeight.Bold, maxLines = 1)

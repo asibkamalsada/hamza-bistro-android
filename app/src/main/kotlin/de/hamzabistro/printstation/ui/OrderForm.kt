@@ -8,10 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -19,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -33,16 +29,16 @@ import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AddressStatus
 import de.hamzabistro.printstation.core.BasketLine
 import de.hamzabistro.printstation.core.Fulfilment
+import de.hamzabistro.printstation.core.OrderSource
 import de.hamzabistro.printstation.core.PhoneOrderDraft
-import de.hamzabistro.printstation.core.PhoneOrderQuote
 import de.hamzabistro.printstation.core.RecentAddress
 import de.hamzabistro.printstation.core.StreetDelivery
 import de.hamzabistro.printstation.core.StreetSuggestion
 
-// Who an order is for and where it goes: the same fields, the same streets to
-// pick from and the same words, step by step on the phone and in the full form.
+// Who an order is for and where it goes: its fields, the streets to pick from,
+// and what is said about them.
 
-/** What the screens of a phone or walk-in order can be asked to do: [NewOrderViewModel] does it, a drawing in a test does not. */
+/** What the screen of a phone or walk-in order can be asked to do: [NewOrderViewModel] does it, a drawing in a test does not. */
 interface OrderTaking {
     fun loadPhoto(url: String)
 
@@ -58,7 +54,7 @@ interface OrderTaking {
 
     fun emptyBasket()
 
-    fun goTo(step: CallStep)
+    fun goTo(step: TakingStep)
 
     fun pickStreet(street: StreetSuggestion)
 
@@ -74,11 +70,17 @@ interface OrderTaking {
 
     /** The minutes an order for now is pre-set to. */
     fun suggestedMinutes(state: NewOrderState): Int
-}
 
-/** The menu as [state] has it, for [DishesPane]. */
-internal fun orderShop(state: NewOrderState, photos: Map<String, ImageBitmap?>, model: OrderTaking): Shop =
-    Shop(state.menu, state.menuError, state.bestsellers, photos, model::loadPhoto, model::loadMenu)
+    /** The round numbers beside them. */
+    fun ladder(): List<Int>
+
+    fun pickMinutes(minutes: Int)
+
+    fun dismissError()
+
+    /** Saved: on to an empty order. */
+    fun another()
+}
 
 /** One field, big enough to read what is typed. */
 @Composable
@@ -103,13 +105,13 @@ internal fun FormField(
 
 /** Name and number. */
 @Composable
-internal fun ContactFields(state: NewOrderState, model: OrderTaking, nameField: Modifier = Modifier) {
+internal fun ContactFields(state: NewOrderState, model: OrderTaking, nameField: Modifier, phoneField: Modifier) {
     val draft = state.draft
     FormField(
         draft.name,
         { v -> model.edit { it.copy(name = v) } },
         stringResource(R.string.new_order_name),
-        nameField.fillMaxWidth(),
+        nameField,
         KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
     )
     // Filled in from the call; typed only when the shop's phone did not say.
@@ -117,19 +119,34 @@ internal fun ContactFields(state: NewOrderState, model: OrderTaking, nameField: 
         draft.phone,
         { v -> model.edit { it.copy(phone = v) } },
         stringResource(R.string.new_order_phone),
+        phoneField,
         keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
     )
 }
 
-/** Lieferung, Abholung or Vor Ort: those of [offered]. */
+/** Telefon or Theke. */
 @Composable
-internal fun FulfilmentChoice(state: NewOrderState, model: OrderTaking, offered: List<Fulfilment>) {
-    Choice(offered.map { stringResource(fulfilmentLabel(it)) }, offered.indexOf(state.draft.fulfilment), Modifier.fillMaxWidth()) { index ->
+internal fun SourceChoice(state: NewOrderState, model: OrderTaking, modifier: Modifier) {
+    val sources = OrderSource.entries
+    Choice(
+        sources.map { stringResource(if (it == OrderSource.PHONE) R.string.source_phone else R.string.source_counter_short) },
+        sources.indexOf(state.draft.source),
+        modifier,
+    ) { index ->
+        model.edit { it.copy(source = sources[index]) }
+    }
+}
+
+/** Lieferung, Abholung or Vor Ort. */
+@Composable
+internal fun FulfilmentChoice(state: NewOrderState, model: OrderTaking, modifier: Modifier) {
+    val offered = listOf(Fulfilment.DELIVERY, Fulfilment.PICKUP, Fulfilment.DINE_IN)
+    Choice(offered.map { stringResource(fulfilmentLabel(it)) }, offered.indexOf(state.draft.fulfilment), modifier) { index ->
         model.edit { it.copy(fulfilment = offered[index]) }
     }
 }
 
-private fun fulfilmentLabel(fulfilment: Fulfilment): Int =
+internal fun fulfilmentLabel(fulfilment: Fulfilment): Int =
     when (fulfilment) {
         Fulfilment.PICKUP -> R.string.fulfilment_pickup
         Fulfilment.DINE_IN -> R.string.fulfilment_dine_in
@@ -294,47 +311,3 @@ internal fun ringName(resources: Resources, zone: String?): String =
         "edge" -> resources.getString(R.string.report_ring_edge)
         else -> zone.orEmpty()
     }
-
-/** The price as the database works it out; what it is still waiting for, or why there is none. */
-@Composable
-internal fun PriceLines(state: NewOrderState) {
-    val quote = state.quote
-    when {
-        state.quoting || state.checking ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircularProgressIndicator(Modifier.size(24.dp))
-                StatusLine(stringResource(R.string.new_order_pricing))
-            }
-        quote != null && state.priced -> Breakdown(quote)
-        state.error == null -> Text(stringResource(R.string.new_order_price_pending), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun Breakdown(quote: PhoneOrderQuote) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        PriceLine(stringResource(R.string.new_order_subtotal), quote.subtotal)
-        if (quote.dealDiscount > 0) PriceLine(stringResource(R.string.new_order_deal), -quote.dealDiscount, note = true)
-        if (quote.pickupDiscount > 0) PriceLine(stringResource(R.string.new_order_pickup_discount), -quote.pickupDiscount)
-        if (quote.deliveryFee > 0) PriceLine(stringResource(R.string.new_order_delivery_fee), quote.deliveryFee)
-        if (quote.smallOrderFee > 0) PriceLine(stringResource(R.string.new_order_small_fee), quote.smallOrderFee)
-        if (quote.waived > 0) PriceLine(stringResource(R.string.new_order_waived), -quote.waived, note = true)
-        HorizontalDivider(Modifier.padding(vertical = 2.dp))
-        PriceLine(stringResource(R.string.new_order_total), quote.total, bold = true)
-        if (quote.deposits > 0) {
-            Text(stringResource(R.string.new_order_deposits, Format.euro(quote.deposits)), style = LINE_SMALL, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (quote.overCapacity) StatusLine(stringResource(R.string.new_order_over_capacity), soon = true)
-    }
-}
-
-/** [note]: already inside the line above (the deal is in the dishes' prices; the waiver is not charged), shown for information. */
-@Composable
-internal fun PriceLine(label: String, amount: Double, bold: Boolean = false, note: Boolean = false) {
-    val style = if (bold) TextStyle(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold) else TextStyle(fontSize = 18.sp, lineHeight = 24.sp)
-    val color = if (note) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-    Row {
-        Text(label, style = style, color = color, modifier = Modifier.weight(1f))
-        Text(Format.euro(amount), style = style, color = color, maxLines = 1)
-    }
-}

@@ -29,7 +29,7 @@ internal open class NoOrder : OrderTaking {
 
     override fun emptyBasket() = Unit
 
-    override fun goTo(step: CallStep) = Unit
+    override fun goTo(step: TakingStep) = Unit
 
     override fun pickStreet(street: StreetSuggestion) = Unit
 
@@ -44,6 +44,14 @@ internal open class NoOrder : OrderTaking {
     override fun saveWaiting() = Unit
 
     override fun suggestedMinutes(state: NewOrderState): Int = 35
+
+    override fun ladder(): List<Int> = listOf(20, 30, 45, 60)
+
+    override fun pickMinutes(minutes: Int) = Unit
+
+    override fun dismissError() = Unit
+
+    override fun another() = Unit
 }
 
 /** A phone order as far as it has got, with the Kasse's menu. Nobody in it exists. */
@@ -55,12 +63,12 @@ internal object OrderFixtures {
             menu = TillFixtures.menu,
             bestsellers = TillFixtures.ranked.bestsellers,
             draft = PhoneOrderDraft(fulfilment = Fulfilment.DELIVERY, phone = "0176 5550001"),
-            callStarted = true,
+            started = true,
         )
 
     val named = called.copy(draft = called.draft.copy(name = "Frau Schmidt-Mustermann"))
 
-    fun at(step: CallStep, of: NewOrderState = named) = of.copy(step = step)
+    fun at(step: TakingStep, of: NewOrderState = named) = of.copy(step = step)
 
     /** A street half typed, with Leipzig's like it. */
     val typing = named.copy(draft = named.draft.copy(street = "karl heine 9"), streets = StreetDirectory.matcher.match("karl heine 9"))
@@ -119,7 +127,7 @@ internal object OrderFixtures {
         return order.copy(draft = draft, quotedDraft = draft)
     }
 
-    fun saved(of: NewOrderState = priced(3)) = of.copy(step = CallStep.DONE, saved = of.quote?.copy(id = "o-1", orderNumber = 57))
+    fun saved(of: NewOrderState = priced(3)) = of.copy(step = TakingStep.DONE, saved = of.quote?.copy(id = "o-1", orderNumber = 57))
 
-    fun waiting(of: NewOrderState = with(3, texted)) = of.copy(step = CallStep.DONE, waiting = true)
+    fun waiting(of: NewOrderState = with(3, texted)) = of.copy(step = TakingStep.DONE, waiting = true)
 }

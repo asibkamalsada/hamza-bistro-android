@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,6 +29,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -130,6 +135,30 @@ internal fun StatusLine(text: String, good: Boolean = false, bad: Boolean = fals
                 else -> MaterialTheme.colorScheme.onSurface
             },
     )
+}
+
+/** What went wrong; gone with a tap, or with the next thing done. */
+@Composable
+internal fun ProblemCard(text: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val dismiss = stringResource(R.string.till_dismiss)
+    Surface(
+        onClick = onDismiss,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shadowElevation = 6.dp,
+        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive },
+    ) {
+        Row(Modifier.heightIn(min = 56.dp).padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                "✕",
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(min = 56.dp).semantics { contentDescription = dismiss },
+            )
+        }
+    }
 }
 
 /** Asked before something that cannot be taken back. */

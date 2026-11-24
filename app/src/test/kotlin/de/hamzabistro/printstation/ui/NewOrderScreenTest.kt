@@ -90,6 +90,7 @@ class NewOrderScreenTest {
         compose.setContent { AppTheme { NewOrderScreen(onBack = {}, navigation = {}, model = model) } }
         val doener = MenuDish(1, "Speisen", "Döner", "", 7.5, 12, 0, "", true, emptyList())
         model.add(BasketLine(doener, 1))
+        model.goTo(TakingStep.DISHES)
         compose.waitForIdle()
         compose.onNodeWithText("+\u00A0Note").performClick()
         compose.onNodeWithText("Note for this dish (optional)").performTextInput("ohne Zwiebeln")

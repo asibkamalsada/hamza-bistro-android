@@ -10,9 +10,11 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.hamzabistro.printstation.core.AddressRequest
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -24,7 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * What Telefon-Bestellung owes whoever takes the call, on the shop's tablet
+ * What "Neue Bestellung" owes whoever takes the call, on the shop's tablet
  * and a phone: the button that goes on always there, the keyboard up or not,
  * and as many dishes and lines in sight as in the Kasse. The pictures of it
  * all are [OrderShotsTest]'s.
@@ -41,7 +43,7 @@ class OrderLayoutTest(private val device: TillDevice) {
 
     private fun show(state: NewOrderState, link: AddressRequest? = null, keyboard: Boolean = false) =
         compose.setScreen(if (keyboard) device.keyboard else null) {
-            CallOrderContent(state, TillFixtures.photos, link, NoOrder(), {}, {}, {}, {}) { MenuButton(0, onClick = {}) }
+            NewOrderContent(state, TillFixtures.photos, link, NoOrder(), {}, {}, {}) { MenuButton(0, onClick = {}) }
         }
 
     private fun nodes(matcher: SemanticsMatcher): List<SemanticsNode> = compose.onAllNodes(matcher).fetchSemanticsNodes()
@@ -63,36 +65,37 @@ class OrderLayoutTest(private val device: TillDevice) {
 
     @Test
     fun theNameIsTypedWithTheWayOnInSight() {
-        show(f.named, keyboard = true)
+        show(f.called, keyboard = true)
         assertWhole(hasText("Name") and hasSetTextAction(), "name", keyboard = true)
-        assertWhole(hasText("Weiter", substring = true) and hasClickAction(), "Weiter", keyboard = true)
+        assertWhole(hasTestTag(BASKET_GO_TAG), "Gerichte", keyboard = true)
     }
 
     @Test
     fun theStreetsToPickShowWhileTheStreetIsTyped() {
-        show(f.at(CallStep.ADDRESS, f.typing), keyboard = true)
-        if (device.phone) return
+        show(f.typing, keyboard = true)
+        compose.onNode(hasText("Straße und Hausnummer") and hasSetTextAction()).performClick()
+        compose.waitForIdle()
         assertWhole(hasText("Straße und Hausnummer") and hasSetTextAction(), "street", keyboard = true)
-        assertWhole(hasText("Karl-Heine-Straße 9") and hasClickAction(), "the street to pick", keyboard = true)
+        if (!device.phone) assertWhole(hasText("Karl-Heine-Straße 9") and hasClickAction(), "the street to pick", keyboard = true)
+        assertWhole(hasTestTag(BASKET_GO_TAG), "Gerichte", keyboard = true)
     }
 
-    @Test
-    fun theWayOnIsThereWithTheKeyboardUp() {
-        show(f.at(CallStep.ADDRESS, f.addressed), keyboard = true)
-        assertWhole(hasText("Weiter", substring = true) and hasClickAction(), "Weiter", keyboard = true)
-    }
-
-    @Test
-    fun theDishesAndTheBasketShowAsInTheKasse() {
-        show(f.at(CallStep.DISHES, f.priced(5)))
+    /** The basket, where it is: on a phone a tap away. */
+    private fun basket(state: NewOrderState, link: AddressRequest? = null) {
+        show(f.at(TakingStep.DISHES, state), link)
         if (device.phone) {
             compose.onNodeWithText("Warenkorb", substring = true).performClick()
             compose.waitForIdle()
         }
-        assertWhole(hasTestTag(BASKET_GO_TAG), "Weiter")
+    }
+
+    @Test
+    fun theDishesAndTheBasketShowAsInTheKasse() {
+        basket(f.priced(5))
+        assertWhole(hasTestTag(BASKET_GO_TAG), "Speichern")
         val lines = nodes(hasTestTag(BASKET_LINE_TAG)).filter { it.whole() }
         // Big letters and a place for the note: some of the five are further down, and said to be.
-        assertTrue("${lines.size} lines on $device", lines.size >= if (device.fontScale == 1f) 5 else 3)
+        assertTrue("${lines.size} lines on $device", lines.size >= if (device.fontScale == 1f) 5 else if (device.phone) 2 else 3)
         if (device.phone) return
         val tiles = nodes(hasTestTag(DISH_TILE_TAG)).filter { it.whole() }
         assertTrue("${tiles.size} dishes on $device", tiles.size >= 8)
@@ -100,15 +103,46 @@ class OrderLayoutTest(private val device: TillDevice) {
 
     @Test
     fun savingIsInReachWhateverTheBasket() {
-        show(f.at(CallStep.CONFIRM, f.priced(12)))
-        assertWhole(hasTestTag(BASKET_GO_TAG), "Speichern")
+        basket(f.priced(12))
+        assertWhole(hasTestTag(BASKET_GO_TAG) and hasText("Speichern", substring = true), "Speichern")
         assertWhole(hasText("Fertig in ca. 35 Min."), "the minutes")
+        assertWhole(hasText("Frau Schmidt-Mustermann") and hasClickAction(), "whose it is")
+    }
+
+    @Test
+    fun whatIsMissingIsSaidAndLeadsThere() {
+        var went: TakingStep? = null
+        val model = object : NoOrder() { override fun goTo(step: TakingStep) { went = step } }
+        compose.setScreen {
+            NewOrderContent(f.at(TakingStep.DISHES, f.with(2, f.called)), TillFixtures.photos, null, model, {}, {}, {}) { MenuButton(0, onClick = {}) }
+        }
+        if (device.phone) {
+            compose.onNodeWithText("Warenkorb", substring = true).performClick()
+            compose.waitForIdle()
+        }
+        assertWhole(hasTestTag(BASKET_GO_TAG) and hasText("Es fehlt noch: Name, Straße, PLZ (5 Ziffern) ➜"), "what is missing")
+        compose.onNodeWithTag(BASKET_GO_TAG).performClick()
+        compose.waitForIdle()
+        assertEquals(TakingStep.CUSTOMER, went)
+    }
+
+    @Test
+    fun withTheLinkSentTheAddressIsNotMissing() {
+        basket(f.with(2, f.texted), f.link())
+        assertWhole(hasTestTag(BASKET_GO_TAG) and hasText("Speichern und auf die Adresse warten", substring = true), "saving")
+    }
+
+    @Test
+    fun anOrderForLaterIsNotSavedWithoutItsAddress() {
+        val state = f.with(2, f.texted)
+        basket(state.copy(draft = state.draft.copy(scheduledFor = Instant.now().plusSeconds(7200))), f.link())
+        assertWhole(hasTestTag(BASKET_GO_TAG) and hasText("Mit Uhrzeit erst speichern", substring = true), "why not")
     }
 
     @Test
     fun nothingToTapIsSmallerThanAFinger() {
         val density = compose.density.density
-        show(f.at(CallStep.DISHES, f.noted(5)))
+        show(f.at(TakingStep.DISHES, f.noted(5)))
         val small =
             nodes(hasClickAction()).filter { it.config.getOrNull(SemanticsActions.OnClick) != null && it.whole() }.filter {
                 val touch = it.touchBoundsInRoot

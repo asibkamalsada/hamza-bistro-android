@@ -32,45 +32,39 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * "Telefon-Bestellung": a call taken one big step at a time — the name, the
- * address or a pickup, the dishes as tiles — and the baskets that wait above
- * the queue for their caller's address.
+ * An order called in: the name, the address or a pickup, the dishes as tiles
+ * — and the baskets that wait above the queue for their caller's address.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w1280dp-h2400dp") // a tablet, tall enough for each step at once
-class CallOrderScreenTest {
+class TakingAnOrderTest {
     @get:Rule val compose = createComposeRule()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
     private fun open(): NewOrderViewModel {
         val model = NewOrderViewModel(app)
-        compose.setContent { AppTheme { CallOrderScreen(onBack = {}, onFullForm = {}, navigation = {}, model = model) } }
+        compose.setContent { AppTheme { NewOrderScreen(onBack = {}, navigation = {}, model = model) } }
         compose.waitForIdle()
         return model
     }
 
     private fun named(model: NewOrderViewModel) {
-        compose.onNodeWithText("Next ➜").assertIsNotEnabled()
         compose.onNodeWithText("Name").performTextInput("Ali")
         compose.onNodeWithText("Phone").performTextInput("0176 5550001")
-        compose.onNodeWithText("Next ➜").assertIsEnabled().performClick()
         compose.waitForIdle()
         assertEquals("Ali", model.state.value.draft.name)
     }
 
     @Test
-    fun aCallIsAPhoneDeliveryTakenStepByStep() {
+    fun aCallIsAPhoneDeliveryTakenInTwoSteps() {
         val model = open()
         assertEquals(OrderSource.PHONE, model.state.value.draft.source)
         assertEquals(Fulfilment.DELIVERY, model.state.value.draft.fulfilment)
-        compose.onNodeWithText("Step 1 of 4 · What is the caller's name?").assertIsDisplayed()
+        compose.onNodeWithText("Step 1 of 2 · For whom, and where to?").assertIsDisplayed()
         named(model)
-
-        compose.onNodeWithText("Step 2 of 4 · Where should it go?").assertIsDisplayed()
         // The way out for an address that does not survive the phone.
         compose.onNodeWithText("📱 Send the caller an SMS").assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithText("Next ➜").assertIsNotEnabled()
 
         compose.onNodeWithText("Street and number").performTextInput("karl heine 9")
         compose.waitUntil(timeoutMillis = 10_000) { model.state.value.streets.isNotEmpty() }
@@ -78,20 +72,33 @@ class CallOrderScreenTest {
         compose.waitForIdle()
         assertEquals("04229", model.state.value.draft.postalCode)
 
-        compose.onNodeWithText("Next ➜").assertIsEnabled().performClick()
+        compose.onNodeWithText("Dishes ➜").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Step 3 of 4 · Which dishes?").assertIsDisplayed()
-        assertEquals(CallStep.DISHES, model.state.value.step)
+        compose.onNodeWithText("Step 2 of 2 · Which dishes?").assertIsDisplayed()
+        assertEquals(TakingStep.DISHES, model.state.value.step)
+        // Whose order it is, and the way back to it.
+        compose.onNodeWithText("Karl-Heine-Straße 9, 04229").performClick()
+        compose.waitForIdle()
+        assertEquals(TakingStep.CUSTOMER, model.state.value.step)
+    }
+
+    @Test
+    fun theDishesComeFirstWhenTheCallerStartsWithThem() {
+        val model = open()
+        compose.onNodeWithText("Dishes ➜").performClick()
+        model.add(BasketLine(cola, 1))
+        compose.waitForIdle()
+        compose.onNodeWithText("Still missing: name, phone, street, postcode (5 digits) ➜").performClick()
+        compose.waitForIdle()
+        assertEquals(TakingStep.CUSTOMER, model.state.value.step)
+        assertEquals(1, model.state.value.draft.lines.size)
     }
 
     @Test
     fun aLandlineIsNotOfferedAnSms() {
-        val model = open()
-        compose.onNodeWithText("Name").performTextInput("Ali")
+        open()
         compose.onNodeWithText("Phone").performTextInput("0341 5550001")
-        compose.onNodeWithText("Next ➜").performClick()
         compose.waitForIdle()
-        assertEquals(CallStep.ADDRESS, model.state.value.step)
         compose.onNodeWithText("📱 Send the caller an SMS").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("That is a landline number: an SMS only goes to a mobile.").assertIsDisplayed()
     }
@@ -104,7 +111,25 @@ class CallOrderScreenTest {
         compose.waitForIdle()
         assertEquals(Fulfilment.PICKUP, model.state.value.draft.fulfilment)
         compose.onNodeWithText("Street and number").assertDoesNotExist()
-        compose.onNodeWithText("Next ➜").assertIsEnabled()
+        compose.onNodeWithText("📱 Send the caller an SMS").assertDoesNotExist()
+    }
+
+    @Test
+    fun somebodyAtTheCounterIsAnOrderOfTheirs() {
+        val model = open()
+        compose.onNodeWithText("Counter").performClick()
+        compose.onNodeWithText("Eat in").performClick()
+        compose.waitForIdle()
+        assertEquals(OrderSource.COUNTER, model.state.value.draft.source)
+        assertEquals(Fulfilment.DINE_IN, model.state.value.draft.fulfilment)
+        // Chosen stays chosen: only a new order starts as a phone delivery again.
+        model.start()
+        compose.waitForIdle()
+        assertEquals(OrderSource.COUNTER, model.state.value.draft.source)
+        model.another()
+        compose.waitForIdle()
+        assertEquals(OrderSource.PHONE, model.state.value.draft.source)
+        assertEquals(Fulfilment.DELIVERY, model.state.value.draft.fulfilment)
     }
 
     @Test

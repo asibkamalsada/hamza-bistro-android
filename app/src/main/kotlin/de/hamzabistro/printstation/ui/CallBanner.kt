@@ -47,7 +47,7 @@ import kotlinx.coroutines.delay
 /**
  * Who is calling the shop's phone, over whatever screen is up: the number,
  * big, where it had its last delivery, and one big button that opens
- * "Telefon-Bestellung" with the number in it. On top of the screen rather
+ * "Neue Bestellung" with the number in it. On top of the screen rather
  * than above it, so no order moves under a finger when the phone rings.
  *
  * Nothing opens by itself. A banner goes when it is used, put away, or a

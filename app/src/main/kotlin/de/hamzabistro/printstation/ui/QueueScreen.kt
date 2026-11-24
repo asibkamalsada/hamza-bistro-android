@@ -123,16 +123,12 @@ fun QueueScreen(
         // A call or somebody at the counter (#9): typed in, straight into "In der Küche".
         floatingActionButton = {
             if (!driving) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // The phone, step by step and big; the full form beside it for everything else.
-                    ExtendedFloatingActionButton(
-                        onClick = { onOpen(StaffScreen.CALL_ORDER) },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ) {
-                        Text("📞 " + stringResource(R.string.call_order), style = MaterialTheme.typography.titleLarge)
-                    }
-                    ExtendedFloatingActionButton(onClick = { onOpen(StaffScreen.NEW_ORDER) }) { Text("+ " + stringResource(R.string.new_order)) }
+                ExtendedFloatingActionButton(
+                    onClick = { onOpen(StaffScreen.NEW_ORDER) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Text("📞 " + stringResource(R.string.new_order), style = MaterialTheme.typography.titleLarge)
                 }
             }
         },
