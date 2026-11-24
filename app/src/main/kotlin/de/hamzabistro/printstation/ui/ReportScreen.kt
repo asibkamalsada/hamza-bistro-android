@@ -69,6 +69,7 @@ import de.hamzabistro.printstation.core.DishOrder
 import de.hamzabistro.printstation.core.OrderRatings
 import de.hamzabistro.printstation.core.OrderSource
 import de.hamzabistro.printstation.core.Report
+import de.hamzabistro.printstation.core.ReportCameFrom
 import de.hamzabistro.printstation.core.ReportCsv
 import de.hamzabistro.printstation.core.ReportDuration
 import de.hamzabistro.printstation.core.ReportLateness
@@ -384,6 +385,8 @@ private fun LazyListScope.reportItems(report: Report, words: ReportWords) {
     item(key = "rings") { Rings(report, words) }
     // Only once something came in by phone or at the counter (#9): otherwise it is all "Website".
     if (report.enteredByStaff) item(key = "sources") { Sources(report, words) }
+    // Only once a web order in the range carries a label (hamza-bistro-web 20261124120000).
+    if (report.knowsCameFrom) item(key = "came_from") { CameFrom(report.cameFrom, words.orders, words.revenue) }
     item(key = "best") { BestSellers(report) }
     item(key = "grid") { BusyHours(report.grid) }
     item(key = "times") { Times(report, words) }
@@ -524,6 +527,38 @@ private fun sourceName(resources: Resources, source: String): String =
         OrderSource.COUNTER.wire -> resources.getString(R.string.report_source_counter)
         else -> source
     }
+
+/** Instagram-Anzeige, Flyer, Google, direkt: what each way in brought, and how many of them were new. */
+@Composable
+internal fun CameFrom(rows: List<ReportCameFrom>, orders: String, revenue: String) {
+    val resources = LocalResources.current
+    val most = rows.maxOfOrNull { it.delivered } ?: 0
+    ReportSection(stringResource(R.string.report_came_from)) {
+        Line("", orders, stringResource(R.string.report_came_from_new), revenue, muted = true)
+        for (row in rows) {
+            // On a line of its own: next to three columns a phone leaves it no room.
+            Text(cameFromName(resources, row.cameFrom), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Line("", row.delivered.toString(), row.newCustomers.toString(), ReportText.euro(row.revenue))
+            if (most > 0) Bar(row.delivered.toDouble() / most)
+        }
+        Text(stringResource(R.string.report_came_from_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The labels worth a word of their own; any other is shown as the shop page stored it. */
+private fun cameFromName(resources: Resources, label: String?): String {
+    if (label == null) return resources.getString(R.string.report_came_from_unknown)
+    return when (label) {
+        "direct" -> resources.getString(R.string.report_came_from_direct)
+        "app" -> resources.getString(R.string.report_came_from_app)
+        "instagram-ad" -> resources.getString(R.string.report_came_from_instagram_ad)
+        "facebook-ad" -> resources.getString(R.string.report_came_from_facebook_ad)
+        "meta" -> resources.getString(R.string.report_came_from_meta)
+        "menu-or-typed" -> resources.getString(R.string.report_came_from_menu)
+        "google-ads" -> resources.getString(R.string.report_came_from_google_ads)
+        else -> label
+    }
+}
 
 /** The top ten, by Menge or by Umsatz, and all of them a tap away. */
 @Composable
