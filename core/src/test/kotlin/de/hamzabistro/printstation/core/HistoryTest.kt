@@ -35,8 +35,9 @@ class HistoryTest {
         assertEquals("created_at.desc", request.url.queryParameter("order"))
         assertEquals("50", request.url.queryParameter("limit"))
         assertEquals(StaffOrder.HISTORY_COLUMNS, request.url.queryParameter("select"))
-        // Every order, not only the open ones — but no tests.
-        assertEquals(null, request.url.queryParameter("status"))
+        // Every order, not only the open ones — but no tests, and none still
+        // being paid for online (staff may read their own).
+        assertEquals("neq.awaiting_payment", request.url.queryParameter("status"))
         assertEquals("eq.false", request.url.queryParameter("is_test"))
     }
 

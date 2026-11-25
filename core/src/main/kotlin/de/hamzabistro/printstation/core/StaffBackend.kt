@@ -35,6 +35,8 @@ interface StaffBackend {
      * Throws [OrderMovedException] when it had moved on meanwhile,
      * [NotDelayableException] for an [OrderStep.Delay] the database refused,
      * [PaymentLockedException] when it refused how it was paid,
+     * [OnlineHoldLostException] for an [OrderStep.Done] on an order paid
+     * online whose hold was lost meanwhile,
      * [NotPackableException] for an [OrderStep.Pack] or [OrderStep.Unpack]
      * on an order that is no accepted delivery (any more), and
      * [PackingUnavailableException] when the database has no "Fertig" yet.
@@ -86,6 +88,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
     /**
      * What the queue reads, newest columns first: each one a database turns
      * out not to have yet is dropped for good, oldest last.
+     * [StaffOrder.ONLINE_COLUMNS] (20261125100000_online_payment), then
      * [StaffOrder.ROUTE_COLUMNS] (20261012100000_order_route), then
      * [StaffOrder.POINT_COLUMNS] (20261004060000_order_coords), then
      * [StaffOrder.SOURCE_COLUMNS] (20261004040000_phone_orders), then
@@ -125,6 +128,9 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
                 // a poll behind, cannot send back out an order already
                 // delivered.
                 .addQueryParameter("status", "eq.${order.status.column}")
+                // And nothing to collect only while there is nothing to
+                // collect: the hold may be lost within the undo window.
+                .apply { if (Payment.needsHold(order, step)) addQueryParameter("payment_method", "eq.online") }
                 .addQueryParameter("select", "id")
                 .build()
         val body = stepBody(step).toRequestBody()
@@ -144,7 +150,25 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
                 }
                 json.decodeFromString(ListSerializer(IdRow.serializer()), text)
             }
-        if (moved.isEmpty()) throw OrderMovedException()
+        if (moved.isEmpty()) {
+            if (Payment.needsHold(order, step) && holdLost(order)) throw OnlineHoldLostException()
+            throw OrderMovedException()
+        }
+    }
+
+    /** Whether [order] is where this device saw it, but no longer paid online. */
+    private suspend fun holdLost(order: StaffOrder): Boolean {
+        val url =
+            rest.endpoint("rest/v1/orders")
+                .addQueryParameter("id", "eq.${order.id}")
+                .addQueryParameter("select", "status,payment_method")
+                .build()
+        return rest.call({ it.url(url).get() }) { response ->
+            val text = response.body.string()
+            if (!response.isSuccessful) throw rest.rejected(response.code, text, "order")
+            val now = json.decodeFromString(ListSerializer(PaidRow.serializer()), text).firstOrNull()
+            now != null && now.status == order.status.column && now.paymentMethod != PaymentMethod.ONLINE.wire
+        }
     }
 
     /**
@@ -270,6 +294,9 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
 
     @Serializable private class IdRow(val id: String)
 
+    @Serializable
+    private class PaidRow(val status: String, @SerialName("payment_method") val paymentMethod: String? = null)
+
     @Serializable private class DelayedRow(val delayed: Int)
 
     @Serializable
@@ -282,6 +309,7 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
         /** What the queue reads, newest database first: see [columns]. */
         val QUEUE_SELECTS =
             listOf(
+                StaffOrder.ONLINE_COLUMNS,
                 StaffOrder.ROUTE_COLUMNS,
                 StaffOrder.POINT_COLUMNS,
                 StaffOrder.SOURCE_COLUMNS,

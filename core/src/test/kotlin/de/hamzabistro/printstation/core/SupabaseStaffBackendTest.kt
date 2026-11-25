@@ -50,7 +50,7 @@ class SupabaseStaffBackendTest {
         val request = test.server.takeRequest()
         assertEquals("/rest/v1/orders", request.url.encodedPath)
         assertEquals("in.(new,confirmed,on_the_way)", request.url.queryParameter("status"))
-        assertEquals(StaffOrder.ROUTE_COLUMNS, request.url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, request.url.queryParameter("select"))
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 
@@ -65,7 +65,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -84,9 +84,9 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         // A database without the coordinates steps down to the columns of before, and stays there.
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.SOURCE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -109,9 +109,9 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         // A database without the route steps down to the points, and stays there.
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.POINT_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -129,7 +129,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -150,7 +150,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }
@@ -165,7 +165,7 @@ class SupabaseStaffBackendTest {
         backend.openOrders()
 
         test.server.takeRequest()
-        assertEquals(StaffOrder.ROUTE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
+        assertEquals(StaffOrder.ONLINE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.NO_SHOW_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
         assertEquals(StaffOrder.QUEUE_COLUMNS, test.server.takeRequest().url.queryParameter("select"))
     }

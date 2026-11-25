@@ -267,6 +267,23 @@ ask for the SMS permission until **Eingeschränkte Einstellungen zulassen**
 is tapped under the app's info (⋮). The setting says so when Android
 refuses.
 
+### Paid online
+
+With online payment on (`20261125100000_online_payment.sql`,
+hamza-bistro-web#82), Stripe only **holds** the money until "Geliefert" /
+"Abgeholt" takes it. The app never sees an order still being paid for; it
+shows up, rings and prints like any other once the money is held. Its card
+and its stop say **"ONLINE – nichts kassieren"**, without "Neuer Kunde", and
+it is handed over with the one button. A hold lost before the handover turns
+that into **"Online-Reservierung weggefallen – kassieren"** with "Bar" /
+"Karte" as usual; handed over as paid online in the moment it is lost,
+nothing is recorded and the screen says so
+([`Payment`](core/src/main/kotlin/de/hamzabistro/printstation/core/CashUp.kt)).
+A payment a person has to settle is a notice above the queue:
+"Online-Zahlung offen: #57". On a database without the migration, none of
+this shows. The column is looked for once per start of the app: restart it
+after the migration.
+
 ### Fahrer
 
 A second tab on the queue, and the one a phone opens on when "Fahrer-Handy"
@@ -276,7 +293,7 @@ is switched on in the settings
 
 - **Mitnehmen**: the deliveries still in the kitchen, by when they are due,
   each with its ring, street, the note for the door and what to collect (or
-  "BEZAHLT"). Tick several, then **Mitnehmen (3)**: each goes "Unterwegs" as
+  "ONLINE – nichts kassieren"). Tick several, then **Mitnehmen (3)**: each goes "Unterwegs" as
   its own step, with its own undo window, and only from where this device
   saw it — one another device moved meanwhile is refused alone and shows as
   it is now, the others go through. Packed bags ("Fertig",
@@ -308,7 +325,8 @@ before it is discarded.
   order and for cashing up. Read when opened, not polled; the cards are for
   reading (the phone number and the route still open). A delivered order
   that was delayed says so: "fällig 18:45 · verschoben +10 Min."; a
-  delivered one says how it was paid: "Bezahlt: Bar / Karte / unbekannt".
+  delivered one says how it was paid: "Bezahlt: Bar / Karte / Online /
+  unbekannt".
 - **Kasse** — a sale at the counter: tap the dishes, *Mitnehmen* or *Hier
   essen*, **Kassieren**, then *Bar* (what was given, the change) or *Karte*
   (the amount for the card app; booked only with "Karte bezahlt"), then the

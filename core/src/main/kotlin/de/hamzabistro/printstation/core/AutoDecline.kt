@@ -52,7 +52,11 @@ object AutoDecline {
     private const val SHOW_TIME_AFTER_MINUTES = 60
     private const val SOON_MINUTES = 5
 
-    /** The countdown for a waiting order; null for any other, or with auto-decline off. */
+    /**
+     * The countdown for a waiting order; null for any other, or without a
+     * deadline. By the order's own deadline, never by the setting: an order
+     * paid online has one with auto-decline off too (hamza-bistro-web#82).
+     */
     fun countdown(order: StaffOrder, now: Instant): DeclineCountdown? {
         if (order.status != OrderStatus.NEW) return null
         val at = order.autoDeclineAt ?: return null

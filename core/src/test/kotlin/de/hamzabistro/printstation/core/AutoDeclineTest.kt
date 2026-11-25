@@ -35,6 +35,15 @@ class AutoDeclineTest {
     }
 
     @Test
+    fun `an order paid online counts down by its own deadline, whatever the setting`() {
+        val online = waiting().copy(paymentMethod = PaymentMethod.ONLINE)
+        assertEquals(6, AutoDecline.countdown(online, at("2026-09-26T16:04:00Z"))!!.minutesLeft)
+        assertTrue(AutoDecline.escalationDue(online, at("2026-09-26T16:08:30Z")))
+        // The hold lost with auto-decline off: no deadline, no countdown.
+        assertNull(AutoDecline.countdown(waiting(autoDeclineAt = null).copy(onlineLostAt = deadline), at("2026-09-26T16:04:00Z")))
+    }
+
+    @Test
     fun `a pre-order more than an hour off shows its time instead`() {
         val pre = waiting(autoDeclineAt = "2026-09-26T19:00:00Z", scheduledFor = "2026-09-26T19:30:00Z")
         val far = AutoDecline.countdown(pre, at("2026-09-26T16:00:00Z"))!!

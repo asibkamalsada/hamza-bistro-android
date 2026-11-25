@@ -264,6 +264,21 @@ class PrintStationTest {
     }
 
     @Test
+    fun `an order paid online prints when it first shows up, though a newer one printed before it`() = runTest {
+        backend.queue += order(58, isNew = true)
+        val changes = MutableSharedFlow<Unit>()
+        backgroundScope.launch { station().run(changes) }
+        runCurrent()
+        assertEquals(listOf("ticket order-58"), printer.printed)
+
+        // Number 57 was being paid for until now: to this device it is new.
+        backend.queue += order(57, isNew = true)
+        changes.emit(Unit)
+        advanceTimeBy(2.seconds)
+        assertEquals(listOf("ticket order-58", "ticket order-57"), printer.printed)
+    }
+
+    @Test
     fun `offline is a problem to show, and the next look tries again`() = runTest {
         backend.failQueue = IOException("no network")
         val station = station()
