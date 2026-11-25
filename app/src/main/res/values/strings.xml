@@ -192,6 +192,10 @@
     <string name="pay_online">Online</string>
     <string name="pay_unknown">unknown</string>
     <string name="paid_with">Paid: %1$s</string>
+    <string name="online_held">ONLINE – collect nothing</string>
+    <string name="online_lost">Online hold gone – collect the money</string>
+    <string name="online_lost_step">Not saved: online hold gone – collect the money, then tap \"Cash\" or \"Card\".</string>
+    <string name="online_claims">Online payment not settled: %1$s</string>
     <string name="decline">Decline</string>
     <string name="cancel_later">Cancel</string>
     <string name="cancel_why">Why? The customer is told.</string>
@@ -768,7 +772,6 @@
     <string name="driver_packed_at">packed at %1$s</string>
     <string name="driver_leg_shop">%1$s from the shop</string>
     <string name="driver_leg">%1$s from the stop before</string>
-    <string name="driver_paid">PAID</string>
     <string name="driver_call">Call</string>
     <string name="route_open">Open route</string>
     <string name="route_open_part">Open route %1$d/%2$d · stops %3$d–%4$d</string>

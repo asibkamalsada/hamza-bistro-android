@@ -40,6 +40,22 @@ data class FailedEmail(
     @SerialName("failed_at") @Serializable(with = InstantSerializer::class) val failedAt: Instant? = null,
 )
 
+/**
+ * A row of order_payment_states with an open claim
+ * (20261125100000_online_payment.sql, hamza-bistro-web#82): the order is
+ * over and its online payment is not settled, so a person has to look.
+ */
+@Serializable
+data class PaymentClaim(
+    @SerialName("order_number") val orderNumber: Long,
+    @SerialName("amount_cents") val amountCents: Int = 0,
+) {
+    companion object {
+        /** "#57, #58": how the line above the queue lists them. */
+        fun list(claims: List<PaymentClaim>): String = claims.joinToString(", ") { "#${it.orderNumber}" }
+    }
+}
+
 /** What one row of "Überwachung" says, before it is put in words. */
 sealed interface OpsVerdict {
     val ok: Boolean
@@ -135,6 +151,9 @@ interface OpsBackend {
 
     /** The latest customer email that failed on its retry too, or null for none. */
     suspend fun failedEmail(): FailedEmail?
+
+    /** The online payments a person has to look at, by order number; empty for none. */
+    suspend fun paymentClaims(): List<PaymentClaim>?
 }
 
 class SupabaseOpsBackend internal constructor(private val rest: SupabaseRest) : OpsBackend {
@@ -159,6 +178,24 @@ class SupabaseOpsBackend internal constructor(private val rest: SupabaseRest) : 
 
     override suspend fun failedEmail(): FailedEmail? =
         rpc("failed_customer_email")?.let { json.decodeFromString(ListSerializer(FailedEmail.serializer()), it).firstOrNull() }
+
+    override suspend fun paymentClaims(): List<PaymentClaim>? {
+        val url =
+            rest.endpoint("rest/v1/order_payment_states")
+                .addQueryParameter("select", "order_number,amount_cents")
+                .addQueryParameter("open_claim", "eq.true")
+                .addQueryParameter("order", "order_number.asc")
+                .build()
+        return rest.call({ it.url(url).get() }) { response ->
+            val body = response.body.string()
+            if (!response.isSuccessful) {
+                val e = rest.rejected(response.code, body, "order_payment_states")
+                if (e is BackendException && e.missingTable) return@call null
+                throw e
+            }
+            json.decodeFromString(ListSerializer(PaymentClaim.serializer()), body)
+        }
+    }
 
     private suspend fun rpc(name: String): String? =
         try {

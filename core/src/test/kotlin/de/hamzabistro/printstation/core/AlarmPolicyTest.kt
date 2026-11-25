@@ -39,6 +39,19 @@ class AlarmPolicyTest {
     }
 
     @Test
+    fun `rings for an order paid online that first shows up once its money is held`() {
+        val older = waiting("old", createdAt = "2026-09-26T15:58:00Z")
+        decide(listOf(older))
+        policy.silence(evening, 60)
+        // Placed at 15:10, paid for at 16:00: created_at is set again then.
+        val online = waiting("online", createdAt = "2026-09-26T16:00:30Z").copy(paymentMethod = PaymentMethod.ONLINE)
+        assertEquals(listOf("online"), decide(listOf(older, online), now = evening.plusSeconds(31)).ringing.map { it.id })
+        val once = AlarmSettings(newOrders = NewOrderAlarm.ONCE)
+        val message = AlarmPolicy().decide(listOf(online), false, null, once, evening.plusSeconds(31)) { 25 }
+        assertEquals(online, assertIs<Chime.NewOrder>(message.chimes.single()).order)
+    }
+
+    @Test
     fun `rings the longest-waiting first`() {
         val older = waiting("old", createdAt = "2026-09-26T15:50:00Z")
         val newer = waiting("new", createdAt = "2026-09-26T15:58:00Z")

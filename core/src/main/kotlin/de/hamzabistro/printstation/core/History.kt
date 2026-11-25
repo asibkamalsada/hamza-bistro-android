@@ -82,6 +82,10 @@ class SupabaseHistoryBackend internal constructor(
         val url =
             rest.endpoint("rest/v1/orders")
                 .addQueryParameter("select", columns)
+                // Staff never see an order still being paid for online
+                // (hamza-bistro-web#82), but may read their own: a status
+                // this app does not know would fail the whole list.
+                .addQueryParameter("status", "neq.awaiting_payment")
                 .apply { if (testsMarked) addQueryParameter("is_test", "eq.false") }
                 .addQueryParameter("order", "created_at.desc")
                 .addQueryParameter("limit", HISTORY_LIMIT.toString())

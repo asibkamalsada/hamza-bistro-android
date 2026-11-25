@@ -249,12 +249,15 @@ private fun Where(order: StaffOrder, onRoute: (() -> Unit)? = null) {
         modifier = if (onRoute != null) Modifier.clickable(onClick = onRoute) else Modifier,
     )
     StaffQueue.doorNote(order)?.let { Note(stringResource(R.string.door_note), it, MaterialTheme.colorScheme.surfaceVariant) }
-    Text(
-        if (order.paymentMethod == PaymentMethod.ONLINE) stringResource(R.string.driver_paid)
-        else stringResource(R.string.collect, Format.euro(order.total)),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-    )
+    OnlineLine(order)
+    // Held online, not paid yet: the line above says there is nothing to collect.
+    if (order.paymentMethod != PaymentMethod.ONLINE) {
+        Text(
+            stringResource(R.string.collect, Format.euro(order.total)),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+    }
 }
 
 /**

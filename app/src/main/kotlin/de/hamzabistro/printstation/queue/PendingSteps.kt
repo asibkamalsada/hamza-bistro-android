@@ -3,6 +3,7 @@ package de.hamzabistro.printstation.queue
 import de.hamzabistro.printstation.core.Logger
 import de.hamzabistro.printstation.core.NotDelayableException
 import de.hamzabistro.printstation.core.NotPackableException
+import de.hamzabistro.printstation.core.OnlineHoldLostException
 import de.hamzabistro.printstation.core.OrderMovedException
 import de.hamzabistro.printstation.core.OrderQueue
 import de.hamzabistro.printstation.core.OrderStep
@@ -46,6 +47,12 @@ sealed interface StepFailure {
      * accepted delivery any more — out of the door, or cancelled.
      */
     data object NotPackable : StepFailure
+
+    /**
+     * Handed over as paid online, and the hold was lost meanwhile
+     * (hamza-bistro-web#82): not recorded, and the card asks "Bar" or "Karte".
+     */
+    data object OnlineHoldLost : StepFailure
 
     data class Failed(val reason: String) : StepFailure
 }
@@ -146,6 +153,8 @@ class PendingSteps(
                 _failures.tryEmit(StepFailure.NotDelayable)
             } catch (e: PaymentLockedException) {
                 _failures.tryEmit(StepFailure.PaymentLocked)
+            } catch (e: OnlineHoldLostException) {
+                _failures.tryEmit(StepFailure.OnlineHoldLost)
             } catch (e: NotPackableException) {
                 _failures.tryEmit(StepFailure.NotPackable)
             } catch (e: PackingUnavailableException) {

@@ -103,6 +103,32 @@ class OpsStatusTest {
     }
 
     @Test
+    fun `reads the online payments that are not settled`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(200, """[{"order_number":57,"amount_cents":2340},{"order_number":58,"amount_cents":900}]""")
+        test.reply(200, "[]")
+
+        val claims = backend.paymentClaims()!!
+        assertEquals(listOf(PaymentClaim(57, 2340), PaymentClaim(58, 900)), claims)
+        assertEquals("#57, #58", PaymentClaim.list(claims))
+        assertEquals(emptyList(), backend.paymentClaims())
+
+        test.server.takeRequest()
+        val request = test.server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/rest/v1/order_payment_states", request.url.encodedPath)
+        assertEquals("eq.true", request.url.queryParameter("open_claim"))
+        assertEquals("order_number,amount_cents", request.url.queryParameter("select"))
+    }
+
+    @Test
+    fun `is quiet about online payments on a database without them`() = runBlocking<Unit> {
+        test.token("access-1", "refresh-1")
+        test.reply(404, """{"code":"PGRST205","message":"Could not find the table 'public.order_payment_states' in the schema cache"}""")
+        assertNull(backend.paymentClaims())
+    }
+
+    @Test
     fun `has no data and no error on a database without it`() = runBlocking<Unit> {
         test.token("access-1", "refresh-1")
         val function = """{"code":"PGRST202","message":"Could not find the function public.ops_overview without parameters in the schema cache"}"""

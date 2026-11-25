@@ -143,6 +143,13 @@ class KitchenFullException(message: String) : Exception(message)
 class PaymentLockedException : Exception("the order's payment method is already recorded")
 
 /**
+ * The order was to be handed over as paid online, and its hold had been lost
+ * meanwhile (hamza-bistro-web#82): nothing was recorded, the money has to be
+ * collected. The queue is read again and asks "Bar" or "Karte".
+ */
+class OnlineHoldLostException : Exception("the order's online payment is gone: the money has to be collected")
+
+/**
  * The database took no report for that range (HB455): it ends before it
  * starts, or covers more than 366 days. The app clamps the range, so this
  * means a clock far off or a server with other limits.

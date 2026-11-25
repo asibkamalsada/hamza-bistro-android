@@ -177,7 +177,7 @@ data class StaffOrder(
     /**
      * When the database declines it unanswered — the computed column
      * auto_decline_at(orders). Null once it is not new, or with auto-decline
-     * off.
+     * off — except for an order paid online, which always has a deadline.
      */
     @SerialName("auto_decline_at") @Serializable(with = InstantSerializer::class) val autoDeclineAt: Instant? = null,
     /**
@@ -190,7 +190,9 @@ data class StaffOrder(
     /**
      * How it was paid, said with "Bar" / "Karte" when it was delivered
      * (20261002190000_cash_up.sql). Null until then, and for an order
-     * delivered from Telegram or before the column existed.
+     * delivered from Telegram or before the column existed. "online" from
+     * the start on one whose money Stripe holds until the handover
+     * (hamza-bistro-web#82) — null again if that hold is lost before it.
      */
     @SerialName("payment_method") val paymentMethod: PaymentMethod? = null,
     /** When it was delivered or collected, from the database clock. */
@@ -246,6 +248,13 @@ data class StaffOrder(
     @SerialName("route_km") val routeKm: Double? = null,
     @SerialName("ride_minutes") val rideMinutes: Int? = null,
     @SerialName("route_source") val routeSource: String? = null,
+    /**
+     * When the hold for an order paid online was found gone before the
+     * handover (20261125100000_online_payment.sql, hamza-bistro-web#82):
+     * [paymentMethod] is null again and the money is collected as usual. Null
+     * on every other order, and on a database without the column.
+     */
+    @SerialName("online_lost_at") @Serializable(with = InstantSerializer::class) val onlineLostAt: Instant? = null,
 ) {
     // Never the customer, wherever an order ends up printed.
     override fun toString(): String = "StaffOrder(#$orderNumber, $status)"
@@ -265,10 +274,11 @@ data class StaffOrder(
     /**
      * "Neuer Kunde": a first order on the site, worth a call. Never for one
      * staff typed in: it has no email to tell a first order by, and whoever
-     * typed it has just spoken to the customer.
+     * typed it has just spoken to the customer. Nor while its money is held
+     * online: that is the check the call would be.
      */
     val newCustomer: Boolean
-        get() = !returningCustomer && !enteredByStaff
+        get() = !returningCustomer && !enteredByStaff && paymentMethod != PaymentMethod.ONLINE
 
     /** Where the stop is, or null when the order has no coordinate. */
     val point: GeoPoint?
@@ -325,10 +335,17 @@ data class StaffOrder(
 
         /**
          * [POINT_COLUMNS] and how far each door is
-         * (20261012100000_order_route.sql): what the open queue reads first.
-         * A database without them reads [POINT_COLUMNS].
+         * (20261012100000_order_route.sql). A database without them reads
+         * [POINT_COLUMNS].
          */
         const val ROUTE_COLUMNS = "$POINT_COLUMNS,route_km,ride_minutes,route_source"
+
+        /**
+         * [ROUTE_COLUMNS] and when an online hold was lost
+         * (20261125100000_online_payment.sql): what the open queue reads
+         * first. A database without it reads [ROUTE_COLUMNS].
+         */
+        const val ONLINE_COLUMNS = "$ROUTE_COLUMNS,online_lost_at"
 
         /** What "Letzte Bestellungen" reads first; [COLUMNS] on a database without [SOURCE_FIELDS]. */
         const val HISTORY_COLUMNS = "$COLUMNS,$SOURCE_FIELDS"
@@ -361,8 +378,8 @@ sealed interface OrderStep {
 
     /**
      * At the door, or collected — and how it was paid, "Bar" or "Karte",
-     * for the Kassensturz. [payment] is null for an order already paid
-     * online, which keeps the one button. [device] is this device's label,
+     * for the Kassensturz. [payment] is null for an order whose
+     * money is held online, which keeps the one button. [device] is this device's label,
      * as staff_app_seen has it, so the Kassensturz can tell two drivers on
      * one account apart.
      */

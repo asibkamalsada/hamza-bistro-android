@@ -58,6 +58,7 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.FailedEmail
 import de.hamzabistro.printstation.core.Kitchen
 import de.hamzabistro.printstation.core.KitchenSlot
+import de.hamzabistro.printstation.core.PaymentClaim
 import de.hamzabistro.printstation.core.ShopHours
 import de.hamzabistro.printstation.core.ShopState
 import de.hamzabistro.printstation.core.StaffQueue
@@ -85,6 +86,8 @@ data class QueueStatus(
     val addressFailing: Boolean = false,
     val failedEmail: FailedEmail? = null,
     val notifyFailingSince: Instant? = null,
+    /** The online payments a person has to look at (hamza-bistro-web#82). */
+    val paymentClaims: List<PaymentClaim> = emptyList(),
 ) {
     /** What keeps the queue from working at all: a slim bar each, always above the list. */
     val blocking: Boolean
@@ -92,7 +95,16 @@ data class QueueStatus(
 
     /** "⚠ N Hinweise": everything else worth knowing, folded into one chip. */
     val hints: Int
-        get() = listOf(onShift && alarmMissing.isNotEmpty(), silencedUntil != null, addressFailing, failedEmail != null, notifyFailingSince != null).count { it }
+        get() =
+            listOf(
+                    onShift && alarmMissing.isNotEmpty(),
+                    silencedUntil != null,
+                    addressFailing,
+                    failedEmail != null,
+                    notifyFailingSince != null,
+                    paymentClaims.isNotEmpty(),
+                )
+                .count { it }
 }
 
 /** What the strip, its bars and its sheet do. */
@@ -303,6 +315,10 @@ private fun Warnings(status: QueueStatus, actions: StatusActions, close: (() -> 
         Banner(stringResource(R.string.queue_offline_since, Format.clock(it)), warning = true) {
             OutlinedButton(onClick = actions.retry) { Text(stringResource(R.string.retry)) }
         }
+    }
+    // Delivered, and the money held online not taken; or whatever else a person has to settle in Stripe.
+    if (status.paymentClaims.isNotEmpty()) {
+        Banner(stringResource(R.string.online_claims, PaymentClaim.list(status.paymentClaims)), warning = true) {}
     }
     // The monitoring (hamza-bistro-web#92): an email that did not go out, and the phones' webhook failing.
     status.failedEmail?.let { failed ->

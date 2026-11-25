@@ -20,6 +20,7 @@ import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.PauseWhat
 import de.hamzabistro.printstation.core.Payment
+import de.hamzabistro.printstation.core.PaymentClaim
 import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.QueueState
 import de.hamzabistro.printstation.core.ShopHours
@@ -80,12 +81,14 @@ data class StaffState(
         get() = StaffQueue.delayableAll(queue.orders, StaffQueue.DELAY_ALL_MINUTES, now)
 }
 
-/** The monitoring's lines above the queue; both null while all is well, or not known. */
+/** The monitoring's lines above the queue; null or empty while all is well, or not known. */
 data class OpsAlerts(
     /** "Die E-Mail zu #57 ging nicht raus …": red, and a tap opens the order. */
     val failedEmail: FailedEmail? = null,
     /** "Benachrichtigungen gestört": since when notify-order has failed. Amber. */
     val notifyFailingSince: Instant? = null,
+    /** "Online-Zahlung offen: #57": red. */
+    val paymentClaims: List<PaymentClaim> = emptyList(),
 )
 
 /** What happened that the screen should say once. */
@@ -201,8 +204,9 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
     private val opsRead = MutableStateFlow(OpsAlerts())
 
     /**
-     * The two monitoring lines above the queue (hamza-bistro-web#92): a
-     * customer email that failed on its retry too, and notify-order failing.
+     * The monitoring lines above the queue (hamza-bistro-web#92): a customer
+     * email that failed on its retry too, notify-order failing, and the
+     * online payments that are not settled (hamza-bistro-web#82).
      * Read again whenever the queue is; nothing on a database without them.
      */
     val ops: StateFlow<OpsAlerts> =
@@ -234,6 +238,16 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
                 graph.logger.warn("Reading the ops status failed: ${e.javaClass.simpleName}")
             }
         }
+        launch {
+            try {
+                val claims = graph.ops.paymentClaims().orEmpty()
+                opsRead.update { it.copy(paymentClaims = claims) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                graph.logger.warn("Reading the open online payments failed: ${e.javaClass.simpleName}")
+            }
+        }
     }
 
     private val _events = MutableStateFlow<StaffEvent?>(null)
@@ -251,7 +265,7 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Out of the door or onto the counter; then delivered or collected,
-     * with the one button an order paid online keeps.
+     * with the one button an order held online keeps.
      */
     fun moveOn(order: StaffOrder) =
         graph.steps.take(

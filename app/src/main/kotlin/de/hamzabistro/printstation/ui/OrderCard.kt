@@ -57,6 +57,7 @@ import de.hamzabistro.printstation.core.OrderSource
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.OrderStep
 import de.hamzabistro.printstation.core.PackedUrgency
+import de.hamzabistro.printstation.core.OnlineNotice
 import de.hamzabistro.printstation.core.Payment
 import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.StaffOrder
@@ -389,7 +390,9 @@ fun OrderCard(
 
             Text(
                 buildString {
-                    append(stringResource(R.string.collect, Format.euro(order.total)))
+                    // "Kassieren" only where somebody has to: not beside "ONLINE – nichts kassieren".
+                    val amount = if (order.paymentMethod == PaymentMethod.ONLINE) R.string.alarm_total else R.string.collect
+                    append(stringResource(amount, Format.euro(order.total)))
                     if (order.fees > 0) append(" (").append(stringResource(R.string.fee_label, Format.euro(order.fees))).append(")")
                     if (order.depositTotal > 0) {
                         append(" (").append(stringResource(R.string.deposit_label, Format.euro(order.depositTotal))).append(")")
@@ -406,6 +409,8 @@ fun OrderCard(
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
+
+            OnlineLine(order)
 
             if (!compact) Contact(order, actions)
 
@@ -445,6 +450,30 @@ internal fun Note(label: String, text: String, color: Color) {
         Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+/**
+ * "ONLINE – nichts kassieren" while Stripe holds the money, "kassieren" once
+ * that hold was lost (hamza-bistro-web#82): on every open order, large, for
+ * whoever stands at the door. Nothing on one paid at the door as ever.
+ */
+@Composable
+internal fun OnlineLine(order: StaffOrder) {
+    val notice = Payment.online(order) ?: return
+    val lost = notice == OnlineNotice.LOST
+    Text(
+        stringResource(if (lost) R.string.online_lost else R.string.online_held),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = if (lost) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(
+                    if (lost) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                    RoundedCornerShape(8.dp),
+                )
+                .padding(10.dp),
+    )
 }
 
 /**
@@ -488,7 +517,7 @@ private fun Contact(order: StaffOrder, actions: OrderActions) {
                 }
             }
         }
-        // Nothing is paid online: the call is the only check that somebody wants the food.
+        // The call is the only check that somebody wants the food — unless its money is held online.
         if (order.newCustomer && order.status == OrderStatus.NEW) {
             Text(stringResource(R.string.new_customer), color = toneColor(Tone.SOON), fontWeight = FontWeight.SemiBold)
         }

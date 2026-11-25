@@ -192,6 +192,10 @@
     <string name="pay_online">Online</string>
     <string name="pay_unknown">unbekannt</string>
     <string name="paid_with">Bezahlt: %1$s</string>
+    <string name="online_held">ONLINE – nichts kassieren</string>
+    <string name="online_lost">Online-Reservierung weggefallen – kassieren</string>
+    <string name="online_lost_step">Nicht gespeichert: Online-Reservierung weggefallen – kassieren, dann „Bar“ oder „Karte“.</string>
+    <string name="online_claims">Online-Zahlung offen: %1$s</string>
     <string name="decline">Ablehnen</string>
     <string name="cancel_later">Stornieren</string>
     <string name="cancel_why">Warum? Der Kunde erfährt es.</string>
@@ -767,7 +771,6 @@
     <string name="driver_packed_at">fertig seit %1$s</string>
     <string name="driver_leg_shop">%1$s ab Laden</string>
     <string name="driver_leg">%1$s vom vorigen Stopp</string>
-    <string name="driver_paid">BEZAHLT</string>
     <string name="driver_call">Anrufen</string>
     <string name="route_open">Route öffnen</string>
     <string name="route_open_part">Route %1$d/%2$d öffnen · Stopps %3$d–%4$d</string>

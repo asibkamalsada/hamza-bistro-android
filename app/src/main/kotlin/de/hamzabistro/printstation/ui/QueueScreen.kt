@@ -218,6 +218,7 @@ private fun queueStatus(state: StaffState, viewModel: StaffViewModel): QueueStat
         addressFailing = state.addressFailing,
         failedEmail = ops.failedEmail,
         notifyFailingSince = ops.notifyFailingSince,
+        paymentClaims = ops.paymentClaims,
     )
 }
 
@@ -235,6 +236,7 @@ fun StaffEvents(viewModel: StaffViewModel, snackbar: SnackbarHostState) {
                         StepFailure.Moved -> resources.getString(R.string.order_moved)
                         StepFailure.NotDelayable -> resources.getString(R.string.order_not_delayable)
                         StepFailure.PaymentLocked -> resources.getString(R.string.payment_locked)
+                        StepFailure.OnlineHoldLost -> resources.getString(R.string.online_lost_step)
                         StepFailure.NotPackable -> resources.getString(R.string.order_not_packable)
                         is StepFailure.Failed -> resources.getString(R.string.step_failed, failure.reason)
                     }

@@ -29,6 +29,7 @@ import de.hamzabistro.printstation.core.IssuesState
 import de.hamzabistro.printstation.core.Kitchen
 import de.hamzabistro.printstation.core.KitchenSlot
 import de.hamzabistro.printstation.core.PauseWhat
+import de.hamzabistro.printstation.core.PaymentClaim
 import de.hamzabistro.printstation.core.ShopHours
 import java.time.Duration
 import java.time.Instant
@@ -157,6 +158,14 @@ class QueueStatusTest {
         compose.onNodeWithText("The email for #57", substring = true).performScrollTo().performClick()
         compose.waitForIdle()
         check("order 57" in calls) { calls.toString() }
+    }
+
+    @Test
+    fun theOnlinePaymentsNotSettledAreANoticeWithTheirOrders() {
+        draw(QueueStatus(shop = open, now = now, paymentClaims = listOf(PaymentClaim(57, 2340), PaymentClaim(58, 900))))
+        compose.onNodeWithText("⚠ 1 notice").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Online payment not settled: #57, #58").performScrollTo().assertIsDisplayed()
     }
 
     @Test

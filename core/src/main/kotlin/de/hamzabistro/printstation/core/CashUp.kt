@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 /**
  * How a delivered order was paid (20261002190000_cash_up.sql in
  * hamza-bistro-web): cash or card at the door or the counter, said with the
- * "Bar" / "Karte" buttons; online once that exists.
+ * "Bar" / "Karte" buttons; online from the moment its money is held.
  */
 @Serializable
 enum class PaymentMethod {
@@ -42,8 +42,8 @@ enum class PaymentMethod {
 object Payment {
     /**
      * Whether the last step asks how it was paid: everything on its way is
-     * paid at the door or the counter, except an order already paid online,
-     * which keeps the one "Geliefert" button.
+     * paid at the door or the counter, except an order whose money is held
+     * online, which keeps the one "Geliefert" button: that tap takes it.
      */
     fun asks(order: StaffOrder): Boolean =
         order.status == OrderStatus.ON_THE_WAY && order.paymentMethod != PaymentMethod.ONLINE
@@ -60,8 +60,39 @@ object Payment {
             device = device?.trim()?.takeIf { it.isNotEmpty() }?.take(DEVICE_MAX),
         )
 
+    /**
+     * Whether an open order's card says that nothing is to be collected, or
+     * that it is after all (hamza-bistro-web#82) — the two lines of the
+     * site's orders-page.html. Null for an order paid at the door as ever,
+     * and for one that is over.
+     */
+    fun online(order: StaffOrder): OnlineNotice? =
+        when {
+            !order.status.open -> null
+            order.paymentMethod == PaymentMethod.ONLINE -> OnlineNotice.HELD
+            order.onlineLostAt != null -> OnlineNotice.LOST
+            else -> null
+        }
+
+    /**
+     * Whether [step] only goes through while [order] is still paid online:
+     * the last step without a method. Once the hold is lost it would record
+     * an order nobody collected the money for.
+     */
+    fun needsHold(order: StaffOrder, step: OrderStep): Boolean =
+        step is OrderStep.Done && order.paymentMethod == PaymentMethod.ONLINE
+
     /** What delivered_device keeps; the database cuts the rest off too. */
     const val DEVICE_MAX = 40
+}
+
+/** What an open order's card says about its online payment. */
+enum class OnlineNotice {
+    /** Stripe holds the money until the handover: nothing to collect. Not paid yet. */
+    HELD,
+
+    /** The hold was lost: to be collected at the door as usual. */
+    LOST,
 }
 
 /** One order behind a Kassensturz sum: its number and money, nothing personal. */
