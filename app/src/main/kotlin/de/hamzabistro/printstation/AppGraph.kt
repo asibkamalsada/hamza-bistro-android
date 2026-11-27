@@ -16,6 +16,9 @@ import de.hamzabistro.printstation.core.ApkDownload
 import de.hamzabistro.printstation.core.BestsellerRanking
 import de.hamzabistro.printstation.core.CallWatch
 import de.hamzabistro.printstation.core.CallsState
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
+import de.hamzabistro.printstation.core.CardTerminals
 import de.hamzabistro.printstation.core.CounterDevice
 import de.hamzabistro.printstation.core.DeviceReport
 import de.hamzabistro.printstation.core.Eta
@@ -38,6 +41,7 @@ import de.hamzabistro.printstation.core.StaffOrder
 import de.hamzabistro.printstation.core.SupabaseAddressRequestBackend
 import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
+import de.hamzabistro.printstation.core.SupabaseCardTerminalBackend
 import de.hamzabistro.printstation.core.SupabaseCounterBackend
 import de.hamzabistro.printstation.core.SupabaseStornoBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
@@ -151,6 +155,31 @@ class AppGraph(context: Context) {
 
     /** The database's till, which the Kasse is an input device of (hamza-bistro-web#225). */
     val counter = SupabaseCounterBackend(config, http, sessions, ::counterDevice)
+
+    /** The S-POS phones "Karte" names (hamza-bistro-web 20261128100000_card_terminals). */
+    private val cardTerminalBackend = SupabaseCardTerminalBackend(config, http, sessions)
+
+    /** The S-POS phones, switched-off ones included; empty until read, and on a database without them. */
+    val cardTerminals = MutableStateFlow<List<CardTerminal>>(emptyList())
+
+    /** Reads the S-POS phones again. A failure keeps what was known: "Karte" still works, phone unknown at worst. */
+    suspend fun refreshCardTerminals() {
+        try {
+            cardTerminals.value = cardTerminalBackend.list()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn("Reading the S-POS phones failed: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /** What "Karte" does on this device now. */
+    fun cardChoice(): CardChoice = CardTerminals.choice(cardTerminals.value, settings.device.value.cardTerminal)
+
+    /** A phone picked with "Karte": this device's usual one from now on. */
+    fun rememberCardTerminal(terminal: CardTerminal) {
+        if (settings.device.value.cardTerminal != terminal.id) settings.update { it.copy(cardTerminal = terminal.id) }
+    }
 
     /** Storno: a delivered order taken back by a second Beleg (hamza-bistro-web 20261127100000_storno). */
     val stornos = SupabaseStornoBackend(config, http, sessions, ::counterDevice)

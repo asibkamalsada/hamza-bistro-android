@@ -461,4 +461,21 @@ class ReportTest {
         assertFailsWith<ReportRangeException> { history.report(range) }
         assertFailsWith<NotAllowedException> { history.report(range) }
     }
+
+    @Test
+    fun `the card money per S-POS phone, and none from a server before it`() {
+        val report =
+            json.decodeFromString(
+                Report.serializer(),
+                """{"from":"2026-11-27","to":"2026-11-27","days":1,
+                   "card_terminals":[
+                     {"card_terminal_id":1,"name":"S-POS 1","tid":"29001234","orders":2,"amount":20.0},
+                     {"card_terminal_id":null,"name":null,"tid":null,"orders":1,"amount":7.49}]}""",
+            )
+        assertEquals(ReportTerminal(1, "S-POS 1", "29001234", 2, 20.0), report.cardTerminals[0])
+        assertNull(report.cardTerminals[1].id)
+        assertEquals("S-POS 1 ${ReportText.euro(20.0)} · ${words.unknown} ${ReportText.euro(7.49)}", ReportText.terminals(report, words))
+        val before = json.decodeFromString(Report.serializer(), """{"from":"2026-11-27","to":"2026-11-27"}""")
+        assertEquals("", ReportText.terminals(before, words))
+    }
 }

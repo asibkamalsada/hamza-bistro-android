@@ -288,6 +288,8 @@ data class Report(
     @SerialName("by_source") val bySource: List<ReportSource> = emptyList(),
     /** Empty from a server before 20261124120000. */
     @SerialName("came_from") val cameFrom: List<ReportCameFrom> = emptyList(),
+    /** Card money per S-POS phone, then the unknown; empty from a server before 20261128100000. */
+    @SerialName("card_terminals") val cardTerminals: List<ReportTerminal> = emptyList(),
 ) {
     /** Whether anything came in other than on the site: otherwise the split says nothing. */
     val enteredByStaff: Boolean
@@ -542,6 +544,10 @@ object ReportText {
             }
             .joinToString(" · ")
 
+    /** "S-POS 1 20,00 € · unbekannt 7,49 €": the card money per S-POS phone; empty when there is none. */
+    fun terminals(report: Report, words: ReportWords): String =
+        report.cardTerminals.joinToString(" · ") { "${it.name ?: words.unknown} ${euro(it.amount)}" }
+
     /**
      * The summary as plain text, to share: the big numbers, delivery and
      * pickup, payments, cancellations and the top best sellers. Counts and
@@ -567,6 +573,10 @@ object ReportText {
             appendLine("${words.delivery} ${f.delivery.orders} · ${euro(f.delivery.revenue)}")
             appendLine("${words.pickup} ${f.pickup.orders} · ${euro(f.pickup.revenue)}")
             append(payments(report.payments, words))
+            terminals(report, words).takeIf { it.isNotEmpty() }?.let {
+                appendLine()
+                append("${words.card}: $it")
+            }
             if (report.cancellations.orders > 0) {
                 appendLine()
                 append("${words.cancelled} ${report.cancellations.orders} · ${euro(report.cancellations.value)}")

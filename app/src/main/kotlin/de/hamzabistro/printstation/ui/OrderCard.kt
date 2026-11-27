@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AutoDecline
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
 import de.hamzabistro.printstation.core.DeclineUrgency
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.NoShows
@@ -65,7 +68,12 @@ import de.hamzabistro.printstation.core.StaffQueue
 import de.hamzabistro.printstation.queue.Pending
 import de.hamzabistro.printstation.station.DevicePrefs
 import java.time.Duration
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.time.Instant
+
+/** No S-POS phones: what an [OrderActions] without them offers. */
+private val NO_CARD_CHOICE: StateFlow<CardChoice> = MutableStateFlow(CardChoice.NoList)
 
 /** What a card's buttons do. */
 interface OrderActions {
@@ -77,6 +85,17 @@ interface OrderActions {
 
     /** "Bar" or "Karte": delivered or collected, and how it was paid. */
     fun deliver(order: StaffOrder, payment: PaymentMethod)
+
+    /**
+     * What "Karte" does on this device: the S-POS phones in use and its
+     * usual one (hamza-bistro-web 20261128100000). None by default: "Karte"
+     * then names no phone, as before.
+     */
+    val cardChoice: StateFlow<CardChoice>
+        get() = NO_CARD_CHOICE
+
+    /** "Karte" on [terminal], the S-POS phone it went through; null: none named. */
+    fun deliverByCard(order: StaffOrder, terminal: CardTerminal?) = deliver(order, PaymentMethod.CARD)
 
     fun cancel(order: StaffOrder, reason: CancelReason?)
 
@@ -655,9 +674,15 @@ private fun Actions(
                         stringResource(if (order.pickup) R.string.step_collected_paid else R.string.step_delivered_paid),
                         style = MaterialTheme.typography.labelLarge,
                     )
+                    // "Karte" names the S-POS phone: one tap on this device's usual one.
+                    val cardChoice by actions.cardChoice.collectAsState()
                     for (method in PaymentMethod.DOOR) {
-                        Button(onClick = { actions.deliver(order, method) }, modifier = Modifier.weight(1f)) {
-                            Text(paymentLabel(context, method))
+                        if (method == PaymentMethod.CARD) {
+                            CardButton(cardChoice, Modifier.weight(1f)) { terminal -> actions.deliverByCard(order, terminal) }
+                        } else {
+                            Button(onClick = { actions.deliver(order, method) }, modifier = Modifier.weight(1f)) {
+                                Text(paymentLabel(context, method))
+                            }
                         }
                     }
                 }

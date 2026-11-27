@@ -74,12 +74,21 @@ private class FakeTill : CounterBackend {
         sale(id).copy(pendingMethod = if (pending) "card" else null).also { sales[id] = it }
     }
 
-    override suspend fun pay(id: String, method: CounterPayment): CounterSale = call("pay $id ${method.wire}") {
-        val sale = sale(id)
-        if (sale.stateName == "paid" && sale.paymentMethod == method.wire) return@call sale
-        if (sale.stateName != "open") refuse(CounterError.ALREADY)
-        sale.copy(stateName = "paid", paymentMethod = method.wire, pendingMethod = null, orderId = "o-$id", receipt = receipts.first()).also { sales[id] = it }
-    }
+    override suspend fun pay(id: String, method: CounterPayment, cardTerminal: Int?): CounterSale =
+        call("pay $id ${method.wire}" + (cardTerminal?.let { " on $it" } ?: "")) {
+            val sale = sale(id)
+            if (sale.stateName == "paid" && sale.paymentMethod == method.wire) return@call sale
+            if (sale.stateName != "open") refuse(CounterError.ALREADY)
+            sale.copy(
+                    stateName = "paid",
+                    paymentMethod = method.wire,
+                    cardTerminalId = cardTerminal,
+                    pendingMethod = null,
+                    orderId = "o-$id",
+                    receipt = receipts.first(),
+                )
+                .also { sales[id] = it }
+        }
 
     override suspend fun abort(id: String): CounterSale = call("abort $id") {
         val sale = sale(id)
@@ -305,6 +314,16 @@ class TillTest {
         assertEquals(TillStep.DONE, now.step)
         assertEquals(CounterPayment.CARD, now.sale!!.payment)
         assertEquals(listOf("card s-1 true", "pay s-1 card"), fake.calls.takeLast(2))
+    }
+
+    @Test
+    fun `a card is booked on the S-POS phone it went through`() = runTest {
+        rungUp()
+        till.chooseCard()
+        till.cardPaid(CardTerminal(2, "S-POS 2"))
+        assertEquals(TillStep.DONE, now.step)
+        assertEquals(2, now.sale!!.cardTerminalId)
+        assertEquals("pay s-1 card on 2", fake.calls.last())
     }
 
     @Test

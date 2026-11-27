@@ -261,14 +261,17 @@ class Till(
         if (_state.value.step == TillStep.CASH && _state.value.cashReady) pay(CounterPayment.CASH)
     }
 
-    /** "Karte bezahlt": only now is it booked as paid by card. */
-    suspend fun cardPaid() {
-        if (_state.value.step == TillStep.CARD) pay(CounterPayment.CARD)
+    /**
+     * "Karte bezahlt": only now is it booked as paid by card, on [terminal],
+     * the S-POS phone it went through (null: none picked, "unbekannt").
+     */
+    suspend fun cardPaid(terminal: CardTerminal? = null) {
+        if (_state.value.step == TillStep.CARD) pay(CounterPayment.CARD, terminal?.id)
     }
 
-    private suspend fun pay(method: CounterPayment) {
+    private suspend fun pay(method: CounterPayment, cardTerminal: Int? = null) {
         val id = _state.value.sale?.id ?: return
-        step(unsure = true) { show(backend.pay(id, method)) }
+        step(unsure = true) { show(backend.pay(id, method, cardTerminal)) }
         if (_state.value.problem == TillProblem.Refused(CounterError.ALREADY)) look(id)
     }
 

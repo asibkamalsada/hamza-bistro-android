@@ -1132,4 +1132,12 @@
         <item quantity="one">%1$d offener Verkauf</item>
         <item quantity="other">%1$d offene Verkäufe</item>
     </plurals>
+    <!-- The S-POS phones (hamza-bistro-web 20261128100000_card_terminals) -->
+    <string name="card_terminal_other">anderes S-POS</string>
+    <string name="card_terminal_pick">Welches S-POS?</string>
+    <string name="card_terminal_off">nicht mehr in Gebrauch</string>
+    <string name="card_terminal_none">keinem, jedes Mal fragen</string>
+    <string name="cash_up_per_terminal">Karte je S-POS</string>
+    <string name="settings_card_terminal">S-POS für Kartenzahlung</string>
+    <string name="settings_card_terminal_hint">Das S-POS-Handy, auf dem dieses Gerät meist Karte kassiert: dann ist „Karte“ ein Tipp. Jedes S-POS-Handy ist ein eigener Sparkasse-Vertrag mit eigener Auszahlung; die Liste wird auf der Website unter Einstellungen gepflegt.</string>
 </resources>

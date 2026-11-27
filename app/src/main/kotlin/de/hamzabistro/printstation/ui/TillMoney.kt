@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
 import de.hamzabistro.printstation.core.CounterPayment
 import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.CounterSale
@@ -382,17 +384,47 @@ private fun tillPlain(cents: Long): String = if (cents % 100 == 0L) "${cents / 1
 
 @Composable
 internal fun TillCardPane(state: TillState, sale: CounterSale, model: TillActions) {
+    // The S-POS phone the card goes through (hamza-bistro-web 20261128100000):
+    // this device's usual one picked already, another one a tap away. With
+    // phones to pick from, nothing is booked before one is picked.
+    val choice = model.cardChoice
+    val offered = offeredTerminals(choice)
+    var picked by remember(sale.id, choice) { mutableStateOf<CardTerminal?>((choice as? CardChoice.Usual)?.terminal) }
+    val paid = stringResource(R.string.till_card_paid)
     TillPage(
         state,
         model,
         bottom = {
             TillButton(stringResource(R.string.till_card_declined), model::cardDeclined, Modifier.weight(1f), !state.busy, TillTone.NO, height = 88.dp, size = 20.sp)
-            TillButton(stringResource(R.string.till_card_paid), model::cardPaid, Modifier.weight(1f), !state.busy, height = 88.dp, size = 20.sp)
+            TillButton(
+                picked?.let { "$paid · ${it.name}" } ?: paid,
+                { model.cardPaidOn(picked) },
+                Modifier.weight(1f),
+                !state.busy && (offered.isEmpty() || picked != null),
+                height = 88.dp,
+                size = 20.sp,
+            )
         },
     ) {
         TillColumn(Modifier.fillMaxSize()) {
             TillAmount(stringResource(R.string.till_card_title), sale.total, size = 72.sp)
             TillNote(stringResource(R.string.till_card_text))
+            if (offered.isNotEmpty()) {
+                TillNote(stringResource(R.string.card_terminal_pick))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (terminal in offered) {
+                        TillButton(
+                            terminal.name,
+                            { picked = terminal },
+                            Modifier.weight(1f),
+                            !state.busy,
+                            if (terminal == picked) TillTone.MAIN else TillTone.QUIET,
+                            height = 56.dp,
+                            size = 16.sp,
+                        )
+                    }
+                }
+            }
         }
     }
 }

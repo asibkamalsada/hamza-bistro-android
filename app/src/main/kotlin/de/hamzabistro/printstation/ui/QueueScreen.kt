@@ -54,6 +54,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
 import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.OrderStatus
 import de.hamzabistro.printstation.core.PauseWhat
@@ -386,6 +388,11 @@ internal class Actions(private val context: Context, private val viewModel: Staf
     override fun moveOn(order: StaffOrder) = viewModel.moveOn(order)
 
     override fun deliver(order: StaffOrder, payment: PaymentMethod) = viewModel.deliver(order, payment)
+
+    override val cardChoice: StateFlow<CardChoice>
+        get() = viewModel.cardChoice
+
+    override fun deliverByCard(order: StaffOrder, terminal: CardTerminal?) = viewModel.deliverByCard(order, terminal)
 
     override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
 

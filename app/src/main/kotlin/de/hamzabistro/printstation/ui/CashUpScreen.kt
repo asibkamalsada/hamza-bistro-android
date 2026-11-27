@@ -46,8 +46,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.AlarmPolicy
+import de.hamzabistro.printstation.core.CardTerminal
 import de.hamzabistro.printstation.core.CashUp
 import de.hamzabistro.printstation.core.CashUpDriver
+import de.hamzabistro.printstation.core.CashUpTerminal
 import de.hamzabistro.printstation.core.CashUpText
 import de.hamzabistro.printstation.core.CashUpWords
 import java.time.Instant
@@ -83,6 +85,9 @@ class CashUpViewModel(application: Application) : AndroidViewModel(application) 
     private val _state = MutableStateFlow(CashUpState())
     val state: StateFlow<CashUpState> = _state.asStateFlow()
 
+    /** The S-POS phones, for the names behind the card sums (hamza-bistro-web 20261128100000). */
+    val terminals: StateFlow<List<CardTerminal>> = graph.cardTerminals
+
     private var reading: Job? = null
 
     /** Today in Leipzig, by this device's clock: the day picker goes no further. */
@@ -103,6 +108,8 @@ class CashUpViewModel(application: Application) : AndroidViewModel(application) 
         _state.update { it.copy(loading = true, error = null, day = day ?: it.day) }
         reading =
             viewModelScope.launch {
+                // The phones' names as they are now, beside the sums.
+                launch { graph.refreshCardTerminals() }
                 var failed = false
                 val read =
                     attempt(app, { error ->
@@ -135,16 +142,18 @@ private fun cashUpWords(context: Context, day: LocalDate): CashUpWords =
         nobody = context.getString(R.string.cash_up_nobody),
         pickup = context.getString(R.string.cash_up_pickup),
         empty = context.getString(R.string.cash_up_empty),
+        perTerminal = context.getString(R.string.cash_up_per_terminal),
+        terminalOff = context.getString(R.string.card_terminal_off),
     )
 
 /** The Android share sheet with the Kassensturz as plain text: to WhatsApp, to email, to the owner. */
-private fun share(context: Context, cashUp: CashUp) {
+private fun share(context: Context, cashUp: CashUp, terminals: List<CardTerminal>) {
     val words = cashUpWords(context, cashUp.date)
     val send =
         Intent(Intent.ACTION_SEND)
             .setType("text/plain")
             .putExtra(Intent.EXTRA_SUBJECT, words.title)
-            .putExtra(Intent.EXTRA_TEXT, CashUpText.share(cashUp, words))
+            .putExtra(Intent.EXTRA_TEXT, CashUpText.share(cashUp, words, terminals = terminals))
     try {
         context.startActivity(Intent.createChooser(send, context.getString(R.string.cash_up_share)))
     } catch (e: ActivityNotFoundException) {
@@ -165,6 +174,7 @@ private fun pickDay(context: Context, day: LocalDate, today: LocalDate, onPicked
 fun CashUpScreen(navigation: @Composable () -> Unit) {
     val model: CashUpViewModel = viewModel()
     val state by model.state.collectAsStateWithLifecycle()
+    val terminals by model.terminals.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LaunchedEffect(Unit) { model.load() }
 
@@ -175,7 +185,7 @@ fun CashUpScreen(navigation: @Composable () -> Unit) {
                 navigationIcon = navigation,
                 actions = {
                     val shown = state.cashUp
-                    TextButton(onClick = { shown?.let { share(context, it) } }, enabled = shown != null && !state.loading) {
+                    TextButton(onClick = { shown?.let { share(context, it, terminals) } }, enabled = shown != null && !state.loading) {
                         Text(stringResource(R.string.cash_up_share))
                     }
                     TextButton(onClick = model::load, enabled = !state.loading) { Text(stringResource(R.string.reload)) }
@@ -216,8 +226,11 @@ fun CashUpScreen(navigation: @Composable () -> Unit) {
                             Text(CashUpText.split(cashUp.totals, words), style = MaterialTheme.typography.bodyLarge)
                         }
                     }
+                    // One line per S-POS phone, to hold against each Sparkasse payout.
+                    val perTerminal = CashUpText.terminals(cashUp)
+                    if (perTerminal.isNotEmpty()) item(key = "terminals") { TerminalsCard(perTerminal, words) }
                     itemsIndexed(cashUp.drivers, key = { index, _ -> "${cashUp.day}-$index" }) { index, driver ->
-                        DriverCard(driver, words, key = "${cashUp.day}-$index")
+                        DriverCard(driver, words, terminals, key = "${cashUp.day}-$index")
                     }
                 }
             }
@@ -244,9 +257,25 @@ private fun DayPicker(day: LocalDate, model: CashUpViewModel) {
     }
 }
 
+/** "Karte je S-POS": each phone's card money for the day, Stornos taken off, the unknown last. */
+@Composable
+private fun TerminalsCard(rows: List<CashUpTerminal>, words: CashUpWords) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(words.perTerminal, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            for (row in rows) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(CashUpText.terminal(row, words), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Text(CashUpText.euro(row.card), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+    }
+}
+
 /** One driver's sums; the orders behind them a tap away, so a difference in the drawer can be traced. */
 @Composable
-private fun DriverCard(driver: CashUpDriver, words: CashUpWords, key: String) {
+private fun DriverCard(driver: CashUpDriver, words: CashUpWords, terminals: List<CardTerminal>, key: String) {
     var open by rememberSaveable(key) { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth().clickable { open = !open }) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -263,7 +292,7 @@ private fun DriverCard(driver: CashUpDriver, words: CashUpWords, key: String) {
             )
             if (open) {
                 for (order in driver.orders) {
-                    Text(CashUpText.order(order, words), style = MaterialTheme.typography.bodyMedium)
+                    Text(CashUpText.order(order, words, terminals = terminals), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }

@@ -381,9 +381,11 @@ sealed interface OrderStep {
      * for the Kassensturz. [payment] is null for an order whose
      * money is held online, which keeps the one button. [device] is this device's label,
      * as staff_app_seen has it, so the Kassensturz can tell two drivers on
-     * one account apart.
+     * one account apart. [cardTerminal] is the S-POS phone a card payment
+     * went through (card_terminals.id, 20261128100000), null when none was
+     * picked: the Kassensturz then says "unbekannt" for its phone.
      */
-    data class Done(val payment: PaymentMethod? = null, val device: String? = null) : OrderStep {
+    data class Done(val payment: PaymentMethod? = null, val device: String? = null, val cardTerminal: Int? = null) : OrderStep {
         override val to = OrderStatus.DELIVERED
     }
 

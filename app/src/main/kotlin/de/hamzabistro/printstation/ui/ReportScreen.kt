@@ -736,6 +736,10 @@ private fun Payments(report: Report, words: ReportWords) {
     ReportSection(stringResource(R.string.report_payments)) {
         Line(words.cash, p.cash.orders.toString(), ReportText.euro(p.cash.amount))
         Line(words.card, p.card.orders.toString(), ReportText.euro(p.card.amount))
+        // The card money per S-POS phone (hamza-bistro-web 20261128100000), under "Karte".
+        for (t in report.cardTerminals) {
+            Line("${words.card} · ${t.name ?: words.unknown}", t.orders.toString(), ReportText.euro(t.amount))
+        }
         Line(words.online, p.online.orders.toString(), ReportText.euro(p.online.amount))
         Line(words.unknown, p.unknown.orders.toString(), ReportText.euro(p.unknown.amount))
     }
