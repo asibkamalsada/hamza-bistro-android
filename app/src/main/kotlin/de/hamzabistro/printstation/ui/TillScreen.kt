@@ -462,6 +462,7 @@ internal fun tillProblemText(context: Context, problem: TillProblem): String =
                     CounterError.STALE -> R.string.till_stale
                     CounterError.NO_SPLIT -> R.string.till_no_split
                     CounterError.DISMISSED -> R.string.till_dismissed
+                    CounterError.CARD_TERMINAL -> R.string.till_card_terminal
                 }
             )
     }
