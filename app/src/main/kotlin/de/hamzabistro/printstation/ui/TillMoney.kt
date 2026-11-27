@@ -59,6 +59,7 @@ import de.hamzabistro.printstation.core.CounterPayment
 import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.CounterSale
 import de.hamzabistro.printstation.core.CounterSales
+import de.hamzabistro.printstation.core.PaymentMethod
 import de.hamzabistro.printstation.core.Qr
 import de.hamzabistro.printstation.core.TillState
 
@@ -401,8 +402,16 @@ internal fun TillCardPane(state: TillState, sale: CounterSale, model: TillAction
 // ---------------------------------------------------------------------------
 
 @Composable
-internal fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, model: TillActions) {
+internal fun TillDonePane(
+    state: TillState,
+    sale: CounterSale,
+    view: TillView,
+    model: TillActions,
+    onStorno: ((StornoTarget) -> Unit)? = null,
+) {
     val receipt = sale.receipt
+    // Its order is there once paid: the sale can be taken back from here.
+    val order = sale.orderId
     TillPage(
         state,
         model,
@@ -414,6 +423,19 @@ internal fun TillDonePane(state: TillState, sale: CounterSale, view: TillView, m
                     model::printReceipt,
                     Modifier.weight(1f),
                     enabled = !view.printing && sale.orderId != null,
+                    tone = TillTone.QUIET,
+                    height = 72.dp,
+                )
+            }
+            if (onStorno != null && order != null) {
+                TillButton(
+                    stringResource(R.string.storno_button),
+                    {
+                        val paid = if (sale.payment == CounterPayment.CARD) PaymentMethod.CARD else PaymentMethod.CASH
+                        onStorno(StornoTarget(order, sale.number, sale.total, paid))
+                    },
+                    Modifier.weight(1f),
+                    enabled = !state.busy,
                     tone = TillTone.QUIET,
                     height = 72.dp,
                 )
