@@ -292,6 +292,7 @@ fun TillScreen(
     navigation: @Composable () -> Unit,
     leaving: Leaving = remember { Leaving() },
     model: TillViewModel = viewModel(),
+    storno: StornoViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val view by model.view.collectAsStateWithLifecycle()
@@ -299,7 +300,9 @@ fun TillScreen(
     LaunchedEffect(Unit) { model.look() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.rank() }
     LaunchedEffect(state.sale?.id, state.step) { if (state.step == TillStep.DONE) model.awaitReceipt() }
-    TillContent(state, view, photos, model, onBack, navigation, leaving)
+    TillContent(state, view, photos, model, onBack, navigation, leaving, onStorno = storno::open)
+    // A sale just paid, taken back at once ("falsch getippt"): the Storno's own receipt follows.
+    StornoDialog(storno, onDone = { _, _ -> })
 }
 
 /**
@@ -317,6 +320,8 @@ internal fun TillContent(
     onBack: () -> Unit,
     navigation: @Composable () -> Unit,
     leaving: Leaving = remember { Leaving() },
+    /** "Storno" on the paid sale; null where nothing can be taken back (the previews). */
+    onStorno: ((StornoTarget) -> Unit)? = null,
 ) {
     val sale = state.sale
     var aborting by remember(sale?.id) { mutableStateOf(false) }
@@ -337,7 +342,7 @@ internal fun TillContent(
                 TillStep.PAY -> if (sale != null) TillPayPane(state, sale, model, onAbort = { aborting = true })
                 TillStep.CASH -> if (sale != null) TillCashPane(state, sale, model)
                 TillStep.CARD -> if (sale != null) TillCardPane(state, sale, model)
-                TillStep.DONE -> if (sale != null) TillDonePane(state, sale, view, model)
+                TillStep.DONE -> if (sale != null) TillDonePane(state, sale, view, model, onStorno)
             }
         }
     }

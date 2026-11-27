@@ -21,6 +21,8 @@ import de.hamzabistro.printstation.core.PhoneOrderException
 import de.hamzabistro.printstation.core.ReportRangeException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.SpecialDayError
+import de.hamzabistro.printstation.core.StornoError
+import de.hamzabistro.printstation.core.StornoException
 import de.hamzabistro.printstation.core.UnknownAllergenException
 import kotlinx.coroutines.CancellationException
 
@@ -44,6 +46,7 @@ fun failureText(context: Context, e: Exception): String =
         is ReportRangeException -> context.getString(R.string.report_range_invalid)
         is IssueActionException -> issueText(context, e.reason)
         is PhoneOrderException -> phoneOrderText(context, e)
+        is StornoException -> stornoText(context, e.reason)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
@@ -60,6 +63,21 @@ suspend fun <T> attempt(context: Context, onFailure: (String) -> Unit, block: su
         onFailure(failureText(context, e))
         null
     }
+
+/** Why order_storno refused (hamza-bistro-web 20261127100000_storno). */
+private fun stornoText(context: Context, reason: StornoError): String =
+    context.getString(
+        when (reason) {
+            StornoError.NOT_STAFF -> R.string.problem_not_staff
+            StornoError.BAD_VALUE -> R.string.storno_error_bad_value
+            StornoError.KEY_REUSED -> R.string.storno_error_key_reused
+            StornoError.NO_REASON -> R.string.storno_error_no_reason
+            StornoError.NOT_DELIVERED -> R.string.storno_error_not_delivered
+            StornoError.ALREADY -> R.string.storno_error_already
+            StornoError.METHOD -> R.string.storno_error_method
+            StornoError.UNSIGNED -> R.string.storno_error_unsigned
+        }
+    )
 
 /** Why staff_place_order refused a phone or walk-in order (#9). */
 private fun phoneOrderText(context: Context, e: PhoneOrderException): String =

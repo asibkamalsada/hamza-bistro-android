@@ -1087,6 +1087,27 @@
     <string name="till_receipt_test">TSE test environment: not a valid receipt</string>
     <string name="till_print_old">This server cannot print receipts yet: print-ticket needs its update.</string>
     <string name="till_print_failed">The receipt did not print: %1$s. Printer on, paper in?</string>
+    <!-- Storno (hamza-bistro-web 20261127100000_storno): a delivered order taken back. -->
+    <string name="storno_button">Reverse sale</string>
+    <string name="storno_title">Reverse #%1$d – give back %2$s</string>
+    <string name="storno_reason">Why?</string>
+    <string name="storno_reason_wrong">Booked by mistake</string>
+    <string name="storno_reason_complaint">Complaint</string>
+    <string name="storno_reason_returned">Customer returned it</string>
+    <string name="storno_refund">Paid back:</string>
+    <string name="storno_confirm">Reverse and give back %1$s</string>
+    <string name="storno_hint_cash">Give the money back in cash from the till.</string>
+    <string name="storno_hint_card">Refund the amount on the card terminal.</string>
+    <string name="storno_hint_online">Refund the amount in the Stripe dashboard.</string>
+    <string name="storno_done">Reversed · reversal #%1$d</string>
+    <string name="storno_unsigned">Booked without a signature: the TSE never had this sale. Take it back in the other register too.</string>
+    <string name="storno_error_bad_value">This app sent something the till does not take. Update the app.</string>
+    <string name="storno_error_key_reused">This reversal was already sent with other details. Close and start again.</string>
+    <string name="storno_error_no_reason">Say why the sale is taken back.</string>
+    <string name="storno_error_not_delivered">Only an order that was handed over can be reversed.</string>
+    <string name="storno_error_already">This order has been reversed already.</string>
+    <string name="storno_error_method">The money cannot go back that way for this order.</string>
+    <string name="storno_error_unsigned">The TSE has not signed the sale yet – wait a moment and try again.</string>
     <string name="till_dismiss">Hide the message</string>
     <string name="till_training_end">End training</string>
     <string name="till_off_strip">TRAINING – the till is off: signing is not switched on</string>

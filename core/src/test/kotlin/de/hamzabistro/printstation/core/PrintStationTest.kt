@@ -65,6 +65,8 @@ class PrintStationTest {
         override suspend fun testTicket(lang: String) = ByteArray(0)
 
         override suspend fun receipt(order: String, lang: String): ByteArray? = error("a station prints no receipts")
+
+        override suspend fun stornoReceipt(order: String, lang: String): ByteArray? = error("a station prints no receipts")
     }
 
     private class FakePrinter : TicketPrinter {

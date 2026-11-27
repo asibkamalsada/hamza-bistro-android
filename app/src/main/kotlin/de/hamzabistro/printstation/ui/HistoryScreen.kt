@@ -3,6 +3,7 @@ package de.hamzabistro.printstation.ui
 import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +36,9 @@ import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.OrderRating
 import de.hamzabistro.printstation.core.StaffOrder
+import de.hamzabistro.printstation.core.Storno
+import de.hamzabistro.printstation.core.StornoMark
+import de.hamzabistro.printstation.core.Stornos
 import de.hamzabistro.printstation.core.Takings
 import java.time.Instant
 import kotlinx.coroutines.async
@@ -56,6 +60,8 @@ data class HistoryState(
     val reported: Set<String> = emptySet(),
     /** The customers' ratings, by order; empty when not known. */
     val ratings: Map<String, OrderRating> = emptyMap(),
+    /** The orders taken back (Storno), by order; empty when not known. */
+    val stornos: Map<String, StornoMark> = emptyMap(),
 )
 
 /**
@@ -81,15 +87,16 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         graph.history.recent() to takings.await()
                     }
                 }
-            // The "Reklamation" badges and the stars are footnotes: without them, the list still stands.
-            val (reported, ratings) =
+            // The "Reklamation" badges, the stars and the Stornos are footnotes: without them, the list still stands.
+            val (reported, ratings, stornos) =
                 read?.let { (orders, _) ->
                     val ids = orders.map { it.id }
                     coroutineScope {
                         val ratings = async { attempt(app, {}) { graph.ratings.forOrders(ids) } }
-                        attempt(app, {}) { graph.issues.reported(ids) } to ratings.await()
+                        val stornos = async { attempt(app, {}) { graph.stornos.marks(ids) } }
+                        Triple(attempt(app, {}) { graph.issues.reported(ids) }, ratings.await(), stornos.await())
                     }
-                } ?: (null to null)
+                } ?: Triple(null, null, null)
             _state.update { state ->
                 if (read == null) state.copy(loading = false)
                 else
@@ -99,16 +106,22 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         takings = read.second,
                         reported = reported.orEmpty(),
                         ratings = ratings.orEmpty(),
+                        stornos = stornos.orEmpty(),
                     )
             }
         }
     }
+
+    /** Booked: the order says so at once, without reading the list again. */
+    fun stornoed(orderId: String, storno: Storno) =
+        _state.update { it.copy(stornos = it.stornos + (orderId to StornoMark(orderId, storno.number, storno.createdAt, storno.refundMethod))) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(staff: StaffViewModel, navigation: @Composable () -> Unit) {
     val history: HistoryViewModel = viewModel()
+    val storno: StornoViewModel = viewModel()
     val state by history.state.collectAsStateWithLifecycle()
     // For the cards' clocks, the dishes' prep times and the map app this device uses.
     val staffState by staff.state.collectAsStateWithLifecycle()
@@ -153,20 +166,42 @@ fun HistoryScreen(staff: StaffViewModel, navigation: @Composable () -> Unit) {
                 }
             }
             items(state.orders, key = { it.id }) { order ->
-                OrderCard(
-                    order = order,
-                    now = staffState.now,
-                    prep = staffState.queue.prep,
-                    prefs = staffState.prefs,
-                    pending = null,
-                    busy = false,
-                    canPrint = false,
-                    actions = actions,
-                    readOnly = true,
-                    reported = order.id in state.reported,
-                    rating = state.ratings[order.id],
-                )
+                Column {
+                    OrderCard(
+                        order = order,
+                        now = staffState.now,
+                        prep = staffState.queue.prep,
+                        prefs = staffState.prefs,
+                        pending = null,
+                        busy = false,
+                        canPrint = false,
+                        actions = actions,
+                        readOnly = true,
+                        reported = order.id in state.reported,
+                        rating = state.ratings[order.id],
+                    )
+                    StornoLine(order, state.stornos[order.id], onStorno = { storno.open(it) })
+                }
             }
         }
+    }
+    StornoDialog(storno, onDone = { target, booked -> history.stornoed(target.orderId, booked) })
+}
+
+/** Under a delivered order: that it was taken back, or "Storno" to take it back. */
+@Composable
+private fun StornoLine(order: StaffOrder, mark: StornoMark?, onStorno: (StornoTarget) -> Unit) {
+    when {
+        mark != null ->
+            Text(
+                stringResource(R.string.storno_done, mark.number),
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+        Stornos.can(order, null) ->
+            TextButton(onClick = { onStorno(StornoTarget(order.id, order.orderNumber, order.total, order.paymentMethod)) }) {
+                Text(stringResource(R.string.storno_button), color = MaterialTheme.colorScheme.error)
+            }
     }
 }

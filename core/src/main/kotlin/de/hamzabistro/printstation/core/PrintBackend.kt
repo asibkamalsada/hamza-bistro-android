@@ -74,6 +74,13 @@ interface PrintBackend {
      * print-ticket only knows kitchen tickets.
      */
     suspend fun receipt(order: String, lang: String): ByteArray?
+
+    /**
+     * The receipt of the order's Storno (hamza-bistro-web
+     * 20261127100000_storno), or null when there is no signed one. Throws
+     * [NeedsServerUpdateException] when print-ticket does not know it.
+     */
+    suspend fun stornoReceipt(order: String, lang: String): ByteArray?
 }
 
 /**
@@ -179,6 +186,19 @@ class SupabasePrintBackend internal constructor(
             }
         ) { response ->
             if (response.header("X-Ticket") != "receipt") throw NeedsServerUpdateException(CounterSales.MIGRATION)
+        }
+
+    /** As [receipt]: a print-ticket from before the Storno would send the order's own receipt. */
+    override suspend fun stornoReceipt(order: String, lang: String): ByteArray? =
+        printTicket(
+            buildJsonObject {
+                put("order", order)
+                put("lang", lang)
+                put("receipt", true)
+                put("storno", true)
+            }
+        ) { response ->
+            if (response.header("X-Ticket") != "storno-receipt") throw NeedsServerUpdateException(Stornos.MIGRATION)
         }
 
     private suspend fun printTicket(body: JsonObject, check: (Response) -> Unit = {}): ByteArray? {

@@ -39,6 +39,7 @@ import de.hamzabistro.printstation.core.SupabaseAddressRequestBackend
 import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabaseCounterBackend
+import de.hamzabistro.printstation.core.SupabaseStornoBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseDishSalesBackend
 import de.hamzabistro.printstation.core.SupabaseHistoryBackend
@@ -150,6 +151,9 @@ class AppGraph(context: Context) {
 
     /** The database's till, which the Kasse is an input device of (hamza-bistro-web#225). */
     val counter = SupabaseCounterBackend(config, http, sessions, ::counterDevice)
+
+    /** Storno: a delivered order taken back by a second Beleg (hamza-bistro-web 20261127100000_storno). */
+    val stornos = SupabaseStornoBackend(config, http, sessions, ::counterDevice)
 
     /** The Kasse: one for the process, so a sale being paid outlives its screen. Keeps nothing on the device. */
     val till = Till(counter, newId = { UUID.randomUUID().toString() }, logger)
@@ -497,6 +501,14 @@ class AppGraph(context: Context) {
     suspend fun printReceipt(order: String) {
         val chosen = settings.printer ?: throw PrinterException("no printer chosen")
         val receipt = backend.receipt(order, TICKET_LANG) ?: throw PrinterException("there is no receipt for this sale")
+        withTimeoutOrNull(TICKET_TIMEOUT) { printer(chosen.address).print(receipt) }
+            ?: throw PrinterException("the printer did not answer")
+    }
+
+    /** The receipt of an order's Storno, on this device's printer. */
+    suspend fun printStornoReceipt(order: String) {
+        val chosen = settings.printer ?: throw PrinterException("no printer chosen")
+        val receipt = backend.stornoReceipt(order, TICKET_LANG) ?: throw PrinterException("there is no signed Storno for this order")
         withTimeoutOrNull(TICKET_TIMEOUT) { printer(chosen.address).print(receipt) }
             ?: throw PrinterException("the printer did not answer")
     }

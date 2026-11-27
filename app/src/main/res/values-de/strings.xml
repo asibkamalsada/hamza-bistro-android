@@ -1086,6 +1086,27 @@
     <string name="till_receipt_test">TSE-Testumgebung: kein gültiger Beleg</string>
     <string name="till_print_old">Der Server kann noch keine Belege drucken: print-ticket braucht das Update.</string>
     <string name="till_print_failed">Der Beleg wurde nicht gedruckt: %1$s. Drucker an, Papier drin?</string>
+    <!-- Storno (hamza-bistro-web 20261127100000_storno): eine übergebene Bestellung zurücknehmen. -->
+    <string name="storno_button">Storno</string>
+    <string name="storno_title">Storno von #%1$d – %2$s zurückgeben</string>
+    <string name="storno_reason">Warum?</string>
+    <string name="storno_reason_wrong">Falsch gebucht</string>
+    <string name="storno_reason_complaint">Reklamation</string>
+    <string name="storno_reason_returned">Kunde hat zurückgegeben</string>
+    <string name="storno_refund">Zurück:</string>
+    <string name="storno_confirm">Stornieren und %1$s zurückgeben</string>
+    <string name="storno_hint_cash">Gib das Geld bar aus der Kasse zurück.</string>
+    <string name="storno_hint_card">Erstatte den Betrag am Kartenterminal.</string>
+    <string name="storno_hint_online">Erstatte den Betrag im Stripe-Dashboard.</string>
+    <string name="storno_done">Storniert · Storno-Beleg #%1$d</string>
+    <string name="storno_unsigned">Ohne Signatur gebucht: Die TSE kannte diesen Verkauf nicht. Auch in der anderen Kasse stornieren.</string>
+    <string name="storno_error_bad_value">Die App hat etwas geschickt, das die Kasse nicht nimmt. App aktualisieren.</string>
+    <string name="storno_error_key_reused">Dieser Storno wurde schon mit anderen Angaben geschickt. Schließen und neu anfangen.</string>
+    <string name="storno_error_no_reason">Sag, warum der Verkauf zurückgenommen wird.</string>
+    <string name="storno_error_not_delivered">Nur eine übergebene Bestellung kann storniert werden.</string>
+    <string name="storno_error_already">Diese Bestellung ist schon storniert.</string>
+    <string name="storno_error_method">So kann das Geld für diese Bestellung nicht zurückgegeben werden.</string>
+    <string name="storno_error_unsigned">Die TSE hat den Verkauf noch nicht signiert – kurz warten und noch einmal.</string>
     <string name="till_dismiss">Meldung ausblenden</string>
     <string name="till_training_end">Training beenden</string>
     <string name="till_off_strip">TRAINING – Kasse ist aus: Signatur nicht eingeschaltet</string>
