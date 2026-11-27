@@ -418,6 +418,34 @@
 
     <!-- Reports (ReportScreen.kt) -->
     <string name="report_title">Reports</string>
+    <!-- Kassen-Nachschau (hamza-bistro-web K7): the files a tax inspection is handed. -->
+    <string name="nachschau_title">Tax inspection</string>
+    <string name="nachschau_intro">What an unannounced tax inspection (Kassen-Nachschau) asks for: the DSFinV-K export of the till and the TSE\'s own log (TAR). Pick the days, then download the files into Downloads/Kassen-Nachschau.</string>
+    <string name="nachschau_pick_range">Days…</string>
+    <string name="nachschau_export_heading">DSFinV-K export</string>
+    <string name="nachschau_export_note">One ZIP of the closed days of the range, made by the till. Only days up to yesterday; it takes a minute or two.</string>
+    <string name="nachschau_export_request">Request the export for these days</string>
+    <string name="nachschau_export_requested">Requested. This list updates by itself.</string>
+    <string name="nachschau_export_closed_only">Only closed days can be exported: up to yesterday.</string>
+    <string name="nachschau_exports_none">No export requested yet.</string>
+    <string name="nachschau_state_requested">being made</string>
+    <string name="nachschau_state_stored">ready</string>
+    <string name="nachschau_state_failed">failed</string>
+    <string name="nachschau_state_dismissed">dismissed</string>
+    <string name="nachschau_state_pending">not kept yet</string>
+    <string name="nachschau_download">Download</string>
+    <string name="nachschau_download_all">Download all (%1$d)</string>
+    <string name="nachschau_downloading">Downloading into Downloads/%1$s.</string>
+    <string name="nachschau_closings_heading">Daily closings (Z)</string>
+    <string name="nachschau_closings_note">Each closed day as its own DSFinV-K ZIP, written by itself after midnight.</string>
+    <string name="nachschau_closings_none">No closed day in this range.</string>
+    <string name="nachschau_closing_built">not archived yet</string>
+    <string name="nachschau_tar_heading">TSE log (TAR)</string>
+    <string name="nachschau_tar_note">The TSE\'s own log, kept at least once a day. Hand over every file that overlaps the days.</string>
+    <string name="nachschau_tar_none">No TAR export in this range.</string>
+    <string name="nachschau_tar_beginning">the TSE\'s first entry</string>
+    <string name="nachschau_tar_until">The kept log reaches %1$s. Anything later is still at the TSE and comes with the next daily export.</string>
+    <string name="nachschau_tar_none_kept">No TAR of the range is kept yet.</string>
     <!-- The first line of the shared text; %1$s is the range. -->
     <string name="report_share_title">Report %1$s</string>
     <string name="report_share">Share</string>

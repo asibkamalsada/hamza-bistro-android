@@ -46,6 +46,7 @@ import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIncomingCallsBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
+import de.hamzabistro.printstation.core.SupabaseNachschauBackend
 import de.hamzabistro.printstation.core.SupabaseOpsBackend
 import de.hamzabistro.printstation.core.SupabasePhoneOrderBackend
 import de.hamzabistro.printstation.core.SupabasePrintBackend
@@ -139,6 +140,9 @@ class AppGraph(context: Context) {
 
     /** "Letzte Bestellungen" and today's takings. */
     val history = SupabaseHistoryBackend(config, http, sessions)
+
+    /** Kassen-Nachschau: the files a tax inspection is handed (hamza-bistro-web 20261127190000_kassen_nachschau). */
+    val nachschau = SupabaseNachschauBackend(config, http, sessions)
 
     /** Who hears about orders, the print stations, the address check. */
     val devices = SupabaseDevicesBackend(config, http, sessions)

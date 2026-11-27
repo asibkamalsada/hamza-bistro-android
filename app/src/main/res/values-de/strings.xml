@@ -417,6 +417,34 @@
 
     <!-- Auswertung (ReportScreen.kt) -->
     <string name="report_title">Auswertung</string>
+    <!-- Kassen-Nachschau (hamza-bistro-web K7): the files a tax inspection is handed. -->
+    <string name="nachschau_title">Kassen-Nachschau</string>
+    <string name="nachschau_intro">Was bei einer unangekündigten Kassen-Nachschau verlangt wird: der DSFinV-K-Export der Kasse und das Protokoll der TSE (TAR). Zeitraum wählen, dann die Dateien nach Downloads/Kassen-Nachschau laden.</string>
+    <string name="nachschau_pick_range">Zeitraum…</string>
+    <string name="nachschau_export_heading">DSFinV-K-Export</string>
+    <string name="nachschau_export_note">Eine ZIP-Datei mit den abgeschlossenen Tagen des Zeitraums, von der Kasse erstellt. Nur Tage bis gestern; dauert ein bis zwei Minuten.</string>
+    <string name="nachschau_export_request">Export für diese Tage anfordern</string>
+    <string name="nachschau_export_requested">Angefordert. Die Liste aktualisiert sich von selbst.</string>
+    <string name="nachschau_export_closed_only">Exportiert werden nur abgeschlossene Tage: bis gestern.</string>
+    <string name="nachschau_exports_none">Noch kein Export angefordert.</string>
+    <string name="nachschau_state_requested">wird erstellt</string>
+    <string name="nachschau_state_stored">fertig</string>
+    <string name="nachschau_state_failed">fehlgeschlagen</string>
+    <string name="nachschau_state_dismissed">verworfen</string>
+    <string name="nachschau_state_pending">noch nicht abgelegt</string>
+    <string name="nachschau_download">Herunterladen</string>
+    <string name="nachschau_download_all">Alle herunterladen (%1$d)</string>
+    <string name="nachschau_downloading">Wird nach Downloads/%1$s geladen.</string>
+    <string name="nachschau_closings_heading">Tagesabschlüsse (Z-Bons)</string>
+    <string name="nachschau_closings_note">Jeder abgeschlossene Tag als eigene DSFinV-K-ZIP-Datei, nach Mitternacht von selbst abgelegt.</string>
+    <string name="nachschau_closings_none">Kein abgeschlossener Tag in diesem Zeitraum.</string>
+    <string name="nachschau_closing_built">noch nicht archiviert</string>
+    <string name="nachschau_tar_heading">TSE-Export (TAR)</string>
+    <string name="nachschau_tar_note">Das Protokoll der TSE, mindestens einmal täglich abgelegt. Jede Datei aushändigen, die die Tage berührt.</string>
+    <string name="nachschau_tar_none">Kein TAR-Export in diesem Zeitraum.</string>
+    <string name="nachschau_tar_beginning">erster Eintrag der TSE</string>
+    <string name="nachschau_tar_until">Das abgelegte Protokoll reicht bis %1$s. Alles danach liegt noch bei der TSE und kommt mit dem nächsten täglichen Export.</string>
+    <string name="nachschau_tar_none_kept">Für den Zeitraum ist noch kein TAR abgelegt.</string>
     <!-- Die erste Zeile des geteilten Texts; %1$s ist der Zeitraum. -->
     <string name="report_share_title">Auswertung %1$s</string>
     <string name="report_share">Teilen</string>

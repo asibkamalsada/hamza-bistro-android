@@ -360,6 +360,17 @@ before it is discarded.
   the summary as text; **CSV** sends the days, the best sellers and the
   rings as three files for German Excel (`;`, decimal comma). Counts and
   sums only, from `staff_report()`.
+- **Kassen-Nachschau** — what an unannounced tax inspection asks for, for
+  a range of days (last month to start with): **Export für diese Tage
+  anfordern** asks the till for one DSFinV-K ZIP of the closed days
+  (`tse_dsfinvk_export()`) and shows it being made until it is ready; the
+  daily closings' ZIPs and the TSE's TAR files of the range are listed
+  with size and SHA-256. **Herunterladen** (or **Alle herunterladen**)
+  fetches them into Downloads/Kassen-Nachschau through the system's
+  download manager, each by a link Storage signs for one minute. From
+  `tse_nachschau()` (hamza-bistro-web
+  `20261127190000_kassen_nachschau.sql`); the site's `/orders/nachschau`
+  does the same.
 - **Speisekarte** — the whole menu, in five tabs. What is sold out, as on
   `/menu-admin`: a dish; a single choice, which goes off in every dish that
   offers it; an ingredient, which takes everything made of it off at once
@@ -598,7 +609,7 @@ the app logs it.
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
-  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), opening and closing the shop, closures and the
+  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), the Kassen-Nachschau (`Nachschau`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
   phone and walk-in orders (`PhoneOrder`), what the Kasse shows first (`Bestsellers`), the caller's number and the
