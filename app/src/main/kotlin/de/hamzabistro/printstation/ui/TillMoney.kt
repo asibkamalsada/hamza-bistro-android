@@ -390,14 +390,14 @@ internal fun TillCardPane(state: TillState, sale: CounterSale, model: TillAction
     val choice = model.cardChoice
     val offered = offeredTerminals(choice)
     var picked by remember(sale.id, choice) { mutableStateOf<CardTerminal?>((choice as? CardChoice.Usual)?.terminal) }
-    val paid = stringResource(R.string.till_card_paid)
     TillPage(
         state,
         model,
         bottom = {
             TillButton(stringResource(R.string.till_card_declined), model::cardDeclined, Modifier.weight(1f), !state.busy, TillTone.NO, height = 88.dp, size = 20.sp)
+            // The phone is the highlighted one above: a phone's narrow button has no room for its name too.
             TillButton(
-                picked?.let { "$paid · ${it.name}" } ?: paid,
+                stringResource(R.string.till_card_paid),
                 { model.cardPaidOn(picked) },
                 Modifier.weight(1f),
                 !state.busy && (offered.isEmpty() || picked != null),
