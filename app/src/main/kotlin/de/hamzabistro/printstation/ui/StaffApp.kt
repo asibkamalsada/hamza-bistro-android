@@ -38,6 +38,9 @@ enum class StaffScreen {
     /** The Kassenbuch: float, Geldtransit, private money and the count, against the drawer (hamza-bistro-web K1). */
     KASSENBUCH,
 
+    /** The Kassenausfall: the outage note and the paper Notbelege, entered when the till is back (hamza-bistro-web K4). */
+    KASSENAUSFALL,
+
     /** The Auswertung: sales, best sellers, busy hours, times over a range of days. */
     REPORT,
 
@@ -119,6 +122,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                 StaffScreen.ISSUES -> IssuesScreen(navigation)
                 StaffScreen.CASH_UP -> CashUpScreen(navigation)
                 StaffScreen.KASSENBUCH -> KassenbuchScreen(navigation)
+                StaffScreen.KASSENAUSFALL -> KassenausfallScreen(navigation)
                 StaffScreen.REPORT -> ReportScreen(navigation)
                 StaffScreen.NACHSCHAU -> NachschauScreen(navigation)
                 StaffScreen.MENU -> MenuScreen(navigation)

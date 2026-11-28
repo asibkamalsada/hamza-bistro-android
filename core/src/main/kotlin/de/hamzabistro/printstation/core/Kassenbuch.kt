@@ -140,7 +140,10 @@ enum class CashBookError(val code: String) {
     TOO_MUCH("HB511"),
 
     /** HB512: private money without a note. */
-    NO_NOTE("HB512");
+    NO_NOTE("HB512"),
+
+    /** HB518: a count while paper Notbelege of today are still to be entered (20261128140000). */
+    COUNT_WAITS("HB518");
 
     companion object {
         fun of(code: String?): CashBookError? =

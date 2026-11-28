@@ -25,6 +25,8 @@ import de.hamzabistro.printstation.core.StornoError
 import de.hamzabistro.printstation.core.CashBookError
 import de.hamzabistro.printstation.core.CashBookException
 import de.hamzabistro.printstation.core.StornoException
+import de.hamzabistro.printstation.core.OutageError
+import de.hamzabistro.printstation.core.OutageException
 import de.hamzabistro.printstation.core.UnknownAllergenException
 import kotlinx.coroutines.CancellationException
 
@@ -50,6 +52,7 @@ fun failureText(context: Context, e: Exception): String =
         is PhoneOrderException -> phoneOrderText(context, e)
         is StornoException -> stornoText(context, e.reason)
         is CashBookException -> cashBookText(context, e.reason)
+        is OutageException -> outageText(context, e.reason)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
@@ -77,6 +80,23 @@ private fun cashBookText(context: Context, reason: CashBookError): String =
             CashBookError.OPENING_TWICE -> R.string.kb_error_opening_twice
             CashBookError.TOO_MUCH -> R.string.kb_error_too_much
             CashBookError.NO_NOTE -> R.string.kb_error_no_note
+            CashBookError.COUNT_WAITS -> R.string.kb_error_count_waits
+        }
+    )
+
+/** Why the Kassenausfall refused (hamza-bistro-web 20261128140000_kassenausfall). */
+private fun outageText(context: Context, reason: OutageError): String =
+    context.getString(
+        when (reason) {
+            OutageError.NOT_STAFF -> R.string.problem_not_staff
+            OutageError.BAD_NOTE -> R.string.ka_error_note
+            OutageError.CORRECTION -> R.string.ka_error_correction
+            OutageError.OVERLAP -> R.string.ka_error_overlap
+            OutageError.NOT_A_SLIP -> R.string.ka_error_slip
+            OutageError.TWICE -> R.string.ka_error_twice
+            OutageError.AMOUNT -> R.string.ka_error_amount
+            OutageError.KEY_REUSED -> R.string.ka_error_key_reused
+            OutageError.SIGNING_OFF -> R.string.ka_error_signing_off
         }
     )
 
