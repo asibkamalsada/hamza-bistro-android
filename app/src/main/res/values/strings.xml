@@ -1228,4 +1228,34 @@
     <string name="report_tips">Card tips {tips}</string>
     <string name="settings_card_terminal">S-POS for card payments</string>
     <string name="settings_card_terminal_hint">The S-POS phone this device usually takes cards on: then “Card” is one tap. Each S-POS phone is its own Sparkasse contract with its own payout; the list is edited on the website under Settings.</string>
+
+    <!-- Reports: progress and customers (staff_growth) -->
+    <string name="report_growth">Progress</string>
+    <string name="report_growth_against">Compared with %1$s</string>
+    <string name="report_growth_before">before: %1$s</string>
+    <string name="report_growth_points">pts</string>
+    <string name="report_growth_new_customers">New customers</string>
+    <string name="report_growth_new_share">Share of new customers</string>
+    <string name="report_growth_new_accounts">New sign-ups</string>
+    <string name="report_customers">Customers</string>
+    <string name="report_customers_range">In this range</string>
+    <string name="report_customers_registered_at">Registered by %1$s</string>
+    <string name="report_customers_web_orders">Website orders delivered</string>
+    <string name="report_customers_returning">of which returning</string>
+    <string name="report_customers_new_revenue">Revenue from new customers</string>
+    <string name="report_customers_today">As of today</string>
+    <string name="report_customers_registered_now">Registered customers</string>
+    <string name="report_customers_ordered_ever">Ever ordered online (%1$s)</string>
+    <string name="report_customers_active">Ordered in the last 30 days</string>
+    <string name="report_customers_repeat">of which more than once (%1$s)</string>
+    <string name="report_customers_hint">New: a website order with no delivery to that email in the 30 days before. Registered: a confirmed customer account, staff not counted; a deleted account drops out, also from past months.</string>
+    <string name="report_months">Month by month</string>
+    <string name="report_months_orders">Orders</string>
+    <string name="report_months_new">New customers</string>
+    <string name="report_months_registered">Registered</string>
+    <string name="report_months_until">The last month counts up to %1$s.</string>
+    <string name="report_months_month">Month</string>
+    <string name="report_months_web_orders">Website orders</string>
+    <string name="report_months_new_share">New customers %</string>
+    <string name="report_growth_needs_update">Progress and customers come with the server update (20261128180000_growth_report).</string>
 </resources>

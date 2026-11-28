@@ -654,7 +654,7 @@ object ReportCsv {
     fun cell(value: String): String =
         if (value.any { it == SEPARATOR || it == '"' || it == '\n' || it == '\r' }) "\"" + value.replace("\"", "\"\"") + "\"" else value
 
-    private fun table(header: List<String>, rows: List<List<String>>): String =
+    internal fun table(header: List<String>, rows: List<List<String>>): String =
         buildString {
             append(BOM)
             for (row in listOf(header) + rows) {

@@ -66,6 +66,8 @@ import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.BusyGrid
 import de.hamzabistro.printstation.core.CashUp
 import de.hamzabistro.printstation.core.DishOrder
+import de.hamzabistro.printstation.core.Growth
+import de.hamzabistro.printstation.core.GrowthCsv
 import de.hamzabistro.printstation.core.OrderRatings
 import de.hamzabistro.printstation.core.OrderSource
 import de.hamzabistro.printstation.core.Report
@@ -102,13 +104,18 @@ data class ReportState(
     val report: Report? = null,
     /** The shop's database does not have staff_report() yet. */
     val missing: Boolean = false,
+    /** Fortschritt and Kunden; null while loading, after a failure, or with [growthMissing]. */
+    val growth: Growth? = null,
+    /** The shop's database does not have staff_growth() yet. */
+    val growthMissing: Boolean = false,
     val error: String? = null,
 )
 
 /**
  * The Auswertung: sales, best sellers, busy hours, delivery times and the
- * late rate over a range of Leipzig days, from staff_report(). Read when
- * asked for, like the Kassensturz.
+ * late rate over a range of Leipzig days, from staff_report(); progress and
+ * customers over the same range, from staff_growth(). Read when asked for,
+ * like the Kassensturz.
  */
 class ReportViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
@@ -135,7 +142,7 @@ class ReportViewModel(application: Application) : AndroidViewModel(application) 
     private fun read(range: ReportRange) {
         // The range tapped last wins over one still on its way.
         reading?.cancel()
-        _state.update { it.copy(loading = true, error = null, range = range) }
+        _state.update { it.copy(loading = true, error = null, range = range, growth = null, growthMissing = false) }
         reading =
             viewModelScope.launch {
                 var failed = false
@@ -147,12 +154,24 @@ class ReportViewModel(application: Application) : AndroidViewModel(application) 
                         graph.history.report(range)
                     }
                 if (failed) return@launch
-                _state.update { it.copy(loading = false, report = read, missing = read == null) }
+                // A failure here leaves the report standing, with the error above it.
+                var growthError: String? = null
+                val growth = read?.let { attempt(app, { error -> growthError = error }) { graph.history.growth(range) } }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        report = read,
+                        missing = read == null,
+                        growth = growth,
+                        growthMissing = read != null && growth == null && growthError == null,
+                        error = growthError,
+                    )
+                }
             }
     }
 }
 
-private fun dateText(day: LocalDate): String = DATE.format(day)
+internal fun dateText(day: LocalDate): String = DATE.format(day)
 
 private val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
@@ -161,7 +180,7 @@ private fun dayText(context: Context, day: LocalDate): String =
     DateTimeFormatter.ofPattern("EEE, dd.MM.", context.resources.configuration.locales[0]).format(day)
 
 /** "29.03.2025 – 31.03.2025". */
-private fun rangeText(range: ReportRange): String =
+internal fun rangeText(range: ReportRange): String =
     if (range.from == range.to) dateText(range.from) else "${dateText(range.from)} – ${dateText(range.to)}"
 
 /** The Auswertung's words, from the resources, for [range]. */
@@ -222,18 +241,20 @@ private fun share(context: Context, report: Report) {
 }
 
 /**
- * The days, best sellers and rings as three CSV files through the share
- * sheet: to email, to Drive, to the Steuerberater. Written to the app's
- * cache, the previous export's files replaced, and handed out read-only.
+ * The days, best sellers and rings as three CSV files, and the months of
+ * [growth] as a fourth, through the share sheet: to email, to Drive, to the
+ * Steuerberater. Written to the app's cache, the previous export's files
+ * replaced, and handed out read-only.
  */
-private suspend fun exportCsv(context: Context, report: Report) {
+private suspend fun exportCsv(context: Context, report: Report, growth: Growth?) {
     val words = reportWords(context, report.range)
+    val months = growth?.takeIf { it.months.isNotEmpty() }?.let { GrowthCsv.months(it, growthWords(context)) }
     val uris =
         withContext(Dispatchers.IO) {
             val dir = File(context.cacheDir, REPORT_DIR)
             dir.deleteRecursively()
             dir.mkdirs()
-            ReportCsv.files(report, words).map { csv ->
+            (ReportCsv.files(report, words) + listOfNotNull(months)).map { csv ->
                 val file = File(dir, csv.name)
                 file.writeText(csv.text, Charsets.UTF_8)
                 FileProvider.getUriForFile(context, "${context.packageName}.files", file)
@@ -296,7 +317,7 @@ fun ReportScreen(navigation: @Composable () -> Unit) {
                 navigationIcon = navigation,
                 actions = {
                     val shown = state.report?.takeIf { !state.loading }
-                    TextButton(onClick = { shown?.let { scope.launch { exportCsv(context, it) } } }, enabled = shown != null) {
+                    TextButton(onClick = { shown?.let { scope.launch { exportCsv(context, it, state.growth) } } }, enabled = shown != null) {
                         Text(stringResource(R.string.report_csv))
                     }
                     TextButton(onClick = { shown?.let { share(context, it) } }, enabled = shown != null) {
@@ -331,7 +352,7 @@ fun ReportScreen(navigation: @Composable () -> Unit) {
                     item(key = "loading") {
                         Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     }
-                report != null -> reportItems(report, reportWords(context, report.range))
+                report != null -> reportItems(report, reportWords(context, report.range), state.growth, state.growthMissing)
             }
         }
     }
@@ -372,9 +393,20 @@ private val PRESETS =
         ReportPreset.LAST_MONTH to R.string.report_last_month,
     )
 
-/** Everything below the range: the big numbers, then each table. */
-private fun LazyListScope.reportItems(report: Report, words: ReportWords) {
+/** Everything below the range: the big numbers, how the shop progresses, then each table. */
+private fun LazyListScope.reportItems(report: Report, words: ReportWords, growth: Growth?, growthMissing: Boolean) {
     item(key = "big") { BigNumbers(report, words) }
+    // Before "nothing delivered": customers register in a quiet range too.
+    if (growth != null) {
+        item(key = "progress") { GrowthProgress(growth) }
+        item(key = "customers") { GrowthCustomersSection(growth) }
+        if (growth.months.isNotEmpty()) item(key = "months") { GrowthMonths(growth) }
+    }
+    if (growthMissing) {
+        item(key = "growth_missing") {
+            Text(stringResource(R.string.report_growth_needs_update), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
+        }
+    }
     if (report.totals.delivered == 0 && report.cancellations.orders == 0) {
         item(key = "empty") {
             Text(words.empty, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
@@ -424,7 +456,7 @@ private fun Big(label: String, value: String, modifier: Modifier) {
 
 /** A card with a heading: one table of the report. */
 @Composable
-private fun ReportSection(title: String, content: @Composable () -> Unit) {
+internal fun ReportSection(title: String, content: @Composable () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -435,7 +467,7 @@ private fun ReportSection(title: String, content: @Composable () -> Unit) {
 
 /** One row of a table: a label on the left, the numbers right-aligned in columns. */
 @Composable
-private fun Line(label: String, vararg values: String, bold: Boolean = false, muted: Boolean = false) {
+internal fun Line(label: String, vararg values: String, bold: Boolean = false, muted: Boolean = false) {
     val weight = if (bold) FontWeight.SemiBold else null
     val color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -458,7 +490,7 @@ private val VALUE_WIDTH = 84.dp
 
 /** A thin bar under a row, as long as its share of the largest. */
 @Composable
-private fun Bar(fraction: Double) {
+internal fun Bar(fraction: Double) {
     Box(Modifier.fillMaxWidth().height(4.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
         Box(
             Modifier.fillMaxWidth(fraction.toFloat().coerceIn(0f, 1f)).height(4.dp).background(MaterialTheme.colorScheme.primary),
