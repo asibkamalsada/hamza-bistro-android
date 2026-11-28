@@ -360,6 +360,22 @@ before it is discarded.
   own; nothing is changed afterwards. From `cash_book_add()` and
   `cash_up().drawer` (hamza-bistro-web `20261128130000_kassenbuch.sql`); the
   site's `/orders` has the same under the Kassensturz.
+- **Kassenausfall** — for afterwards, when the till (the shop's database)
+  could not be reached. The app does not sell offline: a device on its own
+  would be a till of its own. Staff try a phone hotspot first; if the till
+  still cannot be reached they write numbered paper Notbelege and an
+  outage note (the site's Verfahrensdokumentation 2.8). When it is back —
+  the same day, before the count, by any staff account — **Ausfall melden**
+  takes the note (from, to, why, Notbelege first to last, the void ones,
+  what was tried), and **Notbeleg nacherfassen** each paper receipt: its
+  number, the time on the paper, the dishes, the amount on the paper (the
+  till must price it the same), Bar or Karte (and the S-POS phone). It is
+  booked as a counter sale at that time, marked with the Notbeleg, and
+  signed now; the closing says "Kassenausfall … Notbeleg Nr. n nacherfasst"
+  in TSE_TA_FEHLER. The count is refused while a Notbeleg is missing. From
+  `till_outage_report()`, `counter_sale_late()`, `till_outages()`
+  (hamza-bistro-web `20261128140000_kassenausfall.sql`); the site's
+  `/orders` has the same above the Kassenbuch.
 - **Auswertung** — this week, last week, this month, last month or a
   range picked (at most 366 Leipzig days): Umsatz, Bestellungen,
   Ø Warenkorb and Verspätet % on top; per day, Lieferung vs Abholung, the
@@ -618,7 +634,7 @@ the app logs it.
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
-  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), the Kassen-Nachschau (`Nachschau`), the Kassenbuch (`Kassenbuch`), opening and closing the shop, closures and the
+  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), the Kassen-Nachschau (`Nachschau`), the Kassenbuch (`Kassenbuch`), the Kassenausfall (`Kassenausfall`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
   phone and walk-in orders (`PhoneOrder`), what the Kasse shows first (`Bestsellers`), the caller's number and the
