@@ -411,17 +411,28 @@ internal fun TillCardPane(state: TillState, sale: CounterSale, model: TillAction
             TillNote(stringResource(R.string.till_card_text))
             if (offered.isNotEmpty()) {
                 TillNote(stringResource(R.string.card_terminal_pick))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (terminal in offered) {
-                        TillButton(
-                            terminal.name,
-                            { picked = terminal },
-                            Modifier.weight(1f),
-                            !state.busy,
-                            if (terminal == picked) TillTone.MAIN else TillTone.QUIET,
-                            height = 56.dp,
-                            size = 16.sp,
-                        )
+                // As many in a row as fit a name like "S-POS 1" whole: all five on the
+                // tablet, three and two on a phone.
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val perRow = (maxWidth / 100.dp).toInt().coerceIn(1, offered.size)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (row in offered.chunked(perRow)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                for (terminal in row) {
+                                    TillButton(
+                                        terminal.name,
+                                        { picked = terminal },
+                                        Modifier.weight(1f),
+                                        !state.busy,
+                                        if (terminal == picked) TillTone.MAIN else TillTone.QUIET,
+                                        height = 56.dp,
+                                        size = 16.sp,
+                                    )
+                                }
+                                // A short last row keeps the buttons' width.
+                                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
                     }
                 }
             }
