@@ -35,6 +35,9 @@ enum class StaffScreen {
     /** The Kassensturz: per driver, cash and card for a day. */
     CASH_UP,
 
+    /** The Kassenbuch: float, Geldtransit, private money and the count, against the drawer (hamza-bistro-web K1). */
+    KASSENBUCH,
+
     /** The Auswertung: sales, best sellers, busy hours, times over a range of days. */
     REPORT,
 
@@ -115,6 +118,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                 StaffScreen.HISTORY -> HistoryScreen(staff, navigation)
                 StaffScreen.ISSUES -> IssuesScreen(navigation)
                 StaffScreen.CASH_UP -> CashUpScreen(navigation)
+                StaffScreen.KASSENBUCH -> KassenbuchScreen(navigation)
                 StaffScreen.REPORT -> ReportScreen(navigation)
                 StaffScreen.NACHSCHAU -> NachschauScreen(navigation)
                 StaffScreen.MENU -> MenuScreen(navigation)

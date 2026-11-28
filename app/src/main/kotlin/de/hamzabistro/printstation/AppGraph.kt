@@ -50,6 +50,7 @@ import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIncomingCallsBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
+import de.hamzabistro.printstation.core.SupabaseKassenbuchBackend
 import de.hamzabistro.printstation.core.SupabaseNachschauBackend
 import de.hamzabistro.printstation.core.SupabaseOpsBackend
 import de.hamzabistro.printstation.core.SupabasePhoneOrderBackend
@@ -187,6 +188,9 @@ class AppGraph(context: Context) {
 
     /** Storno: a delivered order taken back by a second Beleg (hamza-bistro-web 20261127100000_storno). */
     val stornos = SupabaseStornoBackend(config, http, sessions, ::counterDevice)
+
+    /** The Kassenbuch: float, Geldtransit, private money, the count (hamza-bistro-web 20261128130000_kassenbuch). */
+    val kassenbuch = SupabaseKassenbuchBackend(config, http, sessions, ::counterDevice)
 
     /** The Kasse: one for the process, so a sale being paid outlives its screen. Keeps nothing on the device. */
     val till = Till(counter, newId = { UUID.randomUUID().toString() }, logger)

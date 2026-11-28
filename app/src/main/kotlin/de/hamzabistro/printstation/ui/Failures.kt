@@ -22,6 +22,8 @@ import de.hamzabistro.printstation.core.ReportRangeException
 import de.hamzabistro.printstation.core.SignedOutException
 import de.hamzabistro.printstation.core.SpecialDayError
 import de.hamzabistro.printstation.core.StornoError
+import de.hamzabistro.printstation.core.CashBookError
+import de.hamzabistro.printstation.core.CashBookException
 import de.hamzabistro.printstation.core.StornoException
 import de.hamzabistro.printstation.core.UnknownAllergenException
 import kotlinx.coroutines.CancellationException
@@ -47,6 +49,7 @@ fun failureText(context: Context, e: Exception): String =
         is IssueActionException -> issueText(context, e.reason)
         is PhoneOrderException -> phoneOrderText(context, e)
         is StornoException -> stornoText(context, e.reason)
+        is CashBookException -> cashBookText(context, e.reason)
         else -> context.getString(R.string.problem_offline, e.message ?: e.javaClass.simpleName)
     }
 
@@ -63,6 +66,19 @@ suspend fun <T> attempt(context: Context, onFailure: (String) -> Unit, block: su
         onFailure(failureText(context, e))
         null
     }
+
+/** Why cash_book_add refused (hamza-bistro-web 20261128130000_kassenbuch). */
+private fun cashBookText(context: Context, reason: CashBookError): String =
+    context.getString(
+        when (reason) {
+            CashBookError.NOT_STAFF -> R.string.problem_not_staff
+            CashBookError.BAD_VALUE -> R.string.kb_error_amount
+            CashBookError.KEY_REUSED -> R.string.kb_error_key_reused
+            CashBookError.OPENING_TWICE -> R.string.kb_error_opening_twice
+            CashBookError.TOO_MUCH -> R.string.kb_error_too_much
+            CashBookError.NO_NOTE -> R.string.kb_error_no_note
+        }
+    )
 
 /** Why order_storno refused (hamza-bistro-web 20261127100000_storno). */
 private fun stornoText(context: Context, reason: StornoError): String =
