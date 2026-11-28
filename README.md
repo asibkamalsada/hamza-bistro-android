@@ -351,6 +351,15 @@ before it is discarded.
   the share sheet. "Bar" or "Karte" taken back within the undo window
   records nothing; after it, a correction is made in the Supabase
   dashboard only.
+- **Kassenbuch** — what the till expects in the drawer today (float, cash
+  takings after the card tips paid out, Geldtransit, private money, the
+  differences counted) and the next entry: **Anfangsbestand zählen** (85 €
+  filled in), **Kasse zählen**, **In den Tresor / zur Bank**, **Aus dem
+  Tresor / von der Bank**, **Privatentnahme**, **Privateinlage** (with what
+  for). Each entry that moves money is signed by the TSE as a Beleg of its
+  own; nothing is changed afterwards. From `cash_book_add()` and
+  `cash_up().drawer` (hamza-bistro-web `20261128130000_kassenbuch.sql`); the
+  site's `/orders` has the same under the Kassensturz.
 - **Auswertung** — this week, last week, this month, last month or a
   range picked (at most 366 Leipzig days): Umsatz, Bestellungen,
   Ø Warenkorb and Verspätet % on top; per day, Lieferung vs Abholung, the
@@ -609,7 +618,7 @@ the app logs it.
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
-  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), the Kassen-Nachschau (`Nachschau`), opening and closing the shop, closures and the
+  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), the Kassen-Nachschau (`Nachschau`), the Kassenbuch (`Kassenbuch`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
   phone and walk-in orders (`PhoneOrder`), what the Kasse shows first (`Bestsellers`), the caller's number and the

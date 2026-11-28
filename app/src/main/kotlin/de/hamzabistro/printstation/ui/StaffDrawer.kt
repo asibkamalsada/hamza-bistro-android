@@ -154,6 +154,7 @@ private fun drawerEntries(issues: IssuesState, till: TillState): List<DrawerEntr
         DrawerEntry(StaffScreen.HISTORY, R.string.history_title, R.drawable.ic_history),
         DrawerEntry(StaffScreen.ISSUES, R.string.issues_title, R.drawable.ic_issues).takeIf { issues.available == true },
         DrawerEntry(StaffScreen.CASH_UP, R.string.cash_up_title, R.drawable.ic_cash_up),
+        DrawerEntry(StaffScreen.KASSENBUCH, R.string.kb_title, R.drawable.ic_cash_up),
         DrawerEntry(StaffScreen.REPORT, R.string.report_title, R.drawable.ic_report),
         DrawerEntry(StaffScreen.NACHSCHAU, R.string.nachschau_title, R.drawable.ic_archive),
         DrawerEntry(StaffScreen.MENU, R.string.menu_title, R.drawable.ic_menu_card),
