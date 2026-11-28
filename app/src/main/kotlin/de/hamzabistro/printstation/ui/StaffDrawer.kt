@@ -155,6 +155,8 @@ private fun drawerEntries(issues: IssuesState, till: TillState): List<DrawerEntr
         DrawerEntry(StaffScreen.ISSUES, R.string.issues_title, R.drawable.ic_issues).takeIf { issues.available == true },
         DrawerEntry(StaffScreen.CASH_UP, R.string.cash_up_title, R.drawable.ic_cash_up),
         DrawerEntry(StaffScreen.KASSENBUCH, R.string.kb_title, R.drawable.ic_cash_up),
+        // Only on a database that has a till: what it enters are counter sales.
+        DrawerEntry(StaffScreen.KASSENAUSFALL, R.string.ka_title, R.drawable.ic_issues).takeIf { till.available == true },
         DrawerEntry(StaffScreen.REPORT, R.string.report_title, R.drawable.ic_report),
         DrawerEntry(StaffScreen.NACHSCHAU, R.string.nachschau_title, R.drawable.ic_archive),
         DrawerEntry(StaffScreen.MENU, R.string.menu_title, R.drawable.ic_menu_card),

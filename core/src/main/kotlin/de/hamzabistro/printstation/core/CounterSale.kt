@@ -134,6 +134,8 @@ data class CounterSale(
     /** The TSE knows of it. */
     val signing: Boolean = false,
     @SerialName("tse") val receipt: CounterReceipt? = null,
+    /** A paper Notbeleg entered after a Kassenausfall (20261128140000); null for a sale rung up here. */
+    val late: LateMark? = null,
 ) {
     val state: SaleState
         get() =
@@ -152,6 +154,15 @@ data class CounterSale(
 }
 
 /** Why the till refused, by its error code. */
+/** The Notbeleg a counter sale was entered from, after a Kassenausfall. */
+@Serializable
+data class LateMark(
+    val slip: Int,
+    /** The outage note's id. */
+    val outage: String? = null,
+    @SerialName("entered_at") @Serializable(with = InstantSerializer::class) val enteredAt: Instant? = null,
+)
+
 enum class CounterError(val code: String) {
     /** 42501: the account is not staff (any more). */
     NOT_STAFF("42501"),

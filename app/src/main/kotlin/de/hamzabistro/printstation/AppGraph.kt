@@ -50,6 +50,7 @@ import de.hamzabistro.printstation.core.SupabaseHistoryBackend
 import de.hamzabistro.printstation.core.SupabaseIncomingCallsBackend
 import de.hamzabistro.printstation.core.SupabaseIssuesBackend
 import de.hamzabistro.printstation.core.SupabaseMenuBackend
+import de.hamzabistro.printstation.core.SupabaseKassenausfallBackend
 import de.hamzabistro.printstation.core.SupabaseKassenbuchBackend
 import de.hamzabistro.printstation.core.SupabaseNachschauBackend
 import de.hamzabistro.printstation.core.SupabaseOpsBackend
@@ -191,6 +192,9 @@ class AppGraph(context: Context) {
 
     /** The Kassenbuch: float, Geldtransit, private money, the count (hamza-bistro-web 20261128130000_kassenbuch). */
     val kassenbuch = SupabaseKassenbuchBackend(config, http, sessions, ::counterDevice)
+
+    /** The Kassenausfall: the outage note and the paper Notbelege entered afterwards (hamza-bistro-web 20261128140000_kassenausfall). */
+    val kassenausfall = SupabaseKassenausfallBackend(config, http, sessions, ::counterDevice)
 
     /** The Kasse: one for the process, so a sale being paid outlives its screen. Keeps nothing on the device. */
     val till = Till(counter, newId = { UUID.randomUUID().toString() }, logger)
