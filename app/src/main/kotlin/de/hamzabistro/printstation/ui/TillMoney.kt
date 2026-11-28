@@ -55,6 +55,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.hamzabistro.printstation.R
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
+import de.hamzabistro.printstation.core.CashUpText
 import de.hamzabistro.printstation.core.CounterPayment
 import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.CounterSale
@@ -382,17 +385,86 @@ private fun tillPlain(cents: Long): String = if (cents % 100 == 0L) "${cents / 1
 
 @Composable
 internal fun TillCardPane(state: TillState, sale: CounterSale, model: TillActions) {
+    // The S-POS phone the card goes through (hamza-bistro-web 20261128100000):
+    // this device's usual one picked already, another one a tap away. With
+    // phones to pick from, nothing is booked before one is picked.
+    val choice = model.cardChoice
+    val offered = offeredTerminals(choice)
+    var picked by remember(sale.id, choice) { mutableStateOf<CardTerminal?>((choice as? CardChoice.Usual)?.terminal) }
+    // A tip on top of the bill (hamza-bistro-web 20261128110000): what S-POS
+    // charged, asked in a dialog; null for none.
+    var tip by remember(sale.id) { mutableStateOf<Double?>(null) }
+    var tipping by remember(sale.id) { mutableStateOf(false) }
     TillPage(
         state,
         model,
         bottom = {
             TillButton(stringResource(R.string.till_card_declined), model::cardDeclined, Modifier.weight(1f), !state.busy, TillTone.NO, height = 88.dp, size = 20.sp)
-            TillButton(stringResource(R.string.till_card_paid), model::cardPaid, Modifier.weight(1f), !state.busy, height = 88.dp, size = 20.sp)
+            // The phone is the highlighted one above: a phone's narrow button has no room for its name too.
+            TillButton(
+                stringResource(R.string.till_card_paid),
+                { model.cardPaidOn(picked, tip) },
+                Modifier.weight(1f),
+                !state.busy && (offered.isEmpty() || picked != null),
+                height = 88.dp,
+                size = 20.sp,
+            )
         },
     ) {
         TillColumn(Modifier.fillMaxSize()) {
             TillAmount(stringResource(R.string.till_card_title), sale.total, size = 72.sp)
             TillNote(stringResource(R.string.till_card_text))
+            // "Trinkgeld": the customer gave more on the card.
+            val given = tip
+            if (given != null) {
+                TillNote(stringResource(R.string.till_tip_given, CashUpText.euro(given), CashUpText.euro(sale.total + given)))
+            }
+            TillButton(
+                stringResource(if (given == null) R.string.tip_add else R.string.tip_change),
+                { tipping = true },
+                Modifier.fillMaxWidth(),
+                !state.busy,
+                TillTone.QUIET,
+                height = 56.dp,
+                size = 16.sp,
+            )
+            if (tipping) {
+                TipDialog(
+                    sale.total,
+                    onTip = {
+                        tip = it.takeIf { amount -> amount > 0.0 }
+                        tipping = false
+                    },
+                    onDismiss = { tipping = false },
+                )
+            }
+            if (offered.isNotEmpty()) {
+                TillNote(stringResource(R.string.card_terminal_pick))
+                // As many in a row as fit a name like "S-POS 1" whole: all five on the
+                // tablet, three and two on a phone.
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val perRow = (maxWidth / 100.dp).toInt().coerceIn(1, offered.size)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (row in offered.chunked(perRow)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                for (terminal in row) {
+                                    TillButton(
+                                        terminal.name,
+                                        { picked = terminal },
+                                        Modifier.weight(1f),
+                                        !state.busy,
+                                        if (terminal == picked) TillTone.MAIN else TillTone.QUIET,
+                                        height = 56.dp,
+                                        size = 16.sp,
+                                    )
+                                }
+                                // A short last row keeps the buttons' width.
+                                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

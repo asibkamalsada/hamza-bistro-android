@@ -52,13 +52,25 @@ object Payment {
      * The step for "Bar" or "Karte" — or for the one button, with
      * [payment] null. Never "online" from here, and nothing for an order
      * paid online: the database keeps that by itself. [device] is this
-     * device's label, as staff_app_seen has it.
+     * device's label, as staff_app_seen has it. [cardTerminal] is the S-POS
+     * phone "Karte" went through, kept only with "Karte"; so is [tip], the
+     * tip on top of the bill (20261128110000), and only when there is one.
      */
-    fun done(order: StaffOrder, payment: PaymentMethod?, device: String?): OrderStep.Done =
-        OrderStep.Done(
-            payment = payment?.takeIf { asks(order) && it != PaymentMethod.ONLINE },
+    fun done(
+        order: StaffOrder,
+        payment: PaymentMethod?,
+        device: String?,
+        cardTerminal: CardTerminal? = null,
+        tip: Double? = null,
+    ): OrderStep.Done {
+        val paid = payment?.takeIf { asks(order) && it != PaymentMethod.ONLINE }
+        return OrderStep.Done(
+            payment = paid,
             device = device?.trim()?.takeIf { it.isNotEmpty() }?.take(DEVICE_MAX),
+            cardTerminal = cardTerminal?.id?.takeIf { paid == PaymentMethod.CARD },
+            tip = Tips.sent(tip, paid == PaymentMethod.CARD),
         )
+    }
 
     /**
      * Whether an open order's card says that nothing is to be collected, or
@@ -105,17 +117,33 @@ data class CashUpOrder(
     val total: Double = 0.0,
     /** Null: delivered from Telegram, or by an older app — "unbekannt". */
     @SerialName("payment_method") val paymentMethod: PaymentMethod? = null,
+    /** The S-POS phone of a card payment that named one (20261128100000). */
+    @SerialName("card_terminal_id") val cardTerminalId: Int? = null,
     val pickup: Boolean = false,
+    /** The tip paid on the card on top of [total] (20261128110000); 0 for a Storno. */
+    val tip: Double = 0.0,
 )
 
 /** The sums the Kassensturz gives, for the day and for each driver. In euros, to the cent. */
 interface CashUpSums {
     val count: Int
+
+    /**
+     * Cash taken less the card tips (20261128110000), which are paid out of
+     * the drawer at the end of the shift: the cash that should be there.
+     */
     val cash: Double
+
+    /** Money taken by card, card tips included. */
     val card: Double
     val online: Double
     val unknown: Double
+
+    /** The takings: cash + card + online + unknown, the tips netting out. */
     val total: Double
+
+    /** The card tips; for a driver's (or the counter's) row, what that person is paid out in cash. */
+    val tips: Double
 }
 
 @Serializable
@@ -126,6 +154,7 @@ data class CashUpTotals(
     override val online: Double = 0.0,
     override val unknown: Double = 0.0,
     override val total: Double = 0.0,
+    override val tips: Double = 0.0,
 ) : CashUpSums
 
 /** One driver: one account and one device label, or a name from Telegram. */
@@ -141,6 +170,7 @@ data class CashUpDriver(
     override val total: Double = 0.0,
     /** In the order they were delivered. */
     val orders: List<CashUpOrder> = emptyList(),
+    override val tips: Double = 0.0,
 ) : CashUpSums
 
 /**
@@ -152,6 +182,12 @@ data class CashUp(
     /** "2026-10-02", the Leipzig day it is for. */
     val day: String,
     val totals: CashUpTotals = CashUpTotals(),
+    /**
+     * Card money per S-POS phone (20261128100000): every phone in use, 0 when
+     * it took nothing, any other that took money, then the unknown; adding
+     * up to totals.card. Empty from a server before it.
+     */
+    @SerialName("card_terminals") val cardTerminals: List<CashUpTerminal> = emptyList(),
     val drivers: List<CashUpDriver> = emptyList(),
 ) {
     val date: LocalDate
@@ -182,6 +218,16 @@ data class CashUpWords(
     val pickup: String,
     /** "An diesem Tag wurde nichts geliefert." */
     val empty: String,
+    /** "Karte je S-POS": the heading of the per-phone lines. */
+    val perTerminal: String = "Karte je S-POS",
+    /** After a switched-off phone: "nicht mehr in Gebrauch". */
+    val terminalOff: String = "nicht mehr in Gebrauch",
+    /** Beside card money with tips in it: "davon {tips} Trinkgeld". */
+    val tipsIn: String = "davon {tips} Trinkgeld",
+    /** A person's row: "Trinkgeld bar auszahlen: {tips}". */
+    val tipsOut: String = "Trinkgeld bar auszahlen: {tips}",
+    /** After an order's method: "Trinkgeld {tip}". */
+    val tip: String = "Trinkgeld {tip}",
 )
 
 /** How the Kassensturz reads — cashUpTotals() and cashUpSplit() of the site's /orders. */
@@ -198,13 +244,40 @@ object CashUpText {
     fun split(sums: CashUpSums, words: CashUpWords): String =
         buildList {
                 add("${words.cash} ${euro(sums.cash)}")
-                add("${words.card} ${euro(sums.card)}")
+                // The card tips are in Karte and taken from Bar (20261128110000).
+                add("${words.card} ${card(sums.card, sums.tips, words)}")
                 if (sums.online > 0) add("${words.online} ${euro(sums.online)}")
                 if (sums.unknown > 0) add("${words.unknown} ${euro(sums.unknown)}")
             }
             .joinToString(" · ")
 
     fun driver(driver: CashUpDriver, words: CashUpWords): String = driver.label?.takeIf { it.isNotBlank() } ?: words.nobody
+
+    /** "22,00 €", or "22,00 € (davon 2,00 € Trinkgeld)". */
+    fun card(card: Double, tips: Double, words: CashUpWords): String =
+        if (tips > 0) "${euro(card)} (${words.tipsIn.replace("{tips}", euro(tips))})" else euro(card)
+
+    /** "Trinkgeld bar auszahlen: 2,00 €" for a person who took card tips; null for one who took none. */
+    fun tipsOut(sums: CashUpSums, words: CashUpWords): String? =
+        sums.tips.takeIf { it > 0 }?.let { words.tipsOut.replace("{tips}", euro(it)) }
+
+    /**
+     * The per-phone lines, to hold against each Sparkasse payout: shown when
+     * there is a list or card money with no phone — a day of nothing but
+     * cash says nothing per phone.
+     */
+    fun terminals(cashUp: CashUp): List<CashUpTerminal> =
+        cashUp.cardTerminals.takeIf { rows -> rows.any { it.id != null } || cashUp.totals.card != 0.0 } ?: emptyList()
+
+    /** "S-POS 1 (29001234)", "S-POS 2, nicht mehr in Gebrauch", or "unbekannt". */
+    fun terminal(row: CashUpTerminal, words: CashUpWords): String {
+        if (row.id == null) return words.unknown
+        val name = row.tid?.takeIf { it.isNotBlank() }?.let { "${row.name} ($it)" } ?: row.name.orEmpty()
+        return if (row.active == false) "$name, ${words.terminalOff}" else name
+    }
+
+    /** "S-POS 1 (29001234): 20,00 €". */
+    fun terminalLine(row: CashUpTerminal, words: CashUpWords): String = "${terminal(row, words)}: ${card(row.card, row.tips, words)}"
 
     /** "Bar", "Karte", "Online" or "unbekannt". */
     fun method(method: PaymentMethod?, words: CashUpWords): String =
@@ -216,11 +289,19 @@ object CashUpText {
         }
 
     /** "#41 · 18:32 · Bar · 20,00 €", on a Leipzig clock; "–" for no time known. */
-    fun order(order: CashUpOrder, words: CashUpWords, zone: ZoneId = AlarmPolicy.LEIPZIG): String =
+    fun order(
+        order: CashUpOrder,
+        words: CashUpWords,
+        zone: ZoneId = AlarmPolicy.LEIPZIG,
+        terminals: List<CardTerminal> = emptyList(),
+    ): String =
         buildList {
                 add("#${order.orderNumber}")
                 add(order.deliveredAt?.let { CLOCK.format(it.atZone(zone)) } ?: "–")
                 add(method(order.paymentMethod, words))
+                // "Karte · S-POS 1": the phone, as it is called now.
+                if (order.paymentMethod == PaymentMethod.CARD) CardTerminals.name(terminals, order.cardTerminalId)?.let { add(it) }
+                if (order.tip > 0) add(words.tip.replace("{tip}", euro(order.tip)))
                 if (order.pickup) add(words.pickup)
                 add(euro(order.total))
             }
@@ -231,7 +312,12 @@ object CashUpText {
      * each driver with the orders behind the sums. Order numbers and money
      * only — cash_up() sends nothing about the customers.
      */
-    fun share(cashUp: CashUp, words: CashUpWords, zone: ZoneId = AlarmPolicy.LEIPZIG): String =
+    fun share(
+        cashUp: CashUp,
+        words: CashUpWords,
+        zone: ZoneId = AlarmPolicy.LEIPZIG,
+        terminals: List<CardTerminal> = emptyList(),
+    ): String =
         buildString {
             appendLine(words.title)
             if (cashUp.totals.count == 0) {
@@ -240,14 +326,25 @@ object CashUpText {
             }
             appendLine(totals(cashUp.totals, words))
             append(split(cashUp.totals, words))
+            val perTerminal = terminals(cashUp)
+            if (perTerminal.isNotEmpty()) {
+                appendLine()
+                appendLine()
+                append("${words.perTerminal}:")
+                for (row in perTerminal) {
+                    appendLine()
+                    append("  ").append(terminalLine(row, words))
+                }
+            }
             for (driver in cashUp.drivers) {
                 appendLine()
                 appendLine()
                 appendLine("${driver(driver, words)}: ${totals(driver, words)}")
                 append(split(driver, words))
+                tipsOut(driver, words)?.let { appendLine().append(it) }
                 for (order in driver.orders) {
                     appendLine()
-                    append("  ").append(order(order, words, zone))
+                    append("  ").append(order(order, words, zone, terminals))
                 }
             }
         }

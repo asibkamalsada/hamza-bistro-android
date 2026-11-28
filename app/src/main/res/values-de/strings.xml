@@ -417,6 +417,34 @@
 
     <!-- Auswertung (ReportScreen.kt) -->
     <string name="report_title">Auswertung</string>
+    <!-- Kassen-Nachschau (hamza-bistro-web K7): the files a tax inspection is handed. -->
+    <string name="nachschau_title">Kassen-Nachschau</string>
+    <string name="nachschau_intro">Was bei einer unangekündigten Kassen-Nachschau verlangt wird: der DSFinV-K-Export der Kasse und das Protokoll der TSE (TAR). Zeitraum wählen, dann die Dateien nach Downloads/Kassen-Nachschau laden.</string>
+    <string name="nachschau_pick_range">Zeitraum…</string>
+    <string name="nachschau_export_heading">DSFinV-K-Export</string>
+    <string name="nachschau_export_note">Eine ZIP-Datei mit den abgeschlossenen Tagen des Zeitraums, von der Kasse erstellt. Nur Tage bis gestern; dauert ein bis zwei Minuten.</string>
+    <string name="nachschau_export_request">Export für diese Tage anfordern</string>
+    <string name="nachschau_export_requested">Angefordert. Die Liste aktualisiert sich von selbst.</string>
+    <string name="nachschau_export_closed_only">Exportiert werden nur abgeschlossene Tage: bis gestern.</string>
+    <string name="nachschau_exports_none">Noch kein Export angefordert.</string>
+    <string name="nachschau_state_requested">wird erstellt</string>
+    <string name="nachschau_state_stored">fertig</string>
+    <string name="nachschau_state_failed">fehlgeschlagen</string>
+    <string name="nachschau_state_dismissed">verworfen</string>
+    <string name="nachschau_state_pending">noch nicht abgelegt</string>
+    <string name="nachschau_download">Herunterladen</string>
+    <string name="nachschau_download_all">Alle herunterladen (%1$d)</string>
+    <string name="nachschau_downloading">Wird nach Downloads/%1$s geladen.</string>
+    <string name="nachschau_closings_heading">Tagesabschlüsse (Z-Bons)</string>
+    <string name="nachschau_closings_note">Jeder abgeschlossene Tag als eigene DSFinV-K-ZIP-Datei, nach Mitternacht von selbst abgelegt.</string>
+    <string name="nachschau_closings_none">Kein abgeschlossener Tag in diesem Zeitraum.</string>
+    <string name="nachschau_closing_built">noch nicht archiviert</string>
+    <string name="nachschau_tar_heading">TSE-Export (TAR)</string>
+    <string name="nachschau_tar_note">Das Protokoll der TSE, mindestens einmal täglich abgelegt. Jede Datei aushändigen, die die Tage berührt.</string>
+    <string name="nachschau_tar_none">Kein TAR-Export in diesem Zeitraum.</string>
+    <string name="nachschau_tar_beginning">erster Eintrag der TSE</string>
+    <string name="nachschau_tar_until">Das abgelegte Protokoll reicht bis %1$s. Alles danach liegt noch bei der TSE und kommt mit dem nächsten täglichen Export.</string>
+    <string name="nachschau_tar_none_kept">Für den Zeitraum ist noch kein TAR abgelegt.</string>
     <!-- Die erste Zeile des geteilten Texts; %1$s ist der Zeitraum. -->
     <string name="report_share_title">Auswertung %1$s</string>
     <string name="report_share">Teilen</string>
@@ -1132,4 +1160,28 @@
         <item quantity="one">%1$d offener Verkauf</item>
         <item quantity="other">%1$d offene Verkäufe</item>
     </plurals>
+    <!-- The S-POS phones (hamza-bistro-web 20261128100000_card_terminals) -->
+    <string name="card_terminal_other">anderes S-POS</string>
+    <string name="card_terminal_pick">Welches S-POS?</string>
+    <string name="card_terminal_off">nicht mehr in Gebrauch</string>
+    <string name="card_terminal_none">keinem, jedes Mal fragen</string>
+    <string name="till_card_terminal">Dieses S-POS-Gerät steht nicht mehr in der Liste. Kasse neu öffnen und noch einmal wählen.</string>
+    <!-- Tips paid on the card (hamza-bistro-web 20261128110000_card_tips) -->
+    <string name="tip_add">Trinkgeld</string>
+    <string name="tip_change">Trinkgeld ändern</string>
+    <string name="tip_title">Trinkgeld auf Karte</string>
+    <string name="tip_bill">Rechnung: %1$s</string>
+    <string name="tip_charged">Auf S-POS genommen (€)</string>
+    <string name="tip_is">Trinkgeld %1$s</string>
+    <string name="tip_invalid">Mindestens die Rechnung, höchstens 50 € mehr</string>
+    <string name="tip_take">Übernehmen</string>
+    <string name="till_tip_given">Trinkgeld %1$s · auf S-POS %2$s</string>
+    <string name="till_tip">Trinkgeld nur mit Karte, 0,01 bis 50,00 €.</string>
+    <string name="cash_up_tips_in">davon {tips} Trinkgeld</string>
+    <string name="cash_up_tips_out">Trinkgeld bar auszahlen: {tips}</string>
+    <string name="cash_up_tip">Trinkgeld {tip}</string>
+    <string name="report_tips">Trinkgeld (Karte) {tips}</string>
+    <string name="cash_up_per_terminal">Karte je S-POS</string>
+    <string name="settings_card_terminal">S-POS für Kartenzahlung</string>
+    <string name="settings_card_terminal_hint">Das S-POS-Handy, auf dem dieses Gerät meist Karte kassiert: dann ist „Karte“ ein Tipp. Jedes S-POS-Handy ist ein eigener Sparkasse-Vertrag mit eigener Auszahlung; die Liste wird auf der Website unter Einstellungen gepflegt.</string>
 </resources>

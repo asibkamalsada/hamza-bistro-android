@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
 import de.hamzabistro.printstation.core.CounterError
 import de.hamzabistro.printstation.core.CounterReceipt
 import de.hamzabistro.printstation.core.TillProblem
@@ -30,9 +32,14 @@ private class TillShot(
     val view: TillView = TillFixtures.view,
     val canPrint: Boolean = true,
     val night: Boolean = false,
+    /** The S-POS phones the card step offers. */
+    val card: CardChoice = CardChoice.NoList,
     val on: (TillDevice) -> Boolean = { true },
     val act: ComposeContentTestRule.(TillDevice) -> Unit = {},
 )
+
+/** Five S-POS phones, as the shop has them (hamza-bistro-web 20261128100000). */
+private val spos = (1..5).map { CardTerminal(it, "S-POS $it", position = it) }
 
 private val shots: List<TillShot> by lazy {
     val f = TillFixtures
@@ -61,6 +68,8 @@ private val shots: List<TillShot> by lazy {
         TillShot("13-cash-change", f.at(TillStep.CASH).copy(given = "50")),
         TillShot("14-cash-not-enough", f.at(TillStep.CASH).copy(given = "12,5")),
         TillShot("15-card", f.at(TillStep.CARD)),
+        TillShot("15-card-spos-usual", f.at(TillStep.CARD), card = CardChoice.Usual(spos[1], spos - spos[1])),
+        TillShot("15-card-spos-ask", f.at(TillStep.CARD), card = CardChoice.Ask(spos)),
         TillShot("16-done-signed", f.done(receipt("signed"))),
         TillShot("17-done-waiting", f.done(receipt("pending"), method = "card")),
         TillShot("18-done-outage", f.done(receipt("pending", outage = true))),
@@ -120,7 +129,10 @@ class TillShotsTest(private val device: TillDevice, private val name: String) {
     @OptIn(ExperimentalRoborazziApi::class)
     @Test
     fun draw() {
-        compose.setScreen { TillContent(shot.state, shot.view, TillFixtures.photos, NoTill(shot.canPrint), onBack = {}, navigation = { MenuButton(0, onClick = {}) }) }
+        val model = object : NoTill(shot.canPrint) {
+            override val cardChoice: CardChoice = shot.card
+        }
+        compose.setScreen { TillContent(shot.state, shot.view, TillFixtures.photos, model, onBack = {}, navigation = { MenuButton(0, onClick = {}) }) }
         shot.act(compose, device)
         compose.waitForIdle()
         captureScreenRoboImage(File("build/kasse-shots", "$name--${device.name.lowercase().replace('_', '-')}.png"))

@@ -288,6 +288,10 @@ data class Report(
     @SerialName("by_source") val bySource: List<ReportSource> = emptyList(),
     /** Empty from a server before 20261124120000. */
     @SerialName("came_from") val cameFrom: List<ReportCameFrom> = emptyList(),
+    /** Card money per S-POS phone, then the unknown; empty from a server before 20261128100000. */
+    @SerialName("card_terminals") val cardTerminals: List<ReportTerminal> = emptyList(),
+    /** The card tips over its days, the staff's, no revenue; zero from a server before 20261128110000. */
+    val tips: ReportTips = ReportTips(),
 ) {
     /** Whether anything came in other than on the site: otherwise the split says nothing. */
     val enteredByStaff: Boolean
@@ -471,6 +475,8 @@ data class ReportWords(
     val minutes: String,
     /** "Im Zeitraum wurde nichts geliefert." */
     val empty: String,
+    /** "Trinkgeld (Karte) {tips}": the staff's card tips, no revenue (20261128110000). */
+    val tips: String = "Trinkgeld (Karte) {tips}",
 )
 
 /** How the report reads: numbers in German whatever the device's language, as on the ticket and in the Kassensturz. */
@@ -542,6 +548,14 @@ object ReportText {
             }
             .joinToString(" · ")
 
+    /** "S-POS 1 20,00 € · unbekannt 7,49 €": the card money per S-POS phone; empty when there is none. */
+    fun terminals(report: Report, words: ReportWords): String =
+        report.cardTerminals.joinToString(" · ") { "${it.name ?: words.unknown} ${euro(it.amount)}" }
+
+    /** "Trinkgeld (Karte) 4,50 €"; null when nobody tipped on the card. */
+    fun tips(report: Report, words: ReportWords): String? =
+        report.tips.amount.takeIf { it > 0 }?.let { words.tips.replace("{tips}", euro(it)) }
+
     /**
      * The summary as plain text, to share: the big numbers, delivery and
      * pickup, payments, cancellations and the top best sellers. Counts and
@@ -567,6 +581,14 @@ object ReportText {
             appendLine("${words.delivery} ${f.delivery.orders} · ${euro(f.delivery.revenue)}")
             appendLine("${words.pickup} ${f.pickup.orders} · ${euro(f.pickup.revenue)}")
             append(payments(report.payments, words))
+            terminals(report, words).takeIf { it.isNotEmpty() }?.let {
+                appendLine()
+                append("${words.card}: $it")
+            }
+            tips(report, words)?.let {
+                appendLine()
+                append(it)
+            }
             if (report.cancellations.orders > 0) {
                 appendLine()
                 append("${words.cancelled} ${report.cancellations.orders} · ${euro(report.cancellations.value)}")

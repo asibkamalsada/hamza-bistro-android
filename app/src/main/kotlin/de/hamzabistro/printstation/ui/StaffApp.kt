@@ -38,6 +38,9 @@ enum class StaffScreen {
     /** The Auswertung: sales, best sellers, busy hours, times over a range of days. */
     REPORT,
 
+    /** "Kassen-Nachschau": the DSFinV-K export and the TSE's log for a tax inspection (hamza-bistro-web K7). */
+    NACHSCHAU,
+
     /** What is sold out, and what a dish is and costs: the site's /menu-admin. */
     MENU,
 
@@ -113,6 +116,7 @@ fun StaffApp(staff: StaffViewModel, main: MainViewModel, focus: StateFlow<String
                 StaffScreen.ISSUES -> IssuesScreen(navigation)
                 StaffScreen.CASH_UP -> CashUpScreen(navigation)
                 StaffScreen.REPORT -> ReportScreen(navigation)
+                StaffScreen.NACHSCHAU -> NachschauScreen(navigation)
                 StaffScreen.MENU -> MenuScreen(navigation)
                 StaffScreen.HOURS -> HoursScreen(staff, navigation)
                 StaffScreen.SETTINGS -> SettingsScreen(staff, main, navigation)

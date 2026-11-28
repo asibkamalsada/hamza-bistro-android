@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.calls.TextSender
+import de.hamzabistro.printstation.core.CardTerminals
 import de.hamzabistro.printstation.core.Eta
 import de.hamzabistro.printstation.core.NavApp
 import de.hamzabistro.printstation.core.NewOrderAlarm
@@ -255,6 +256,20 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, navigation: @Comp
                 Text(stringResource(R.string.travel_by_ring_hint), style = MaterialTheme.typography.bodySmall)
                 SwitchRow(stringResource(R.string.driver_device), prefs.driver) { on -> staff.updatePrefs { it.copy(driver = on) } }
                 Text(stringResource(R.string.driver_device_hint), style = MaterialTheme.typography.bodySmall)
+            }
+
+            // The S-POS phone "Karte" names in one tap on this device (hamza-bistro-web
+            // 20261128100000). The list itself is the shop's, edited on the site.
+            val terminals by staff.cardTerminals.collectAsStateWithLifecycle()
+            val offered = CardTerminals.offered(terminals)
+            if (offered.isNotEmpty()) {
+                Section(stringResource(R.string.settings_card_terminal)) {
+                    val none = stringResource(R.string.card_terminal_none)
+                    Chips(listOf<Int?>(null) + offered.map { it.id }, prefs.cardTerminal?.takeIf { id -> offered.any { it.id == id } }, { id ->
+                        offered.firstOrNull { it.id == id }?.name ?: none
+                    }) { id -> staff.updatePrefs { it.copy(cardTerminal = id) } }
+                    Text(stringResource(R.string.settings_card_terminal_hint), style = MaterialTheme.typography.bodySmall)
+                }
             }
 
             // Only on a device that takes calls: a tablet without a SIM has no screening role to give, nor texts to send.

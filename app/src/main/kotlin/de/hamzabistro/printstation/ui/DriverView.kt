@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -206,8 +207,16 @@ private fun StopCard(
                                 OutlinedButton(onClick = { actions.call(order.phone) }) { Text(stringResource(R.string.driver_call)) }
                             }
                             if (Payment.asks(order)) {
+                                // "Karte" names the S-POS phone: one tap on this phone's usual one.
+                                val cardChoice by actions.cardChoice.collectAsState()
                                 for (method in PaymentMethod.DOOR) {
-                                    Button(onClick = { actions.deliver(order, method) }) { Text(paymentLabel(context, method)) }
+                                    if (method == PaymentMethod.CARD) {
+                                        CardButton(cardChoice) { terminal -> actions.deliverByCard(order, terminal) }
+                                        // More than the bill on the card (hamza-bistro-web 20261128110000).
+                                        CardTipButton(cardChoice, order.total) { terminal, tip -> actions.deliverByCard(order, terminal, tip) }
+                                    } else {
+                                        Button(onClick = { actions.deliver(order, method) }) { Text(paymentLabel(context, method)) }
+                                    }
                                 }
                             } else {
                                 Button(onClick = { actions.moveOn(order) }) { Text(stepLabel(context, order, OrderStep.Done())) }
