@@ -382,9 +382,17 @@ before it is discarded.
   rings, the best sellers (top 10, all a tap away, by Menge or Umsatz), the
   busy hours as a weekday × hour grid, median and p90 of each step's time,
   cancellations by who and why, discounts and payments. **Teilen** sends
-  the summary as text; **CSV** sends the days, the best sellers and the
-  rings as three files for German Excel (`;`, decimal comma). Counts and
-  sums only, from `staff_report()`.
+  the summary as text; **CSV** sends the days, the best sellers, the
+  rings and the months as four files for German Excel (`;`, decimal
+  comma). Counts and sums only, from `staff_report()`.
+  Under the four big numbers, from `staff_growth()` (hamza-bistro-web
+  `20261128180000_growth_report.sql`): **Fortschritt**, the range beside
+  the one before it (the same days a month earlier for a month, else as
+  many whole weeks earlier as it is long); **Kunden**, new customers and
+  their share, sign-ups, registered customers, who has ever ordered and
+  who came back within 30 days; and **Monat für Monat**, the last twelve
+  months as bars by Umsatz, Bestellungen, Neukunden or Registriert. For
+  charts outside the app see "Growth figures" in hamza-bistro-web.
 - **Kassen-Nachschau** — what an unannounced tax inspection asks for, for
   a range of days (last month to start with): **Export für diese Tage
   anfordern** asks the till for one DSFinV-K ZIP of the closed days
@@ -634,7 +642,7 @@ the app logs it.
 - [`core/`](core) — plain Kotlin, tested on the JVM: Supabase Auth
   (`SupabaseAuth`, `SessionManager`), the queue (`StaffOrder`,
   `StaffQueue`, `Eta`, `SupabaseStaffBackend`, `OrderQueue`), the history
-  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`), the Kassen-Nachschau (`Nachschau`), the Kassenbuch (`Kassenbuch`), the Kassenausfall (`Kassenausfall`), opening and closing the shop, closures and the
+  and takings (`History`), the Kassensturz (`CashUp`), the Auswertung (`Report`, `Growth`), the Kassen-Nachschau (`Nachschau`), the Kassenbuch (`Kassenbuch`), the Kassenausfall (`Kassenausfall`), opening and closing the shop, closures and the
   week (`ShopHours`, `SupabaseShopBackend`), the menu, choices and
   ingredients and editing them (`Menu`, `MenuEditing`, `Allergens`, `DrinkVolume`, `PhotoCrop`),
   phone and walk-in orders (`PhoneOrder`), what the Kasse shows first (`Bestsellers`), the caller's number and the

@@ -47,6 +47,12 @@ interface HistoryBackend {
      * not take (HB455).
      */
     suspend fun report(range: ReportRange): Report?
+
+    /**
+     * How the shop progresses, for the same range (staff_growth() in
+     * 20261128180000_growth_report.sql). Null on a database without it yet.
+     */
+    suspend fun growth(range: ReportRange): Growth?
 }
 
 /** [HistoryBackend] over PostgREST, as the signed-in account — staff read every order. */
@@ -131,20 +137,24 @@ class SupabaseHistoryBackend internal constructor(
         return json.decodeFromString(CashUp.serializer(), body)
     }
 
-    override suspend fun report(range: ReportRange): Report? {
-        val body =
-            try {
-                rest.rpc("staff_report", buildJsonObject {
-                    put("p_from", range.from.toString())
-                    put("p_to", range.to.toString())
-                })
-            } catch (e: BackendException) {
-                if (e.missingFunction) return null
-                if (e.code == "HB455") throw ReportRangeException(e.message ?: "HB455")
-                throw e
-            }
-        return json.decodeFromString(Report.serializer(), body)
-    }
+    override suspend fun report(range: ReportRange): Report? =
+        overRange("staff_report", range)?.let { json.decodeFromString(Report.serializer(), it) }
+
+    override suspend fun growth(range: ReportRange): Growth? =
+        overRange("staff_growth", range)?.let { json.decodeFromString(Growth.serializer(), it) }
+
+    /** What [function] answers for [range]; null on a database without it. */
+    private suspend fun overRange(function: String, range: ReportRange): String? =
+        try {
+            rest.rpc(function, buildJsonObject {
+                put("p_from", range.from.toString())
+                put("p_to", range.to.toString())
+            })
+        } catch (e: BackendException) {
+            if (e.code == "HB455") throw ReportRangeException(e.message ?: "HB455")
+            if (!e.missingFunction) throw e
+            null
+        }
 
     @Serializable private class TotalRow(val total: Double)
 
