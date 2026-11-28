@@ -113,8 +113,11 @@ interface TillActions {
     val cardChoice: CardChoice
         get() = CardChoice.NoList
 
-    /** "Karte bezahlt" on [terminal], the S-POS phone it went through; null: none named. */
-    fun cardPaidOn(terminal: CardTerminal?) = cardPaid()
+    /**
+     * "Karte bezahlt" on [terminal], the S-POS phone it went through (null:
+     * none named), with [tip] on top of the bill when there is one.
+     */
+    fun cardPaidOn(terminal: CardTerminal?, tip: Double? = null) = cardPaid()
 
     fun cardDeclined()
 
@@ -248,9 +251,9 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
 
     override fun cardPaid() = step { till.cardPaid() }
 
-    override fun cardPaidOn(terminal: CardTerminal?) {
+    override fun cardPaidOn(terminal: CardTerminal?, tip: Double?) {
         terminal?.let { graph.rememberCardTerminal(it) }
-        step { till.cardPaid(terminal) }
+        step { till.cardPaid(terminal, tip) }
     }
 
     override fun cardDeclined() = step { till.cardDeclined() }
@@ -463,6 +466,7 @@ internal fun tillProblemText(context: Context, problem: TillProblem): String =
                     CounterError.NO_SPLIT -> R.string.till_no_split
                     CounterError.DISMISSED -> R.string.till_dismissed
                     CounterError.CARD_TERMINAL -> R.string.till_card_terminal
+                    CounterError.TIP -> R.string.till_tip
                 }
             )
     }

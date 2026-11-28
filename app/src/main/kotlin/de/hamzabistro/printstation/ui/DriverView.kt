@@ -212,6 +212,8 @@ private fun StopCard(
                                 for (method in PaymentMethod.DOOR) {
                                     if (method == PaymentMethod.CARD) {
                                         CardButton(cardChoice) { terminal -> actions.deliverByCard(order, terminal) }
+                                        // More than the bill on the card (hamza-bistro-web 20261128110000).
+                                        CardTipButton(cardChoice, order.total) { terminal, tip -> actions.deliverByCard(order, terminal, tip) }
                                     } else {
                                         Button(onClick = { actions.deliver(order, method) }) { Text(paymentLabel(context, method)) }
                                     }

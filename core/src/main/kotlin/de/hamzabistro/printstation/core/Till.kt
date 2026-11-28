@@ -263,15 +263,16 @@ class Till(
 
     /**
      * "Karte bezahlt": only now is it booked as paid by card, on [terminal],
-     * the S-POS phone it went through (null: none picked, "unbekannt").
+     * the S-POS phone it went through (null: none picked, "unbekannt"), with
+     * [tip] on top of the bill when the customer gave one (20261128110000).
      */
-    suspend fun cardPaid(terminal: CardTerminal? = null) {
-        if (_state.value.step == TillStep.CARD) pay(CounterPayment.CARD, terminal?.id)
+    suspend fun cardPaid(terminal: CardTerminal? = null, tip: Double? = null) {
+        if (_state.value.step == TillStep.CARD) pay(CounterPayment.CARD, terminal?.id, tip)
     }
 
-    private suspend fun pay(method: CounterPayment, cardTerminal: Int? = null) {
+    private suspend fun pay(method: CounterPayment, cardTerminal: Int? = null, tip: Double? = null) {
         val id = _state.value.sale?.id ?: return
-        step(unsure = true) { show(backend.pay(id, method, cardTerminal)) }
+        step(unsure = true) { show(backend.pay(id, method, cardTerminal, tip)) }
         if (_state.value.problem == TillProblem.Refused(CounterError.ALREADY)) look(id)
     }
 

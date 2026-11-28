@@ -106,7 +106,10 @@ data class CashUpTerminal(
     val active: Boolean? = null,
     val count: Int = 0,
     val stornos: Int = 0,
+    /** The money taken on the phone, card tips included: its payout. */
     val card: Double = 0.0,
+    /** The card tips in [card] (20261128110000). */
+    val tips: Double = 0.0,
 )
 
 /** One phone's card money in the report. [id] null: nobody named a phone. */
@@ -116,5 +119,7 @@ data class ReportTerminal(
     val name: String? = null,
     val tid: String? = null,
     val orders: Int = 0,
+    /** The money taken on the phone, card tips included (20261128110000). */
     val amount: Double = 0.0,
+    val tips: Double = 0.0,
 )

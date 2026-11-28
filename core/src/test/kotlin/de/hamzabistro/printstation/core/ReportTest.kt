@@ -473,6 +473,8 @@ class ReportTest {
                      {"card_terminal_id":null,"name":null,"tid":null,"orders":1,"amount":7.49}]}""",
             )
         assertEquals(ReportTerminal(1, "S-POS 1", "29001234", 2, 20.0), report.cardTerminals[0])
+        // No tips in it: the report says nothing of them (20261128110000).
+        assertEquals(null, ReportText.tips(report, words))
         assertNull(report.cardTerminals[1].id)
         assertEquals("S-POS 1 ${ReportText.euro(20.0)} · ${words.unknown} ${ReportText.euro(7.49)}", ReportText.terminals(report, words))
         val before = json.decodeFromString(Report.serializer(), """{"from":"2026-11-27","to":"2026-11-27"}""")

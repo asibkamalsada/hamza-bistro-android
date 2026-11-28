@@ -94,8 +94,11 @@ interface OrderActions {
     val cardChoice: StateFlow<CardChoice>
         get() = NO_CARD_CHOICE
 
-    /** "Karte" on [terminal], the S-POS phone it went through; null: none named. */
-    fun deliverByCard(order: StaffOrder, terminal: CardTerminal?) = deliver(order, PaymentMethod.CARD)
+    /**
+     * "Karte" on [terminal], the S-POS phone it went through (null: none
+     * named), with [tip] on top of the bill when there is one.
+     */
+    fun deliverByCard(order: StaffOrder, terminal: CardTerminal?, tip: Double? = null) = deliver(order, PaymentMethod.CARD)
 
     fun cancel(order: StaffOrder, reason: CancelReason?)
 
@@ -686,6 +689,10 @@ private fun Actions(
                         }
                     }
                 }
+                // More than the bill on the card (hamza-bistro-web 20261128110000):
+                // below the row, which has no room left on a phone.
+                val tipChoice by actions.cardChoice.collectAsState()
+                CardTipButton(tipChoice, order.total) { terminal, tip -> actions.deliverByCard(order, terminal, tip) }
                 DelayButtons(order, actions)
             }
             else -> {

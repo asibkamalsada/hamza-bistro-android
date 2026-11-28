@@ -392,7 +392,7 @@ internal class Actions(private val context: Context, private val viewModel: Staf
     override val cardChoice: StateFlow<CardChoice>
         get() = viewModel.cardChoice
 
-    override fun deliverByCard(order: StaffOrder, terminal: CardTerminal?) = viewModel.deliverByCard(order, terminal)
+    override fun deliverByCard(order: StaffOrder, terminal: CardTerminal?, tip: Double?) = viewModel.deliverByCard(order, terminal, tip)
 
     override fun cancel(order: StaffOrder, reason: CancelReason?) = viewModel.cancel(order, reason)
 

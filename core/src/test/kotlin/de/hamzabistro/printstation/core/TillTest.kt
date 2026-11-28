@@ -74,8 +74,8 @@ private class FakeTill : CounterBackend {
         sale(id).copy(pendingMethod = if (pending) "card" else null).also { sales[id] = it }
     }
 
-    override suspend fun pay(id: String, method: CounterPayment, cardTerminal: Int?): CounterSale =
-        call("pay $id ${method.wire}" + (cardTerminal?.let { " on $it" } ?: "")) {
+    override suspend fun pay(id: String, method: CounterPayment, cardTerminal: Int?, tip: Double?): CounterSale =
+        call("pay $id ${method.wire}" + (cardTerminal?.let { " on $it" } ?: "") + (tip?.let { " tip $it" } ?: "")) {
             val sale = sale(id)
             if (sale.stateName == "paid" && sale.paymentMethod == method.wire) return@call sale
             if (sale.stateName != "open") refuse(CounterError.ALREADY)
@@ -83,6 +83,7 @@ private class FakeTill : CounterBackend {
                     stateName = "paid",
                     paymentMethod = method.wire,
                     cardTerminalId = cardTerminal,
+                    tip = tip ?: 0.0,
                     pendingMethod = null,
                     orderId = "o-$id",
                     receipt = receipts.first(),
@@ -324,6 +325,16 @@ class TillTest {
         assertEquals(TillStep.DONE, now.step)
         assertEquals(2, now.sale!!.cardTerminalId)
         assertEquals("pay s-1 card on 2", fake.calls.last())
+    }
+
+    @Test
+    fun `a card tip is booked with the card, on top of the bill`() = runTest {
+        rungUp()
+        till.chooseCard()
+        till.cardPaid(CardTerminal(2, "S-POS 2"), 1.5)
+        assertEquals(TillStep.DONE, now.step)
+        assertEquals(1.5, now.sale!!.tip)
+        assertEquals("pay s-1 card on 2 tip 1.5", fake.calls.last())
     }
 
     @Test

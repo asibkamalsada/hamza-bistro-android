@@ -1140,6 +1140,21 @@
     <string name="card_terminal_none">none, ask every time</string>
     <string name="till_card_terminal">This S-POS phone is not in the list any more. Reopen the Kasse and pick one again.</string>
     <string name="cash_up_per_terminal">Card per S-POS</string>
+    <!-- Tips paid on the card (hamza-bistro-web 20261128110000_card_tips) -->
+    <string name="tip_add">Tip</string>
+    <string name="tip_change">Change tip</string>
+    <string name="tip_title">Tip on the card</string>
+    <string name="tip_bill">Bill: %1$s</string>
+    <string name="tip_charged">Charged on S-POS (€)</string>
+    <string name="tip_is">Tip %1$s</string>
+    <string name="tip_invalid">At least the bill, at most €50 on top</string>
+    <string name="tip_take">Take</string>
+    <string name="till_tip_given">Tip %1$s · on S-POS %2$s</string>
+    <string name="till_tip">A tip goes only with a card payment, €0.01 to €50.00.</string>
+    <string name="cash_up_tips_in">incl. {tips} tips</string>
+    <string name="cash_up_tips_out">Pay out tips in cash: {tips}</string>
+    <string name="cash_up_tip">Tip {tip}</string>
+    <string name="report_tips">Card tips {tips}</string>
     <string name="settings_card_terminal">S-POS for card payments</string>
     <string name="settings_card_terminal_hint">The S-POS phone this device usually takes cards on: then “Card” is one tap. Each S-POS phone is its own Sparkasse contract with its own payout; the list is edited on the website under Settings.</string>
 </resources>

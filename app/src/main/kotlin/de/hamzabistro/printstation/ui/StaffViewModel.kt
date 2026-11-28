@@ -294,12 +294,13 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * "Karte" on [terminal], the S-POS phone it went through — remembered as
-     * this device's usual one — or on none named ("unbekannt"). Through the
-     * undo window like "Bar".
+     * this device's usual one — or on none named ("unbekannt"), with [tip] on
+     * top of the bill (hamza-bistro-web 20261128110000). Through the undo
+     * window like "Bar".
      */
-    fun deliverByCard(order: StaffOrder, terminal: CardTerminal?) {
+    fun deliverByCard(order: StaffOrder, terminal: CardTerminal?, tip: Double? = null) {
         terminal?.let { graph.rememberCardTerminal(it) }
-        graph.steps.take(order, Payment.done(order, PaymentMethod.CARD, graph.deviceLabel(), terminal))
+        graph.steps.take(order, Payment.done(order, PaymentMethod.CARD, graph.deviceLabel(), terminal, tip))
     }
 
     fun cancel(order: StaffOrder, reason: CancelReason?) = graph.steps.take(order, OrderStep.Cancel(reason))

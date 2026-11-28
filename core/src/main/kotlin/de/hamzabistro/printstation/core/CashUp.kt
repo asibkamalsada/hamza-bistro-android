@@ -53,14 +53,22 @@ object Payment {
      * [payment] null. Never "online" from here, and nothing for an order
      * paid online: the database keeps that by itself. [device] is this
      * device's label, as staff_app_seen has it. [cardTerminal] is the S-POS
-     * phone "Karte" went through, kept only with "Karte".
+     * phone "Karte" went through, kept only with "Karte"; so is [tip], the
+     * tip on top of the bill (20261128110000), and only when there is one.
      */
-    fun done(order: StaffOrder, payment: PaymentMethod?, device: String?, cardTerminal: CardTerminal? = null): OrderStep.Done {
+    fun done(
+        order: StaffOrder,
+        payment: PaymentMethod?,
+        device: String?,
+        cardTerminal: CardTerminal? = null,
+        tip: Double? = null,
+    ): OrderStep.Done {
         val paid = payment?.takeIf { asks(order) && it != PaymentMethod.ONLINE }
         return OrderStep.Done(
             payment = paid,
             device = device?.trim()?.takeIf { it.isNotEmpty() }?.take(DEVICE_MAX),
             cardTerminal = cardTerminal?.id?.takeIf { paid == PaymentMethod.CARD },
+            tip = Tips.sent(tip, paid == PaymentMethod.CARD),
         )
     }
 
@@ -112,16 +120,30 @@ data class CashUpOrder(
     /** The S-POS phone of a card payment that named one (20261128100000). */
     @SerialName("card_terminal_id") val cardTerminalId: Int? = null,
     val pickup: Boolean = false,
+    /** The tip paid on the card on top of [total] (20261128110000); 0 for a Storno. */
+    val tip: Double = 0.0,
 )
 
 /** The sums the Kassensturz gives, for the day and for each driver. In euros, to the cent. */
 interface CashUpSums {
     val count: Int
+
+    /**
+     * Cash taken less the card tips (20261128110000), which are paid out of
+     * the drawer at the end of the shift: the cash that should be there.
+     */
     val cash: Double
+
+    /** Money taken by card, card tips included. */
     val card: Double
     val online: Double
     val unknown: Double
+
+    /** The takings: cash + card + online + unknown, the tips netting out. */
     val total: Double
+
+    /** The card tips; for a driver's (or the counter's) row, what that person is paid out in cash. */
+    val tips: Double
 }
 
 @Serializable
@@ -132,6 +154,7 @@ data class CashUpTotals(
     override val online: Double = 0.0,
     override val unknown: Double = 0.0,
     override val total: Double = 0.0,
+    override val tips: Double = 0.0,
 ) : CashUpSums
 
 /** One driver: one account and one device label, or a name from Telegram. */
@@ -147,6 +170,7 @@ data class CashUpDriver(
     override val total: Double = 0.0,
     /** In the order they were delivered. */
     val orders: List<CashUpOrder> = emptyList(),
+    override val tips: Double = 0.0,
 ) : CashUpSums
 
 /**
@@ -198,6 +222,12 @@ data class CashUpWords(
     val perTerminal: String = "Karte je S-POS",
     /** After a switched-off phone: "nicht mehr in Gebrauch". */
     val terminalOff: String = "nicht mehr in Gebrauch",
+    /** Beside card money with tips in it: "davon {tips} Trinkgeld". */
+    val tipsIn: String = "davon {tips} Trinkgeld",
+    /** A person's row: "Trinkgeld bar auszahlen: {tips}". */
+    val tipsOut: String = "Trinkgeld bar auszahlen: {tips}",
+    /** After an order's method: "Trinkgeld {tip}". */
+    val tip: String = "Trinkgeld {tip}",
 )
 
 /** How the Kassensturz reads — cashUpTotals() and cashUpSplit() of the site's /orders. */
@@ -214,13 +244,22 @@ object CashUpText {
     fun split(sums: CashUpSums, words: CashUpWords): String =
         buildList {
                 add("${words.cash} ${euro(sums.cash)}")
-                add("${words.card} ${euro(sums.card)}")
+                // The card tips are in Karte and taken from Bar (20261128110000).
+                add("${words.card} ${card(sums.card, sums.tips, words)}")
                 if (sums.online > 0) add("${words.online} ${euro(sums.online)}")
                 if (sums.unknown > 0) add("${words.unknown} ${euro(sums.unknown)}")
             }
             .joinToString(" · ")
 
     fun driver(driver: CashUpDriver, words: CashUpWords): String = driver.label?.takeIf { it.isNotBlank() } ?: words.nobody
+
+    /** "22,00 €", or "22,00 € (davon 2,00 € Trinkgeld)". */
+    fun card(card: Double, tips: Double, words: CashUpWords): String =
+        if (tips > 0) "${euro(card)} (${words.tipsIn.replace("{tips}", euro(tips))})" else euro(card)
+
+    /** "Trinkgeld bar auszahlen: 2,00 €" for a person who took card tips; null for one who took none. */
+    fun tipsOut(sums: CashUpSums, words: CashUpWords): String? =
+        sums.tips.takeIf { it > 0 }?.let { words.tipsOut.replace("{tips}", euro(it)) }
 
     /**
      * The per-phone lines, to hold against each Sparkasse payout: shown when
@@ -238,7 +277,7 @@ object CashUpText {
     }
 
     /** "S-POS 1 (29001234): 20,00 €". */
-    fun terminalLine(row: CashUpTerminal, words: CashUpWords): String = "${terminal(row, words)}: ${euro(row.card)}"
+    fun terminalLine(row: CashUpTerminal, words: CashUpWords): String = "${terminal(row, words)}: ${card(row.card, row.tips, words)}"
 
     /** "Bar", "Karte", "Online" or "unbekannt". */
     fun method(method: PaymentMethod?, words: CashUpWords): String =
@@ -262,6 +301,7 @@ object CashUpText {
                 add(method(order.paymentMethod, words))
                 // "Karte · S-POS 1": the phone, as it is called now.
                 if (order.paymentMethod == PaymentMethod.CARD) CardTerminals.name(terminals, order.cardTerminalId)?.let { add(it) }
+                if (order.tip > 0) add(words.tip.replace("{tip}", euro(order.tip)))
                 if (order.pickup) add(words.pickup)
                 add(euro(order.total))
             }
@@ -301,6 +341,7 @@ object CashUpText {
                 appendLine()
                 appendLine("${driver(driver, words)}: ${totals(driver, words)}")
                 append(split(driver, words))
+                tipsOut(driver, words)?.let { appendLine().append(it) }
                 for (order in driver.orders) {
                     appendLine()
                     append("  ").append(order(order, words, zone, terminals))

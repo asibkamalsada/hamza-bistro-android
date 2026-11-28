@@ -285,6 +285,8 @@ class SupabaseStaffBackend internal constructor(private val rest: SupabaseRest) 
                 // only when one was picked: a database before the list has
                 // no such column.
                 if (step.payment == PaymentMethod.CARD) step.cardTerminal?.let { put("card_terminal_id", it) }
+                // The tip, the same way (HB507 otherwise; 20261128110000).
+                Tips.sent(step.tip, step.payment == PaymentMethod.CARD)?.let { put("tip", it) }
                 step.device?.trim()?.takeIf { it.isNotEmpty() }?.let { put("delivered_device", it) }
             }
             is OrderStep.Cancel -> {

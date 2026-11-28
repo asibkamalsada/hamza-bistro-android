@@ -1138,6 +1138,21 @@
     <string name="card_terminal_off">nicht mehr in Gebrauch</string>
     <string name="card_terminal_none">keinem, jedes Mal fragen</string>
     <string name="till_card_terminal">Dieses S-POS-Gerät steht nicht mehr in der Liste. Kasse neu öffnen und noch einmal wählen.</string>
+    <!-- Tips paid on the card (hamza-bistro-web 20261128110000_card_tips) -->
+    <string name="tip_add">Trinkgeld</string>
+    <string name="tip_change">Trinkgeld ändern</string>
+    <string name="tip_title">Trinkgeld auf Karte</string>
+    <string name="tip_bill">Rechnung: %1$s</string>
+    <string name="tip_charged">Auf S-POS genommen (€)</string>
+    <string name="tip_is">Trinkgeld %1$s</string>
+    <string name="tip_invalid">Mindestens die Rechnung, höchstens 50 € mehr</string>
+    <string name="tip_take">Übernehmen</string>
+    <string name="till_tip_given">Trinkgeld %1$s · auf S-POS %2$s</string>
+    <string name="till_tip">Trinkgeld nur mit Karte, 0,01 bis 50,00 €.</string>
+    <string name="cash_up_tips_in">davon {tips} Trinkgeld</string>
+    <string name="cash_up_tips_out">Trinkgeld bar auszahlen: {tips}</string>
+    <string name="cash_up_tip">Trinkgeld {tip}</string>
+    <string name="report_tips">Trinkgeld (Karte) {tips}</string>
     <string name="cash_up_per_terminal">Karte je S-POS</string>
     <string name="settings_card_terminal">S-POS für Kartenzahlung</string>
     <string name="settings_card_terminal_hint">Das S-POS-Handy, auf dem dieses Gerät meist Karte kassiert: dann ist „Karte“ ein Tipp. Jedes S-POS-Handy ist ein eigener Sparkasse-Vertrag mit eigener Auszahlung; die Liste wird auf der Website unter Einstellungen gepflegt.</string>

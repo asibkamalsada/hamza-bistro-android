@@ -72,6 +72,54 @@ internal fun CardButton(choice: CardChoice, modifier: Modifier = Modifier, enabl
     }
 }
 
+/**
+ * "Trinkgeld" at the door (hamza-bistro-web 20261128110000): the customer
+ * pays more than the bill [total] on the card. Asks what S-POS charged,
+ * then pays by card as [CardButton] does — on this device's usual phone,
+ * or the one picked — with the difference as the tip. [onPaid] gets the
+ * phone (null for none) and the tip (null for none).
+ */
+@Composable
+internal fun CardTipButton(choice: CardChoice, total: Double, enabled: Boolean = true, onPaid: (CardTerminal?, Double?) -> Unit) {
+    var tipping by rememberSaveable { mutableStateOf(false) }
+    // The tip said, kept while the phone is picked.
+    var tip by rememberSaveable { mutableStateOf<Double?>(null) }
+    var picking by rememberSaveable { mutableStateOf(false) }
+    TextButton(onClick = { tipping = true }, enabled = enabled) { Text(stringResource(R.string.tip_add)) }
+    if (tipping) {
+        TipDialog(
+            total,
+            onTip = { given ->
+                tipping = false
+                val paid = given.takeIf { it > 0.0 }
+                when (choice) {
+                    is CardChoice.Usual -> onPaid(choice.terminal, paid)
+                    is CardChoice.Ask -> {
+                        tip = paid
+                        picking = true
+                    }
+                    CardChoice.NoList -> onPaid(null, paid)
+                }
+            },
+            onDismiss = { tipping = false },
+        )
+    }
+    if (picking) {
+        CardTerminalDialog(
+            offeredTerminals(choice),
+            onPick = { terminal ->
+                picking = false
+                onPaid(terminal, tip)
+                tip = null
+            },
+            onDismiss = {
+                picking = false
+                tip = null
+            },
+        )
+    }
+}
+
 /** "Welches S-POS?": the phones in use, one button each. */
 @Composable
 internal fun CardTerminalDialog(terminals: List<CardTerminal>, onPick: (CardTerminal) -> Unit, onDismiss: () -> Unit) {

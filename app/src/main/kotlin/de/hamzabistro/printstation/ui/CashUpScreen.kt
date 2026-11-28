@@ -144,6 +144,9 @@ private fun cashUpWords(context: Context, day: LocalDate): CashUpWords =
         empty = context.getString(R.string.cash_up_empty),
         perTerminal = context.getString(R.string.cash_up_per_terminal),
         terminalOff = context.getString(R.string.card_terminal_off),
+        tipsIn = context.getString(R.string.cash_up_tips_in),
+        tipsOut = context.getString(R.string.cash_up_tips_out),
+        tip = context.getString(R.string.cash_up_tip),
     )
 
 /** The Android share sheet with the Kassensturz as plain text: to WhatsApp, to email, to the owner. */
@@ -266,7 +269,7 @@ private fun TerminalsCard(rows: List<CashUpTerminal>, words: CashUpWords) {
             for (row in rows) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(CashUpText.terminal(row, words), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Text(CashUpText.euro(row.card), style = MaterialTheme.typography.bodyLarge)
+                    Text(CashUpText.card(row.card, row.tips, words), style = MaterialTheme.typography.bodyLarge)
                 }
             }
         }
@@ -285,6 +288,10 @@ private fun DriverCard(driver: CashUpDriver, words: CashUpWords, terminals: List
                 fontWeight = FontWeight.SemiBold,
             )
             Text(CashUpText.split(driver, words), style = MaterialTheme.typography.bodyLarge)
+            // The card tips go to whoever took the payment, in cash at the end of the shift.
+            CashUpText.tipsOut(driver, words)?.let {
+                Text(it, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            }
             Text(
                 "${stringResource(R.string.cash_up_orders)} ${if (open) "▴" else "▾"}",
                 style = MaterialTheme.typography.labelLarge,
