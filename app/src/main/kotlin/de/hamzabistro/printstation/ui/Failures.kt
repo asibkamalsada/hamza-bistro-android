@@ -112,6 +112,12 @@ private fun stornoText(context: Context, reason: StornoError): String =
             StornoError.ALREADY -> R.string.storno_error_already
             StornoError.METHOD -> R.string.storno_error_method
             StornoError.UNSIGNED -> R.string.storno_error_unsigned
+            StornoError.AFTER_PART -> R.string.part_storno_error_after
+            StornoError.LINE -> R.string.part_storno_error_line
+            StornoError.FEE -> R.string.part_storno_error_fee
+            StornoError.GOODWILL -> R.string.part_storno_error_goodwill
+            StornoError.NOTHING -> R.string.part_storno_error_nothing
+            StornoError.LINES_UNKNOWN -> R.string.part_storno_error_unknown
         }
     )
 

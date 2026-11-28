@@ -43,6 +43,7 @@ import de.hamzabistro.printstation.core.SupabaseAuth
 import de.hamzabistro.printstation.core.SupabaseConfig
 import de.hamzabistro.printstation.core.SupabaseCardTerminalBackend
 import de.hamzabistro.printstation.core.SupabaseCounterBackend
+import de.hamzabistro.printstation.core.SupabasePartStornoBackend
 import de.hamzabistro.printstation.core.SupabaseStornoBackend
 import de.hamzabistro.printstation.core.SupabaseDevicesBackend
 import de.hamzabistro.printstation.core.SupabaseDishSalesBackend
@@ -189,6 +190,9 @@ class AppGraph(context: Context) {
 
     /** Storno: a delivered order taken back by a second Beleg (hamza-bistro-web 20261127100000_storno). */
     val stornos = SupabaseStornoBackend(config, http, sessions, ::counterDevice)
+
+    /** Teilstorno: part of a delivered order taken back (hamza-bistro-web 20261128200000_teilstorno). */
+    val partStornos = SupabasePartStornoBackend(config, http, sessions, ::counterDevice)
 
     /** The Kassenbuch: float, Geldtransit, private money, the count (hamza-bistro-web 20261128130000_kassenbuch). */
     val kassenbuch = SupabaseKassenbuchBackend(config, http, sessions, ::counterDevice)
@@ -550,6 +554,15 @@ class AppGraph(context: Context) {
     suspend fun printStornoReceipt(order: String) {
         val chosen = settings.printer ?: throw PrinterException("no printer chosen")
         val receipt = backend.stornoReceipt(order, TICKET_LANG) ?: throw PrinterException("there is no signed Storno for this order")
+        withTimeoutOrNull(TICKET_TIMEOUT) { printer(chosen.address).print(receipt) }
+            ?: throw PrinterException("the printer did not answer")
+    }
+
+    /** The receipt of one of an order's Teilstornos, on this device's printer. */
+    suspend fun printPartStornoReceipt(order: String, partStorno: String) {
+        val chosen = settings.printer ?: throw PrinterException("no printer chosen")
+        val receipt =
+            backend.partStornoReceipt(order, partStorno, TICKET_LANG) ?: throw PrinterException("there is no signed Teilstorno of this order")
         withTimeoutOrNull(TICKET_TIMEOUT) { printer(chosen.address).print(receipt) }
             ?: throw PrinterException("the printer did not answer")
     }

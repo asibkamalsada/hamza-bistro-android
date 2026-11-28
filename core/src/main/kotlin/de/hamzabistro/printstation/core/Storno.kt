@@ -76,7 +76,25 @@ enum class StornoError(val code: String) {
     METHOD("HB504"),
 
     /** HB505: the TSE has not signed the sale yet. */
-    UNSIGNED("HB505");
+    UNSIGNED("HB505"),
+
+    /** HB540: part of the order was taken back already (Teilstorno): the rest goes back line by line. */
+    AFTER_PART("HB540"),
+
+    /** HB541: not a line to take back, or more of it than is left. */
+    LINE("HB541"),
+
+    /** HB542: not a fee to take back (none, or taken back already). */
+    FEE("HB542"),
+
+    /** HB543: not a goodwill amount, or more than is left of the goods. */
+    GOODWILL("HB543"),
+
+    /** HB544: nothing chosen, or it gives back 0,00 €. */
+    NOTHING("HB544"),
+
+    /** HB545: the order's lines are not known: only the whole Storno. */
+    LINES_UNKNOWN("HB545");
 
     companion object {
         fun of(code: String?): StornoError? =
@@ -98,8 +116,12 @@ object Stornos {
     /** Mirrors the column: the most a reason may say. */
     const val REASON_MAX = 300
 
-    /** Only a handed-over order is taken back, and once; before, it is cancelled. */
-    fun can(order: StaffOrder, mark: StornoMark?): Boolean = order.status == OrderStatus.DELIVERED && mark == null
+    /**
+     * Only a handed-over order is taken back, and once; before, it is
+     * cancelled. After a Teilstorno ([parts]) not whole any more (HB540).
+     */
+    fun can(order: StaffOrder, mark: StornoMark?, parts: List<PartStornoMark> = emptyList()): Boolean =
+        order.status == OrderStatus.DELIVERED && mark == null && parts.isEmpty()
 
     /** The ways the money can go back, the usual first: the way it was paid, and cash. */
     fun refundMethods(paid: PaymentMethod?): List<RefundMethod> =
