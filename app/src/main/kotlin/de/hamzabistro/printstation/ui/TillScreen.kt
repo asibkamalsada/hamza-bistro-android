@@ -33,6 +33,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import de.hamzabistro.printstation.PrintStationApp
 import de.hamzabistro.printstation.R
 import de.hamzabistro.printstation.core.BasketLine
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
+import de.hamzabistro.printstation.core.CardTerminals
 import de.hamzabistro.printstation.core.Bestsellers
 import de.hamzabistro.printstation.core.CounterError
 import de.hamzabistro.printstation.core.CounterSale
@@ -53,6 +56,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -101,6 +105,20 @@ interface TillActions {
 
     fun cardPaid()
 
+    /**
+     * What "Karte bezahlt" offers: the S-POS phones in use and this device's
+     * usual one (hamza-bistro-web 20261128100000). None by default: the
+     * card is booked with no phone, as before.
+     */
+    val cardChoice: CardChoice
+        get() = CardChoice.NoList
+
+    /**
+     * "Karte bezahlt" on [terminal], the S-POS phone it went through (null:
+     * none named), with [tip] on top of the bill when there is one.
+     */
+    fun cardPaidOn(terminal: CardTerminal?, tip: Double? = null) = cardPaid()
+
     fun cardDeclined()
 
     fun back()
@@ -136,11 +154,26 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
 
     private var pricing: Job? = null
 
+    /** The S-POS phones and this device's usual one, as Compose state: the card pane redraws when either changes. */
+    private val choice = mutableStateOf(graph.cardChoice())
+
+    override val cardChoice: CardChoice
+        get() = choice.value
+
+    init {
+        // Only the graph's flows: nothing of this class is read here.
+        viewModelScope.launch {
+            combine(graph.cardTerminals, graph.settings.device) { terminals, prefs -> CardTerminals.choice(terminals, prefs.cardTerminal) }
+                .collect { choice.value = it }
+        }
+    }
+
     override fun loadPhoto(url: String) = dishPhotos.load(url)
 
-    /** On every visit: whether the till is on, what is open, and what has sold out since. */
+    /** On every visit: whether the till is on, what is open, and what has sold out since; and the S-POS phones. */
     fun look() {
         step { till.refresh() }
+        viewModelScope.launch { graph.refreshCardTerminals() }
         loadMenu()
     }
 
@@ -217,6 +250,11 @@ class TillViewModel(application: Application) : AndroidViewModel(application), T
     override fun cashPaid() = step { till.cashPaid() }
 
     override fun cardPaid() = step { till.cardPaid() }
+
+    override fun cardPaidOn(terminal: CardTerminal?, tip: Double?) {
+        terminal?.let { graph.rememberCardTerminal(it) }
+        step { till.cardPaid(terminal, tip) }
+    }
 
     override fun cardDeclined() = step { till.cardDeclined() }
 
@@ -427,6 +465,8 @@ internal fun tillProblemText(context: Context, problem: TillProblem): String =
                     CounterError.STALE -> R.string.till_stale
                     CounterError.NO_SPLIT -> R.string.till_no_split
                     CounterError.DISMISSED -> R.string.till_dismissed
+                    CounterError.CARD_TERMINAL -> R.string.till_card_terminal
+                    CounterError.TIP -> R.string.till_tip
                 }
             )
     }

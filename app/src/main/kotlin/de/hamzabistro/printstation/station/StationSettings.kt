@@ -72,6 +72,12 @@ data class DevicePrefs(
      * tablet asks for ("SMS-Links senden"), from its own number.
      */
     val sendTexts: Boolean = false,
+    /**
+     * The S-POS phone this device usually takes cards on (card_terminals.id,
+     * hamza-bistro-web 20261128100000), so "Karte" is one tap: the last one
+     * picked here. Null until one is.
+     */
+    val cardTerminal: Int? = null,
 )
 
 /**
@@ -181,6 +187,7 @@ class StationSettings(context: Context) {
             driver = prefs.getBoolean(DRIVER, d.driver),
             reportCalls = prefs.getBoolean(REPORT_CALLS, d.reportCalls),
             sendTexts = prefs.getBoolean(SEND_TEXTS, d.sendTexts),
+            cardTerminal = if (prefs.contains(CARD_TERMINAL)) prefs.getInt(CARD_TERMINAL, 0).takeIf { it > 0 } else d.cardTerminal,
         )
     }
 
@@ -214,6 +221,7 @@ class StationSettings(context: Context) {
             .putBoolean(DRIVER, p.driver)
             .putBoolean(REPORT_CALLS, p.reportCalls)
             .putBoolean(SEND_TEXTS, p.sendTexts)
+            .run { p.cardTerminal?.let { putInt(CARD_TERMINAL, it) } ?: remove(CARD_TERMINAL) }
             .apply()
     }
 
@@ -233,6 +241,7 @@ class StationSettings(context: Context) {
         val RING_CHOICES = listOf(3, 5, 10, 20)
         val UNDO_CHOICES = listOf(0, 5, 10)
 
+        private const val CARD_TERMINAL = "card_terminal"
         private const val STATION_ID = "station_id"
         private const val ENABLED = "enabled"
         private const val BAG_SLIP = "bag_slip"

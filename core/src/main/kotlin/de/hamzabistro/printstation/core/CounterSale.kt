@@ -119,6 +119,10 @@ data class CounterSale(
     /** "card" while the card terminal is being asked. */
     @SerialName("pending_method") val pendingMethod: String? = null,
     @SerialName("payment_method") val paymentMethod: String? = null,
+    /** The S-POS phone a card-paid sale went through; null when none was named. */
+    @SerialName("card_terminal_id") val cardTerminalId: Int? = null,
+    /** The tip paid on the card on top of [total] (20261128110000). */
+    val tip: Double = 0.0,
     @SerialName("opened_at") @Serializable(with = InstantSerializer::class) val openedAt: Instant? = null,
     @SerialName("opened_by") val openedBy: String = "",
     /** The name of the device it was rung up on. */
@@ -180,7 +184,13 @@ enum class CounterError(val code: String) {
     NO_SPLIT("HB495"),
 
     /** HB496: somebody gave up on its TSE transaction: abort it, ring it up again. */
-    DISMISSED("HB496");
+    DISMISSED("HB496"),
+
+    /** HB506: an S-POS phone with cash, or one that is not in the list (any more). */
+    CARD_TERMINAL("HB506"),
+
+    /** HB507: a tip with cash, or one that is not 0,01 to 50,00 €. */
+    TIP("HB507");
 
     companion object {
         fun of(code: String?): CounterError? =
@@ -235,6 +245,22 @@ object CounterSales {
             put("p_test", training)
         }
 
+    /**
+     * "Bar" or "Karte bezahlt". The S-POS phone goes only with a card, and
+     * only when one was picked: a database before 20261128100000 knows no
+     * p_card_terminal, and without it pays as before, phone unknown. The tip
+     * the same way: only with a card and only when there is one, since a
+     * database before 20261128110000 knows no p_tip.
+     */
+    fun payBody(id: String, method: CounterPayment, device: CounterDevice, cardTerminal: Int?, tip: Double? = null): JsonObject =
+        buildJsonObject {
+            put("p_id", id)
+            put("p_method", method.wire)
+            put("p_device", device.toJson())
+            if (method == CounterPayment.CARD) cardTerminal?.let { put("p_card_terminal", it) }
+            Tips.sent(tip, method == CounterPayment.CARD)?.let { put("p_tip", it) }
+        }
+
     /** The till's refusal as a [CounterException]; null for anything else. */
     fun error(e: Exception): CounterException? {
         if (e is NotAllowedException) return CounterException(CounterError.NOT_STAFF, e.message ?: "staff only")
@@ -282,8 +308,11 @@ interface CounterBackend {
     /** Whether the card terminal is being asked. Books nothing. */
     suspend fun cardPending(id: String, pending: Boolean): CounterSale
 
-    /** The money is there. */
-    suspend fun pay(id: String, method: CounterPayment): CounterSale
+    /**
+     * The money is there; by card, on [cardTerminal] when one was picked
+     * (20261128100000), with [tip] on top when there is one (20261128110000).
+     */
+    suspend fun pay(id: String, method: CounterPayment, cardTerminal: Int? = null, tip: Double? = null): CounterSale
 
     suspend fun abort(id: String): CounterSale
 
@@ -321,12 +350,8 @@ class SupabaseCounterBackend internal constructor(private val rest: SupabaseRest
             put("p_method", if (pending) JsonPrimitive(CounterPayment.CARD.wire) else JsonNull)
         })
 
-    override suspend fun pay(id: String, method: CounterPayment): CounterSale =
-        sale("counter_sale_pay", buildJsonObject {
-            put("p_id", id)
-            put("p_method", method.wire)
-            put("p_device", device().toJson())
-        })
+    override suspend fun pay(id: String, method: CounterPayment, cardTerminal: Int?, tip: Double?): CounterSale =
+        sale("counter_sale_pay", CounterSales.payBody(id, method, device(), cardTerminal, tip))
 
     override suspend fun abort(id: String): CounterSale =
         sale("counter_sale_abort", buildJsonObject {

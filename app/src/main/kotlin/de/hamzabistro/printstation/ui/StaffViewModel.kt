@@ -9,6 +9,9 @@ import de.hamzabistro.printstation.core.AlarmDecision
 import de.hamzabistro.printstation.core.AlarmPolicy
 import de.hamzabistro.printstation.core.AppRelease
 import de.hamzabistro.printstation.core.CancelReason
+import de.hamzabistro.printstation.core.CardChoice
+import de.hamzabistro.printstation.core.CardTerminal
+import de.hamzabistro.printstation.core.CardTerminals
 import de.hamzabistro.printstation.core.Driver
 import de.hamzabistro.printstation.core.FailedEmail
 import de.hamzabistro.printstation.core.InstallState
@@ -281,6 +284,25 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun deliver(order: StaffOrder, payment: PaymentMethod) = graph.steps.take(order, Payment.done(order, payment, graph.deviceLabel()))
 
+    /** The S-POS phones, switched-off ones included (hamza-bistro-web 20261128100000). */
+    val cardTerminals: StateFlow<List<CardTerminal>> = graph.cardTerminals
+
+    /** What "Karte" does on this device: the S-POS phones in use and the one it remembers. */
+    val cardChoice: StateFlow<CardChoice> =
+        combine(graph.cardTerminals, graph.settings.device) { terminals, prefs -> CardTerminals.choice(terminals, prefs.cardTerminal) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, graph.cardChoice())
+
+    /**
+     * "Karte" on [terminal], the S-POS phone it went through — remembered as
+     * this device's usual one — or on none named ("unbekannt"), with [tip] on
+     * top of the bill (hamza-bistro-web 20261128110000). Through the undo
+     * window like "Bar".
+     */
+    fun deliverByCard(order: StaffOrder, terminal: CardTerminal?, tip: Double? = null) {
+        terminal?.let { graph.rememberCardTerminal(it) }
+        graph.steps.take(order, Payment.done(order, PaymentMethod.CARD, graph.deviceLabel(), terminal, tip))
+    }
+
     fun cancel(order: StaffOrder, reason: CancelReason?) = graph.steps.take(order, OrderStep.Cancel(reason))
 
     /**
@@ -549,6 +571,8 @@ class StaffViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { graph.steps.failures.collect { _events.value = StaffEvent.Step(it) } }
         // What is read anyway: collecting liveQueue here would keep the queue running behind the screen.
         viewModelScope.launch { graph.queue.state.collect { forgetGone(it.orders) } }
+        // The S-POS phones "Karte" offers: once per screen, and the Kassensturz reads them again.
+        viewModelScope.launch { graph.refreshCardTerminals() }
     }
 
     private companion object {

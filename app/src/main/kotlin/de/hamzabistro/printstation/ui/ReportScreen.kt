@@ -203,6 +203,7 @@ private fun reportWords(context: Context, range: ReportRange): ReportWords =
         reasonNone = context.getString(R.string.reason_none),
         minutes = context.getString(R.string.report_minutes),
         empty = context.getString(R.string.report_empty),
+        tips = context.getString(R.string.report_tips),
     )
 
 /** The Android share sheet with the summary as plain text. */
@@ -736,8 +737,16 @@ private fun Payments(report: Report, words: ReportWords) {
     ReportSection(stringResource(R.string.report_payments)) {
         Line(words.cash, p.cash.orders.toString(), ReportText.euro(p.cash.amount))
         Line(words.card, p.card.orders.toString(), ReportText.euro(p.card.amount))
+        // The card money per S-POS phone (hamza-bistro-web 20261128100000), under "Karte".
+        for (t in report.cardTerminals) {
+            Line("${words.card} · ${t.name ?: words.unknown}", t.orders.toString(), ReportText.euro(t.amount))
+        }
         Line(words.online, p.online.orders.toString(), ReportText.euro(p.online.amount))
         Line(words.unknown, p.unknown.orders.toString(), ReportText.euro(p.unknown.amount))
+        // The card tips (hamza-bistro-web 20261128110000): the staff's, in no revenue above.
+        if (report.tips.amount > 0) {
+            Line(words.tips.replace("{tips}", "").trim(), report.tips.orders.toString(), ReportText.euro(report.tips.amount))
+        }
     }
 }
 
