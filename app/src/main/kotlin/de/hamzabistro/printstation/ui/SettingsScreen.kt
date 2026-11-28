@@ -264,8 +264,9 @@ fun SettingsScreen(staff: StaffViewModel, main: MainViewModel, navigation: @Comp
             val offered = CardTerminals.offered(terminals)
             if (offered.isNotEmpty()) {
                 Section(stringResource(R.string.settings_card_terminal)) {
+                    val none = stringResource(R.string.card_terminal_none)
                     Chips(listOf<Int?>(null) + offered.map { it.id }, prefs.cardTerminal?.takeIf { id -> offered.any { it.id == id } }, { id ->
-                        offered.firstOrNull { it.id == id }?.name ?: context.getString(R.string.card_terminal_none)
+                        offered.firstOrNull { it.id == id }?.name ?: none
                     }) { id -> staff.updatePrefs { it.copy(cardTerminal = id) } }
                     Text(stringResource(R.string.settings_card_terminal_hint), style = MaterialTheme.typography.bodySmall)
                 }
